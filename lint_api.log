@@ -1,0 +1,115 @@
+﻿
+C:\Development\pratibha\src\app\api\admin\qualifications\generate\route.ts
+   14:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   44:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  164:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\admin\qualifications\route.ts
+   13:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   51:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   62:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\admin\registrations\route.ts
+   14:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   26:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  167:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  180:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  192:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  237:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  252:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\admin\settings\route.ts
+   6:5   error    'config' is never reassigned. Use 'const' instead  prefer-const
+  19:35  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  25:12  warning  'error' is defined but never used                  @typescript-eslint/no-unused-vars
+  25:19  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  37:35  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  49:12  warning  'error' is defined but never used                  @typescript-eslint/no-unused-vars
+  49:19  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\competitions\route.ts
+   77:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  155:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\cron\scoring-reminders\route.ts
+  72:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\cron\telegram-retry\route.ts
+  36:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\judge\analytics\route.ts
+   14:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\judge\assignments\route.ts
+  13:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  95:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\judge\payouts\route.ts
+   14:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   67:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   80:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  114:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\judge\profile\route.ts
+   6:27  warning  'request' is defined but never used       @typescript-eslint/no-unused-vars
+  13:35  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  18:37  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  43:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:35  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  61:37  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  66:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  70:53  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  98:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\judge\score\route.ts
+  130:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\notifications\preferences\route.ts
+  14:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  22:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  35:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  85:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\notifications\route.ts
+   23:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   61:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   77:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  113:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  129:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  149:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\notifications\sse\route.ts
+  16:35  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+C:\Development\pratibha\src\app\api\parent\prizes\route.ts
+  12:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  81:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\parent\profile\route.ts
+   6:27  warning  'request' is defined but never used       @typescript-eslint/no-unused-vars
+  13:37  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  39:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  52:37  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  57:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  90:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\parent\qualifications\route.ts
+  12:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  80:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\prizes\[competitionId]\route.ts
+  52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\registrations\create\route.ts
+   31:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  153:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Development\pratibha\src\app\api\registrations\verify\route.ts
+  133:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 69 problems (64 errors, 5 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+

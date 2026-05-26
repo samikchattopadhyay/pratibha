@@ -1,0 +1,69 @@
+# Admin Dashboard Navigation & Interconnection Plan
+
+The objective is to establish logical, seamless navigation across all 10 workspace tabs within the single-page admin dashboard (`src/app/admin/dashboard/page.tsx`). Clicking on specific cards, status metrics, or table links will update state parameters (`setActiveTab`, `setSearch`, and `setFilter`) to route the admin to the relevant workflow screen.
+
+## User Review Required
+
+> [!NOTE]
+> Since the admin panel is a single-page application tab system, all navigation is handled instantly client-side without full-page reloads. This keeps the experience extremely fast and responsive.
+
+## Proposed Changes
+
+### Admin Dashboard Component
+
+#### [MODIFY] [page.tsx](file:///c:/Development/pratibha/src/app/admin/dashboard/page.tsx)
+
+* **Today's Operations Command Center**:
+  * (Done) Linked Ended Competitions Queue card → `competitions` tab.
+  * (Done) Linked Pending Examiner Backlogs card → `judges` tab.
+  * (Done) Linked Courier Operations Queue card → `courier` tab.
+
+* **Live Status Metrics Grid**:
+  * Link **Active Contests** card → `competitions` tab.
+  * Link **Pending Judging** card → `judges` tab.
+  * Link **Videos Posted Today** card → `facebook` (FB Scraper Analytics) tab.
+  * Link **Pending Payments** card → `participants` tab (sets `filter` state to `"PENDING"`).
+  * Link **Certificates Generated** card → `certificates` tab.
+  * Link **Courier Pending** card → `courier` tab.
+
+* **Revenue Intake Trend & AI Insights**:
+  * Link **Revenue Intake Trend** block → `finance` tab.
+  * Link **Category Surge** (AI Insights) → `judges` tab (to adjust capacity).
+  * Link **High Conversion Cohort** & **Pricing Optimization** (AI Insights) → `finance` tab.
+
+* **Facebook Viral Engine Tracker & Global Hotspots**:
+  * Link **Facebook Viral Engine Tracker** card → `voting` (People's Choice Live Velocity) tab.
+  * Link **Global Enrollment Hotspots** card → `participants` tab.
+
+* **Competitions Tab**:
+  * Make individual Competition cards clickable → links to `participants` tab and searches for that competition title.
+
+* **Participants Tab**:
+  * Make assigned Examiner names in the table clickable → links to `judges` tab.
+
+* **Judges Tab**:
+  * Make Judge Audit cards clickable → links to `participants` tab and searches for that judge's name to see their assignments.
+
+* **Live Voting Tab**:
+  * Make Participant names in the table clickable → links to `participants` tab and searches for that student's name.
+
+* **Certificates Tab**:
+  * Link the **Pending Generation** stats card → `participants` tab (sets `filter` state to `"PENDING"`).
+
+* **Finance Tab**:
+  * Make Student names in the Recent Transactions table clickable → links to `participants` tab and searches for that student's name.
+
+* **Header (Quick Action Buttons)**:
+  * Link **Generate Certificates** button → `certificates` tab.
+  * Link **Request Courier** button → `courier` tab.
+
+---
+
+## Verification Plan
+
+### Automated Checks
+- Run `npm run lint` or `npx eslint` to ensure no syntax errors.
+
+### Manual Verification
+- Verify cursor changes to `pointer` when hovering over connected cards.
+- Click each connected card/link and check if it switches to the correct tab (and applies filters/searches where applicable).

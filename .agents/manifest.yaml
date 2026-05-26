@@ -1,0 +1,29 @@
+specVersion: "1.0.0"
+
+metadata:
+  project: "Scout App (FenBridge)"
+  description: "Production-grade mobile-first React PWA for agricultural supply chain management"
+  owner: "FenBridge Team"
+
+defaults:
+  mode: "development"
+  policy: "safe"
+  profile: "standard"
+
+enabled:
+  modes:
+    - "development"
+    - "testing"
+    - "production"
+  policies:
+    - "safe"
+    - "aggressive"
+  skills:
+    - "generate-screen"
+    - "generate-form"
+    - "generate-layout"
+    - "component-rules"
+    - "frontend-rules"
+    - "performance-rules"
+    - "accessibility-rules"
+    - "mobile-ux-rules"

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "tailwindcss-mobile-first",
+  "owner": "josiahsiegel",
+  "repo": "claude-plugin-marketplace",
+  "path": "plugins/tailwindcss-master/skills/tailwindcss-mobile-first",
+  "branch": "main",
+  "sha": "1a3d7a34ac8effec71c38991992dbc065b954856",
+  "source": "manual"
+}

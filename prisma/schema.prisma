@@ -1,0 +1,665 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── ENUMS (EXISTING) ─────────────────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  MODERATOR
+  JUDGE
+  PARENT
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum EntryStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  DISQUALIFIED
+}
+
+enum CertificateType {
+  PARTICIPATION
+  MERIT_1
+  MERIT_2
+  MERIT_3
+  SPECIAL_MENTION
+}
+
+// ─── ENUMS (PLAN 01 — Geographic Scope) ──────────────────────────────────────
+
+enum CompetitionScope {
+  STATE
+  NATIONAL
+}
+
+// ─── ENUMS (PLAN 02 — Prize System) ──────────────────────────────────────────
+
+enum PrizeType {
+  DIGITAL_CERTIFICATE
+  DIGITAL_MEDAL
+  PHYSICAL_MEDAL
+  PHYSICAL_TROPHY
+  CASH_PRIZE
+  SCHOLARSHIP
+  RECOGNITION
+}
+
+enum PrizeRank {
+  FIRST_PLACE
+  SECOND_PLACE
+  THIRD_PLACE
+  MERIT_1
+  MERIT_2
+  MERIT_3
+  SPECIAL_MENTION
+  PEOPLES_CHOICE
+  PARTICIPATION
+}
+
+// ─── ENUMS (PLAN 03 — Judge Seniority) ───────────────────────────────────────
+
+enum JudgeTier {
+  LOCAL
+  REGIONAL
+  NATIONAL
+  EXPERT
+}
+
+// ─── ENUMS (PLAN 04 — Qualification) ─────────────────────────────────────────
+
+enum QualificationStatus {
+  OFFERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+// ─── ENUMS (PLAN 05 — Courier) ───────────────────────────────────────────────
+
+enum ShipmentStatus {
+  PENDING
+  LABEL_GENERATED
+  PICKUP_SCHEDULED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  DELIVERY_FAILED
+  RETURNED
+}
+
+enum PackageSKU {
+  TROPHY_LARGE
+  TROPHY_MEDIUM
+  MEDAL_CERTIFICATE
+  CERTIFICATE_ONLY
+  MEDAL_ONLY
+}
+
+// ─── ENUMS (PLAN 07 — Judge Payouts & Disciplines) ───────────────────────────
+
+enum CategoryGroup {
+  MUSIC_VOCAL
+  MUSIC_INSTRUMENTAL
+  PERFORMING_ARTS
+  VISUAL_ARTS
+  LITERARY_ARTS
+  SPOKEN_WORD
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+// ─── ENUMS (NOTIFICATION SYSTEM) ──────────────────────────────────────────────
+
+enum NotificationType {
+  REGISTRATION_CREATED
+  PAYMENT_RECEIVED
+  REGISTRATION_VERIFIED
+  REGISTRATION_REJECTED
+  RESULTS_PUBLISHED
+  CERTIFICATE_READY
+  QUALIFICATION_OFFERED
+  QUALIFICATION_EXPIRING
+  JUDGE_ASSIGNED
+  SCORING_REMINDER
+  SCORING_DEADLINE
+  ADMIN_NEW_REGISTRATION
+  ADMIN_PAYMENT_CONFIRMED
+  ADMIN_JUDGE_CONFLICT
+  ADMIN_UNASSIGNED_REGISTRATIONS
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+}
+
+// ─── ENUMS (TELEGRAM DELIVERY) ────────────────────────────────────────────────
+
+enum DeliveryStatus {
+  QUEUED
+  SENDING
+  SENT
+  TEMPORARILY_FAILED
+  PERMANENTLY_FAILED
+}
+
+enum DeliveryErrorType {
+  RATE_LIMITED
+  USER_BLOCKED
+  INVALID_CHAT
+  BAD_REQUEST
+  NETWORK_ERROR
+  UNKNOWN
+}
+
+// ─── USER & PROFILE MODELS ────────────────────────────────────────────────────
+
+model User {
+  id                      String                    @id @default(uuid())
+  email                   String                    @unique
+  passwordHash            String
+  role                    Role                      @default(PARENT)
+  profileImageUrl         String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  parentProfile           Parent?
+  judgeProfile            Judge?
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+}
+
+model Parent {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  phone            String    @unique
+  address          String
+  city             String
+  state            String
+  postalCode       String
+  country          String    @default("India")
+  profileImageUrl  String?
+  preferredState   String?   // Plan 07 — preferred state for filtering state-wise competitions
+  students         Student[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Student {
+  id                  String              @id @default(uuid())
+  parentId            String
+  parent              Parent              @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  name                String
+  dateOfBirth         DateTime
+  gender              String
+  disciplineInterests String[]            @default([]) // Plan 07 — student category slugs interest
+  registrations       Registration[]
+  qualificationSlots  QualificationSlot[] // Plan 04
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+}
+
+// ─── COMPETITION MODELS ───────────────────────────────────────────────────────
+
+model Competition {
+  id                   String                @id @default(uuid())
+  title                String
+  description          String
+  bannerUrl            String?
+  entryFeeINR          Decimal               @db.Decimal(10, 2)
+  startDate            DateTime
+  endDate              DateTime
+  registrationDeadline DateTime
+  resultDate           DateTime
+  isActive             Boolean               @default(true)
+
+  // Plan 01 — Geographic Scope
+  scope                CompetitionScope      @default(STATE)
+  eligibleStates       String[]              @default([])
+  hostState            String?
+  difficultyLevel      Int                   @default(1)
+  minJudgesRequired    Int                   @default(2)
+
+  // Wizard Fields
+  rules                String?
+  facebookGroupUrl     String?
+  capacity             Int?
+  criteriaConfig       Json?                 // Per-competition criteria label customizations
+
+  // Relations
+  categories                     CompetitionCategory[]
+  prizePool                      PrizePool?               // Plan 02
+  panelRequirement               JudgePanelRequirement?   // Plan 03
+  qualificationRulesAsState      QualificationRule[]      @relation("StateComp")        // Plan 04
+  qualificationRulesAsNational   QualificationRule[]      @relation("NationalComp")     // Plan 04
+  qualificationSlotsAsNational   QualificationSlot[]      @relation("QualSlotNational") // Plan 04
+  assignedJudges                 CompetitionJudge[]       // Wizard judges assignment
+
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+}
+
+model Category {
+  id           String                @id @default(uuid())
+  name         String                @unique
+  slug         String                @unique
+  icon         String?               // Plan 07 — icon name (e.g., Music, Mic, Paintbrush)
+  grouping     CategoryGroup?        // Plan 07 — category visual groupings
+  competitions CompetitionCategory[]
+}
+
+model BannerTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  imageUrl    String
+  description String?
+  tags        String[] @default([])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CompetitionCategory {
+  id            String         @id @default(uuid())
+  competitionId String
+  competition   Competition    @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  minAge        Int
+  maxAge        Int
+  language      String?        // Plan 07 — specific language required (e.g. Bengali, English, Any)
+  registrations Registration[]
+
+  @@unique([competitionId, categoryId, minAge, maxAge])
+}
+
+// ─── REGISTRATION & TRANSACTION MODELS ───────────────────────────────────────
+
+model Registration {
+  id                     String               @id @default(uuid())
+  studentId              String
+  student                Student              @relation(fields: [studentId], references: [id])
+  competitionCategoryId  String
+  competitionCategory    CompetitionCategory  @relation(fields: [competitionCategoryId], references: [id])
+  fbPostUrl              String               @unique
+  paymentStatus          PaymentStatus        @default(PENDING)
+  registrationId         String               @unique
+  status                 EntryStatus          @default(PENDING_VERIFICATION)
+  scoringFinalized       Boolean              @default(false)
+  conflictResolved       Boolean              @default(false)
+
+  // Plan 02 — Prize result fields
+  finalRank              Int?
+  finalScore             Decimal?             @db.Decimal(8, 4)
+
+  // Plan 04 — Qualification discount
+  discountApplied        Decimal?             @db.Decimal(5, 2)
+
+  // Relations
+  transactions               Transaction[]
+  judgeAssignments           JudgeAssignment[]
+  socialMetrics              SocialMetric?
+  certificate                Certificate?
+  prizeAward                 PrizeAward?          // Plan 02
+  qualificationSlotEarned    QualificationSlot?   @relation("EarnedSlot")  // Plan 04
+  qualificationSlotUsed      QualificationSlot?   @relation("UsedSlot")    // Plan 04
+
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+}
+
+model Transaction {
+  id                String        @id @default(uuid())
+  registrationId    String
+  registration      Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  razorpayOrderId   String        @unique
+  razorpayPaymentId String?       @unique
+  razorpaySignature String?
+  amount            Decimal       @db.Decimal(10, 2)
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now())
+}
+
+// ─── JUDGE MODELS ─────────────────────────────────────────────────────────────
+
+model Judge {
+  id                  String            @id @default(uuid())
+  userId              String            @unique
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  specializations     String[]
+  profileImageUrl     String?
+
+  // Plan 03 — Seniority & Verification
+  tier                JudgeTier         @default(LOCAL)
+  bio                 String?
+  credentials         String?
+  stateOfResidence    String?
+  yearsOfExperience   Int?
+  isVerified          Boolean           @default(false)
+  isAvailable         Boolean           @default(true)
+  totalEvaluations    Int               @default(0)
+  averageScoreGiven   Decimal?          @db.Decimal(5, 2)
+
+  // Plan 07 — Payments & Ledgers
+  bankAccountDetails  Json?             // Structured bank info: bankName, accountNum, ifscCode
+  payouts             JudgePayout[]
+
+  // Phase 2 — Telegram notifications
+  telegramChatId      String?
+
+  assignments                JudgeAssignment[]
+  competitionAssignments     CompetitionJudge[]
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @default(now()) @updatedAt
+}
+
+model JudgePayout {
+  id             String       @id @default(uuid())
+  judgeId        String
+  judge          Judge        @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  amount         Decimal      @db.Decimal(10, 2)
+  status         PayoutStatus @default(PENDING)
+  assignedCount  Int          // Number of entries processed in this payout
+  paymentDate    DateTime?
+  transactionRef String?      // UTR / Transaction reference
+  adminNotes     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model JudgeAssignment {
+  id             String       @id @default(uuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  judgeId        String
+  judge          Judge        @relation(fields: [judgeId], references: [id])
+  isSubmitted    Boolean      @default(false)
+  score          Score?
+  assignedAt     DateTime     @default(now())
+  submittedAt    DateTime?
+
+  // Plan 03 — Conflict of Interest
+  conflictChecked  Boolean    @default(false)
+  conflictFlagged  Boolean    @default(false)
+  conflictReason   String?
+
+  @@unique([registrationId, judgeId])
+}
+
+// Plan 03 — Panel composition requirements per competition
+model JudgePanelRequirement {
+  id                    String      @id @default(uuid())
+  competitionId         String      @unique
+  competition           Competition @relation(fields: [competitionId], references: [id])
+  minJudges             Int         @default(2)
+  minNationalTierJudges Int         @default(0)
+  requireCrossCategory  Boolean     @default(false)
+  createdAt             DateTime    @default(now())
+}
+
+// Wizard — Judge pre-assignment to competition (many-to-many)
+model CompetitionJudge {
+  id            String      @id @default(uuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  judgeId       String
+  judge         Judge       @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  assignedAt    DateTime    @default(now())
+
+  @@unique([competitionId, judgeId])
+  @@index([competitionId])
+  @@index([judgeId])
+}
+
+// ─── SCORING & SOCIAL METRICS ─────────────────────────────────────────────────
+
+model Score {
+  id                String          @id @default(uuid())
+  judgeAssignmentId String          @unique
+  assignment        JudgeAssignment @relation(fields: [judgeAssignmentId], references: [id], onDelete: Cascade)
+  criteria1         Int             // Technique/Skill (max 40)
+  criteria2         Int             // Expression/Presentation (max 30)
+  criteria3         Int             // Rhythm/Composition (max 30)
+  criteria4         Int?            // Plan 01 — Originality/Innovation (National only, max 10)
+  totalScore        Int
+  remarks           String?
+  createdAt         DateTime        @default(now())
+}
+
+model SocialMetric {
+  id                     String       @id @default(uuid())
+  registrationId         String       @unique
+  registration           Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  likesCount             Int          @default(0)
+  commentsCount          Int          @default(0)
+  sharesCount            Int          @default(0)
+  calculatedEngagement   Decimal      @db.Decimal(5, 2) @default(0.00)
+  lastSyncedAt           DateTime     @default(now())
+}
+
+// ─── CERTIFICATE MODEL ────────────────────────────────────────────────────────
+
+model Certificate {
+  id             String          @id @default(uuid())
+  registrationId String          @unique
+  registration   Registration    @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  certificateId  String          @unique
+  certificateUrl String
+  qrCodeUrl      String
+  type           CertificateType @default(PARTICIPATION)
+  prizeAwardId   String?         @unique  // Plan 02 — link certificate to award
+  prizeAward     PrizeAward?     @relation(fields: [prizeAwardId], references: [id])
+  issuedAt       DateTime        @default(now())
+}
+
+// ─── PRIZE MODELS (PLAN 02) ───────────────────────────────────────────────────
+
+model PrizePool {
+  id            String        @id @default(uuid())
+  competitionId String        @unique
+  competition   Competition   @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  isPublished   Boolean       @default(false)
+  items         PrizeItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model PrizeItem {
+  id             String        @id @default(uuid())
+  prizePoolId    String
+  prizePool      PrizePool     @relation(fields: [prizePoolId], references: [id], onDelete: Cascade)
+  rank           PrizeRank
+  type           PrizeType
+  title          String
+  description    String?
+  estimatedValue Decimal?      @db.Decimal(10, 2)
+  isPhysical     Boolean       @default(false)
+  imageUrl       String?
+  perCategory    Boolean       @default(false)
+  awards         PrizeAward[]
+  createdAt      DateTime      @default(now())
+}
+
+model PrizeAward {
+  id                String              @id @default(uuid())
+  prizeItemId       String
+  prizeItem         PrizeItem           @relation(fields: [prizeItemId], references: [id])
+  registrationId    String              @unique
+  registration      Registration        @relation(fields: [registrationId], references: [id])
+  rank              PrizeRank
+  awardedAt         DateTime            @default(now())
+  isDispatched      Boolean             @default(false)
+  dispatchedAt      DateTime?
+  courierTrackingId String?
+  certificate       Certificate?
+  physicalOrder     PhysicalPrizeOrder? // Plan 05
+  createdAt         DateTime            @default(now())
+}
+
+// ─── QUALIFICATION MODELS (PLAN 04) ──────────────────────────────────────────
+
+model QualificationRule {
+  id                    String              @id @default(uuid())
+  stateCompetitionId    String
+  stateCompetition      Competition         @relation("StateComp", fields: [stateCompetitionId], references: [id])
+  nationalCompetitionId String
+  nationalCompetition   Competition         @relation("NationalComp", fields: [nationalCompetitionId], references: [id])
+  slotsPerCategory      Int                 @default(3)
+  wildCardSlots         Int                 @default(1)
+  minScoreThreshold     Decimal?            @db.Decimal(8, 4)
+  discountPercent       Int                 @default(50)
+  slotExpiryDays        Int                 @default(14)
+  isActive              Boolean             @default(true)
+  slots                 QualificationSlot[]
+  createdAt             DateTime            @default(now())
+}
+
+model QualificationSlot {
+  id                     String              @id @default(uuid())
+  qualificationRuleId    String
+  qualificationRule      QualificationRule   @relation(fields: [qualificationRuleId], references: [id])
+  registrationId         String              @unique
+  registration           Registration        @relation("EarnedSlot", fields: [registrationId], references: [id])
+  studentId              String
+  student                Student             @relation(fields: [studentId], references: [id])
+  nationalCompetitionId  String
+  nationalCompetition    Competition         @relation("QualSlotNational", fields: [nationalCompetitionId], references: [id])
+  status                 QualificationStatus @default(OFFERED)
+  offeredAt              DateTime            @default(now())
+  expiresAt              DateTime
+  acceptedAt             DateTime?
+  nationalRegistrationId String?             @unique
+  nationalRegistration   Registration?       @relation("UsedSlot", fields: [nationalRegistrationId], references: [id])
+  isWildCard             Boolean             @default(false)
+  createdAt              DateTime            @default(now())
+}
+
+// ─── PHYSICAL PRIZE & COURIER MODELS (PLAN 05) ───────────────────────────────
+
+model PhysicalPrizeOrder {
+  id                   String          @id @default(uuid())
+  prizeAwardId         String          @unique
+  prizeAward           PrizeAward      @relation(fields: [prizeAwardId], references: [id])
+  recipientName        String
+  recipientPhone       String
+  recipientAddress     String
+  recipientCity        String
+  recipientState       String
+  recipientPostalCode  String
+  recipientCountry     String          @default("India")
+  packageSKU           PackageSKU
+  weightGrams          Int
+  lengthCm             Int
+  widthCm              Int
+  heightCm             Int
+  shiprocketOrderId    String?         @unique
+  shiprocketShipmentId String?         @unique
+  shiprocketLabelUrl   String?
+  awbNumber            String?
+  courierName          String?
+  estimatedDelivery    DateTime?
+  status               ShipmentStatus  @default(PENDING)
+  batchId              String?
+  labelGeneratedAt     DateTime?
+  pickupScheduledAt    DateTime?
+  dispatchedAt         DateTime?
+  deliveredAt          DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+}
+
+model ShipmentBatch {
+  id            String    @id @default(uuid())
+  batchNumber   String    @unique
+  description   String?
+  totalOrders   Int       @default(0)
+  processedAt   DateTime?
+  manifestUrl   String?
+  createdAt     DateTime  @default(now())
+}
+
+// ─── NOTIFICATION SYSTEM MODELS ───────────────────────────────────────────────
+
+model Notification {
+  id              String                      @id @default(uuid())
+  userId          String
+  user            User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  title           String
+  body            String
+  read            Boolean                     @default(false)
+  readAt          DateTime?
+  actionUrl       String?
+  registrationId  String?
+  assignmentId    String?
+  certificateId   String?
+  qualificationId String?
+  telegramDelivery TelegramMessageDelivery?
+  createdAt       DateTime                    @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, type, channel])
+  @@index([userId])
+}
+
+// ─── TELEGRAM DELIVERY TRACKING ────────────────────────────────────────────────
+
+model TelegramMessageDelivery {
+  id              String           @id @default(cuid())
+  notificationId  String           @unique
+  notification    Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  chatId          String
+  messageId       String?
+  status          DeliveryStatus   @default(QUEUED)
+  errorType       DeliveryErrorType?
+  errorCode       String?
+  errorMessage    String?
+  sentAt          DateTime?
+  failureCount    Int              @default(0)
+  lastAttemptAt   DateTime?
+  nextRetryAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status])
+  @@index([status, nextRetryAt])
+  @@index([chatId])
+  @@index([createdAt])
+}
