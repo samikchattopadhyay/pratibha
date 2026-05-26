@@ -424,7 +424,7 @@ export default function CreateCompetitionWizard({
                 className="h-full bg-gradient-to-r from-terracotta to-gold transition-all absolute left-0 top-0"
                 style={{ width: `${(currentStep / 10) * 100}%` }}
               />
-              <span className="text-xs font-bold text-cream/70 relative z-10">
+              <span className="text-[10px] font-bold text-cream/70 relative z-10">
                 {currentStep}/10
               </span>
             </div>
