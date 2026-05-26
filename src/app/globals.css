@@ -57,3 +57,38 @@ body {
   animation: slide-in 0.3s ease-out;
 }
 
+/* Theme-compatible scrollbars */
+:root {
+  --scrollbar-thumb: #b23b1e;
+  --scrollbar-thumb-hover: #c84c2e;
+  --scrollbar-track: #fcf9f2;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+:root.dark {
+  --scrollbar-thumb: #d4af37;
+  --scrollbar-thumb-hover: #e8c454;
+  --scrollbar-track: #181512;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+

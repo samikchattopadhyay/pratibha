@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Star } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
 import BannerTemplatePicker from "./BannerTemplatePicker";
+import Button from "../Button";
+import RichTextEditor from "../RichTextEditor";
 import { INDIA_STATES, AGE_GROUPS, SCORING_CRITERIA } from "@/lib/constants";
 
 interface CriterionConfig {
@@ -184,43 +186,58 @@ export default function CreateCompetitionWizard({
     }
   };
 
-  const validateStep1 = () => {
-    if (!data.title) {
-      setError("Competition title is required");
-      return false;
+  const validateStep = (step: number) => {
+    switch (step) {
+      case 1:
+        if (!data.title) {
+          setError("Competition title is required");
+          return false;
+        }
+        return true;
+      case 2:
+        return true;
+      case 3:
+        if (data.scope === "STATE" && data.eligibleStates.length === 0) {
+          setError("Select at least one eligible state");
+          return false;
+        }
+        if (data.scope === "STATE" && !data.hostState) {
+          setError("Host state is required for state-level competitions");
+          return false;
+        }
+        return true;
+      case 4:
+        if (!data.categoryId) {
+          setError("Select a category specialization");
+          return false;
+        }
+        return true;
+      case 5:
+        if (!data.registrationDeadline) {
+          setError("Registration deadline is required");
+          return false;
+        }
+        if (!data.startDate || !data.endDate || !data.resultDate) {
+          setError("All dates are required");
+          return false;
+        }
+        return true;
+      case 6:
+        if (!data.bannerSlug) {
+          setError("Select a banner design theme");
+          return false;
+        }
+        return true;
+      default:
+        return true;
     }
-    if (data.scope === "STATE" && data.eligibleStates.length === 0) {
-      setError("Select at least one eligible state");
-      return false;
-    }
-    if (data.scope === "STATE" && !data.hostState) {
-      setError("Host state is required for state-level competitions");
-      return false;
-    }
-    if (!data.categoryId) {
-      setError("Select a category specialization");
-      return false;
-    }
-    if (!data.registrationDeadline) {
-      setError("Registration deadline is required");
-      return false;
-    }
-    if (!data.startDate || !data.endDate || !data.resultDate) {
-      setError("All dates are required");
-      return false;
-    }
-    if (!data.bannerSlug) {
-      setError("Select a banner design theme");
-      return false;
-    }
-    return true;
   };
 
   const handleNext = () => {
     setError("");
-    if (currentStep === 1 && !validateStep1()) return;
-    if (currentStep === 2) handleEnterStep2();
-    if (currentStep < 5) {
+    if (!validateStep(currentStep)) return;
+    if (currentStep === 8) handleEnterStep2();
+    if (currentStep < 10) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -385,38 +402,39 @@ export default function CreateCompetitionWizard({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-charcoal/80 z-40 flex items-center justify-center p-4">
-      <div className="bg-charcoal border border-terracotta/30 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-charcoal border-b border-terracotta/20 p-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-cream">Create Competition</h2>
-          <button
-            onClick={onClose}
-            className="text-cream/50 hover:text-cream transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="px-6 pt-6 pb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-cream/70">
-              Step {currentStep} of 5
-            </span>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 min-h-screen">
+      <div className="bg-cream dark:bg-charcoal rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] border border-terracotta/10 dark:border-terracotta/20 overflow-y-auto flex flex-col">
+        {/* Header with Progress Bar */}
+        <div className="sticky top-0 bg-gradient-to-r from-terracotta/5 to-gold/5 dark:from-terracotta/10 dark:to-gold/10 border-b border-terracotta/10 dark:border-terracotta/20 flex-shrink-0">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <h2 className="text-lg font-serif font-bold text-charcoal dark:text-cream">
+              Create Competition
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-charcoal/50 dark:text-cream/50 hover:text-charcoal dark:hover:text-cream transition-colors"
+            >
+              ✕
+            </button>
           </div>
-          <div className="h-2 bg-charcoal-light rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-terracotta to-gold transition-all"
-              style={{ width: `${(currentStep / 5) * 100}%` }}
-            />
+
+          <div className="px-4 pb-3 flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-charcoal-light rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-terracotta to-gold transition-all"
+                style={{ width: `${(currentStep / 10) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-bold text-cream/70 min-w-max">
+              {currentStep}/10
+            </span>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {error && (
-            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded text-red-300 text-sm">
+            <div className="p-4 bg-red-500/10 border border-red-500/30 dark:border-red-500/40 rounded-lg text-red-600 dark:text-red-400 text-sm font-medium">
               {error}
             </div>
           )}
@@ -425,7 +443,6 @@ export default function CreateCompetitionWizard({
           {currentStep === 1 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Basic Details</h3>
-
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Competition Title *
@@ -440,92 +457,99 @@ export default function CreateCompetitionWizard({
                   placeholder="e.g., Bengal Fine Arts 2026"
                 />
               </div>
+            </div>
+          )}
 
+          {/* Step 2: Description */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-cream">Description</h3>
+              <RichTextEditor
+                value={data.description}
+                onChange={(html) =>
+                  setData((prev) => ({
+                    ...prev,
+                    description: html,
+                  }))
+                }
+                placeholder="Brief description of the competition..."
+              />
+            </div>
+          )}
+
+          {/* Step 3: Scope & States */}
+          {currentStep === 3 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-cream">Scope & States</h3>
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Description
+                  Scope *
                 </label>
-                <textarea
-                  value={data.description}
-                  onChange={(e) =>
-                    setData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta resize-none"
-                  rows={3}
-                  placeholder="Brief description of the competition..."
-                />
+                <div className="space-y-2">
+                  {(["STATE", "NATIONAL"] as const).map((scope) => (
+                    <label
+                      key={scope}
+                      className="flex items-center gap-2 text-cream text-sm"
+                    >
+                      <input
+                        type="radio"
+                        value={scope}
+                        checked={data.scope === scope}
+                        onChange={(e) =>
+                          setData((prev) => ({
+                            ...prev,
+                            scope: e.target.value as "STATE" | "NATIONAL",
+                            eligibleStates: [],
+                            criteriaConfig: [],
+                          }))
+                        }
+                        className="accent-gold"
+                      />
+                      {scope}
+                    </label>
+                  ))}
+                </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Scope *
-                  </label>
-                  <div className="space-y-2">
-                    {(["STATE", "NATIONAL"] as const).map((scope) => (
-                      <label
-                        key={scope}
-                        className="flex items-center gap-2 text-cream text-sm"
-                      >
-                        <input
-                          type="radio"
-                          value={scope}
-                          checked={data.scope === scope}
-                          onChange={(e) =>
-                            setData((prev) => ({
-                              ...prev,
-                              scope: e.target.value as "STATE" | "NATIONAL",
-                              eligibleStates: [],
-                              criteriaConfig: [],
-                            }))
-                          }
-                          className="accent-gold"
-                        />
-                        {scope}
-                      </label>
-                    ))}
+              {data.scope === "STATE" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-cream/80 mb-2">
+                      Eligible States *
+                    </label>
+                    <SearchableSelect
+                      options={stateOptions}
+                      value={data.eligibleStates[0] || ""}
+                      onChange={(state) =>
+                        setData((prev) => ({
+                          ...prev,
+                          eligibleStates: [state],
+                        }))
+                      }
+                      placeholder="Select primary state"
+                    />
                   </div>
-                </div>
-              </div>
-
-              {data.scope === "STATE" && (
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Eligible States *
-                  </label>
-                  <SearchableSelect
-                    options={stateOptions}
-                    value={data.eligibleStates[0] || ""}
-                    onChange={(state) =>
-                      setData((prev) => ({
-                        ...prev,
-                        eligibleStates: [state],
-                      }))
-                    }
-                    placeholder="Select primary state"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-cream/80 mb-2">
+                      Host State *
+                    </label>
+                    <SearchableSelect
+                      options={stateOptions}
+                      value={data.hostState}
+                      onChange={(state) =>
+                        setData((prev) => ({ ...prev, hostState: state }))
+                      }
+                      placeholder="Select host state"
+                    />
+                  </div>
+                </>
               )}
+            </div>
+          )}
 
-              {data.scope === "STATE" && (
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Host State *
-                  </label>
-                  <SearchableSelect
-                    options={stateOptions}
-                    value={data.hostState}
-                    onChange={(state) =>
-                      setData((prev) => ({ ...prev, hostState: state }))
-                    }
-                    placeholder="Select host state"
-                  />
-                </div>
-              )}
-
+          {/* Step 4: Category & Language */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-cream">Category & Language</h3>
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Category Specialization *
@@ -537,25 +561,6 @@ export default function CreateCompetitionWizard({
                   placeholder="Search category..."
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Age Group *
-                </label>
-                <select
-                  value={`${data.minAge}-${data.maxAge}`}
-                  onChange={(e) => handleAgeGroupSelect(e.target.value)}
-                  className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                >
-                  <option value="">Select age group...</option>
-                  {AGE_GROUPS.map((group) => (
-                    <option key={group.label} value={`${group.min}-${group.max}`}>
-                      {group.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Language
@@ -574,7 +579,30 @@ export default function CreateCompetitionWizard({
                   ))}
                 </select>
               </div>
+            </div>
+          )}
 
+          {/* Step 5: Age & Dates & Fee */}
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-cream">Age, Dates & Fee</h3>
+              <div>
+                <label className="block text-sm font-semibold text-cream/80 mb-2">
+                  Age Group *
+                </label>
+                <select
+                  value={`${data.minAge}-${data.maxAge}`}
+                  onChange={(e) => handleAgeGroupSelect(e.target.value)}
+                  className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                >
+                  <option value="">Select age group...</option>
+                  {AGE_GROUPS.map((group) => (
+                    <option key={group.label} value={`${group.min}-${group.max}`}>
+                      {group.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-cream/80 mb-2">
@@ -606,7 +634,6 @@ export default function CreateCompetitionWizard({
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-cream/80 mb-2">
@@ -638,7 +665,6 @@ export default function CreateCompetitionWizard({
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-cream/80 mb-2">
@@ -672,7 +698,6 @@ export default function CreateCompetitionWizard({
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Difficulty Level ({data.difficultyLevel}/5)
@@ -696,7 +721,6 @@ export default function CreateCompetitionWizard({
                   ))}
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Entry Fee (INR)
@@ -743,24 +767,25 @@ export default function CreateCompetitionWizard({
                   )}
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Banner Design Theme *
-                </label>
-                <BannerTemplatePicker
-                  templates={bannerTemplates}
-                  value={data.bannerSlug}
-                  onChange={(slug) =>
-                    setData((prev) => ({ ...prev, bannerSlug: slug }))
-                  }
-                />
-              </div>
             </div>
           )}
 
-          {/* Step 2: Judge Selection */}
-          {currentStep === 2 && (
+          {/* Step 6: Banner Design Theme */}
+          {currentStep === 6 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-cream">Banner Design Theme</h3>
+              <BannerTemplatePicker
+                templates={bannerTemplates}
+                value={data.bannerSlug}
+                onChange={(slug) =>
+                  setData((prev) => ({ ...prev, bannerSlug: slug }))
+                }
+              />
+            </div>
+          )}
+
+          {/* Step 7: Judge Selection */}
+          {currentStep === 7 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Judge Selection</h3>
               <p className="text-sm text-cream/70">
@@ -798,8 +823,8 @@ export default function CreateCompetitionWizard({
             </div>
           )}
 
-          {/* Step 3: Rules */}
-          {currentStep === 3 && (
+          {/* Step 8: Rules */}
+          {currentStep === 8 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Rules & Regulations</h3>
               <p className="text-xs text-cream/60">
@@ -821,8 +846,8 @@ Markdown formatting is supported."
             </div>
           )}
 
-          {/* Step 4: Criteria */}
-          {currentStep === 4 && (
+          {/* Step 9: Criteria */}
+          {currentStep === 9 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-cream">Judging Criteria</h3>
@@ -909,8 +934,8 @@ Markdown formatting is supported."
             </div>
           )}
 
-          {/* Step 5: Prizes */}
-          {currentStep === 5 && (
+          {/* Step 10: Prizes */}
+          {currentStep === 10 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Prizes</h3>
 
@@ -1033,32 +1058,39 @@ Markdown formatting is supported."
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-charcoal border-t border-terracotta/20 p-6 flex items-center justify-between gap-3">
-          <button
+        <div className="sticky bottom-0 bg-terracotta/5 dark:bg-gold/5 border-t border-terracotta/10 dark:border-terracotta/20 p-6 flex items-center justify-between gap-3 flex-shrink-0">
+          <Button
             onClick={handlePrev}
             disabled={currentStep === 1}
-            className="flex items-center gap-2 px-4 py-2 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            variant="outline"
+            size="md"
+            className="flex items-center gap-2"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
-          </button>
+          </Button>
 
-          {currentStep === 5 ? (
-            <button
+          {currentStep === 10 ? (
+            <Button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex-1 py-2 bg-gradient-to-r from-terracotta to-gold text-charcoal font-semibold rounded hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              isLoading={isSubmitting}
+              variant="primary"
+              size="md"
+              className="flex-1"
             >
               {isSubmitting ? "Creating..." : "Submit & Deploy"}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               onClick={handleNext}
-              className="flex items-center gap-2 px-4 py-2 bg-gold text-charcoal font-semibold rounded hover:shadow-lg transition-all"
+              variant="primary"
+              size="md"
+              className="flex items-center gap-2"
             >
               Next
               <ChevronRight className="w-4 h-4" />
-            </button>
+            </Button>
           )}
         </div>
       </div>
