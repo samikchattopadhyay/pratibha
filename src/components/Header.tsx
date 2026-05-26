@@ -58,7 +58,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
   }, [status]);
 
   const fetchProfileImage = useCallback(async (currentPathname: string) => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !session?.user) return;
     try {
       const isAdmin = currentPathname.startsWith("/admin");
       const isJudge = currentPathname.startsWith("/judge");
@@ -72,9 +72,9 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
         }
       }
     } catch (error) {
-      console.error("Failed to fetch profile image:", error);
+      // Silently ignore profile image fetch errors
     }
-  }, [status]);
+  }, [status, session?.user]);
 
   const markNotificationRead = useCallback(async (id: string) => {
     try {

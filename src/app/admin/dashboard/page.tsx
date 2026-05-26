@@ -3,15 +3,12 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import Header from "@/components/Header";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
 import {
   Check, Award, FileText, Plus,
   RefreshCw, Truck
 } from "lucide-react";
-
-import AdminSidebar from "@/components/admin/AdminSidebar";
 import OverviewTab, { OverviewDashboardData } from "@/components/admin/OverviewTab";
 import CompetitionsTab, { Competition } from "@/components/admin/CompetitionsTab";
 import ParticipantsTab, { Judge, Registration } from "@/components/admin/ParticipantsTab";
@@ -75,7 +72,6 @@ function AdminDashboardContent() {
   const tabFromUrl = searchParams.get("tab") || "dashboard";
 
   // Navigation and UI states
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [statusMessage, setStatusMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -672,29 +668,16 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal text-cream flex flex-col font-sans">
-      <Header isAdmin={true} />
+    <>
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-gold text-charcoal px-4 py-3 rounded-lg shadow-xl font-bold flex items-center gap-2 animate-bounce">
+          <Check className="w-4 h-4" /> {toastMessage}
+        </div>
+      )}
 
-      {/* Main Container */}
-      <div className="flex flex-1 relative overflow-hidden">
-        
-        {/* LEFT SIDEBAR */}
-        <AdminSidebar
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          activeTab={activeTab}
-          navigateToTab={navigateToTab}
-        />
-
-        <main className="flex-1 bg-charcoal p-6 md:p-8 overflow-y-auto space-y-6 relative">
+      <main className="flex-1 bg-charcoal p-6 md:p-8 overflow-y-auto space-y-6 relative">
           {loading && <Loading variant="overlay" text="Loading workspace..." />}
-          
-          {/* Toast Notification */}
-          {toastMessage && (
-            <div className="fixed bottom-5 right-5 z-50 bg-gold text-charcoal px-4 py-3 rounded-lg shadow-xl font-bold flex items-center gap-2 animate-bounce">
-              <Check className="w-4 h-4" /> {toastMessage}
-            </div>
-          )}
 
           {/* Quick Action bar & Status */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-terracotta/10">
@@ -890,8 +873,7 @@ function AdminDashboardContent() {
             />
           )}
 
-        </main>
-      </div>
+      </main>
 
       {/* CREATE COMPETITION WIZARD */}
       <CreateCompetitionWizard
@@ -905,8 +887,7 @@ function AdminDashboardContent() {
         dbCategories={dbCategories}
         bannerTemplates={bannerTemplates}
       />
-
-    </div>
+    </>
   );
 }
 
