@@ -450,6 +450,92 @@ export default function CreateCompetitionWizard({
                   placeholder="e.g., Bengal Fine Arts 2026"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-semibold text-cream/80 mb-2">
+                  Age Group *
+                </label>
+                <select
+                  value={`${data.minAge}-${data.maxAge}`}
+                  onChange={(e) => handleAgeGroupSelect(e.target.value)}
+                  className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                >
+                  <option value="">Select age group...</option>
+                  {AGE_GROUPS.map((group) => (
+                    <option key={group.label} value={`${group.min}-${group.max}`}>
+                      {group.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-cream/80 mb-2">
+                  Difficulty Level ({data.difficultyLevel}/5)
+                </label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => handleDifficultyChange(level)}
+                      className={`transition-colors ${
+                        level <= data.difficultyLevel
+                          ? "text-gold"
+                          : "text-cream/30"
+                      }`}
+                    >
+                      <Star
+                        className="w-6 h-6"
+                        fill={level <= data.difficultyLevel ? "currentColor" : "none"}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-cream/80 mb-2">
+                  Entry Fee (INR)
+                </label>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {["50", "100", "150", "200"].map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => handleEntryFeeChange(preset)}
+                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                          data.entryFeePreset === preset
+                            ? "bg-gold text-charcoal"
+                            : "bg-terracotta/20 text-cream border border-terracotta/30 hover:bg-terracotta/30"
+                        }`}
+                      >
+                        ₹{preset}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => handleEntryFeeChange("custom")}
+                      className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                        data.entryFeePreset === "custom"
+                          ? "bg-gold text-charcoal"
+                          : "bg-terracotta/20 text-cream border border-terracotta/30 hover:bg-terracotta/30"
+                      }`}
+                    >
+                      Custom
+                    </button>
+                  </div>
+                  {data.entryFeePreset === "custom" && (
+                    <input
+                      type="number"
+                      value={data.entryFeeINR}
+                      onChange={(e) =>
+                        setData((prev) => ({
+                          ...prev,
+                          entryFeeINR: e.target.value,
+                        }))
+                      }
+                      className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                      placeholder="Enter custom amount"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -560,27 +646,10 @@ export default function CreateCompetitionWizard({
             </div>
           )}
 
-          {/* Step 5: Age & Dates & Fee */}
+          {/* Step 5: Dates & Capacity */}
           {currentStep === 5 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-cream">Age, Dates & Fee</h3>
-              <div>
-                <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Age Group *
-                </label>
-                <select
-                  value={`${data.minAge}-${data.maxAge}`}
-                  onChange={(e) => handleAgeGroupSelect(e.target.value)}
-                  className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                >
-                  <option value="">Select age group...</option>
-                  {AGE_GROUPS.map((group) => (
-                    <option key={group.label} value={`${group.min}-${group.max}`}>
-                      {group.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <h3 className="text-lg font-semibold text-cream">Dates & Capacity</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-cream/80 mb-2">
@@ -674,75 +743,6 @@ export default function CreateCompetitionWizard({
                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
                     placeholder="https://facebook.com/groups/..."
                   />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Difficulty Level ({data.difficultyLevel}/5)
-                </label>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((level) => (
-                    <button
-                      key={level}
-                      onClick={() => handleDifficultyChange(level)}
-                      className={`transition-colors ${
-                        level <= data.difficultyLevel
-                          ? "text-gold"
-                          : "text-cream/30"
-                      }`}
-                    >
-                      <Star
-                        className="w-6 h-6"
-                        fill={level <= data.difficultyLevel ? "currentColor" : "none"}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Entry Fee (INR)
-                </label>
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {["50", "100", "150", "200"].map((preset) => (
-                      <button
-                        key={preset}
-                        onClick={() => handleEntryFeeChange(preset)}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          data.entryFeePreset === preset
-                            ? "bg-gold text-charcoal"
-                            : "bg-terracotta/20 text-cream border border-terracotta/30 hover:bg-terracotta/30"
-                        }`}
-                      >
-                        ₹{preset}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => handleEntryFeeChange("custom")}
-                      className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                        data.entryFeePreset === "custom"
-                          ? "bg-gold text-charcoal"
-                          : "bg-terracotta/20 text-cream border border-terracotta/30 hover:bg-terracotta/30"
-                      }`}
-                    >
-                      Custom
-                    </button>
-                  </div>
-                  {data.entryFeePreset === "custom" && (
-                    <input
-                      type="number"
-                      value={data.entryFeeINR}
-                      onChange={(e) =>
-                        setData((prev) => ({
-                          ...prev,
-                          entryFeeINR: e.target.value,
-                        }))
-                      }
-                      className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                      placeholder="Enter custom amount"
-                    />
-                  )}
                 </div>
               </div>
             </div>
