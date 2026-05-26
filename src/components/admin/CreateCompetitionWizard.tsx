@@ -405,7 +405,7 @@ export default function CreateCompetitionWizard({
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 min-h-screen">
       <div className="bg-cream dark:bg-charcoal rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] border border-terracotta/10 dark:border-terracotta/20 overflow-y-auto flex flex-col">
         {/* Header with Progress Bar */}
-        <div className="sticky top-0 bg-gradient-to-r from-terracotta/5 to-gold/5 dark:from-terracotta/10 dark:to-gold/10 border-b border-terracotta/10 dark:border-terracotta/20 flex-shrink-0">
+        <div className="sticky top-0 z-20 bg-gradient-to-r from-terracotta/5 to-gold/5 dark:from-terracotta/10 dark:to-gold/10 border-b border-terracotta/10 dark:border-terracotta/20 flex-shrink-0">
           <div className="px-4 py-3 flex items-center justify-between">
             <h2 className="text-lg font-serif font-bold text-charcoal dark:text-cream">
               Create Competition
@@ -1058,7 +1058,7 @@ Markdown formatting is supported."
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-terracotta/5 dark:bg-gold/5 border-t border-terracotta/10 dark:border-terracotta/20 p-6 flex items-center justify-between gap-3 flex-shrink-0">
+        <div className="sticky bottom-0 z-10 bg-terracotta/5 dark:bg-gold/5 border-t border-terracotta/10 dark:border-terracotta/20 p-6 flex items-center justify-between gap-3 flex-shrink-0">
           <Button
             onClick={handlePrev}
             disabled={currentStep === 1}
