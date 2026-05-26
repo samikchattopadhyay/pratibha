@@ -123,7 +123,7 @@ export default function SearchableSelect({
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-charcoal border border-terracotta/30 rounded shadow-lg z-50 overflow-hidden"
+          className="absolute top-full left-0 right-0 mt-1 bg-charcoal border border-terracotta/30 rounded shadow-lg z-[9999] overflow-hidden"
         >
           {/* Search Input */}
           <div className="p-2 border-b border-terracotta/10 bg-charcoal-light">
