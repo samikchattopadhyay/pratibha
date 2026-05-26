@@ -48,7 +48,6 @@ interface WizardData {
   description: string;
   scope: "STATE" | "NATIONAL";
   eligibleStates: string[];
-  hostState: string;
   registrationDeadline: string;
   startDate: string;
   endDate: string;
@@ -103,7 +102,6 @@ export default function CreateCompetitionWizard({
     description: "",
     scope: "STATE",
     eligibleStates: [],
-    hostState: "",
     registrationDeadline: "",
     startDate: "",
     endDate: "",
@@ -199,10 +197,6 @@ export default function CreateCompetitionWizard({
       case 3:
         if (data.scope === "STATE" && data.eligibleStates.length === 0) {
           setError("Select at least one eligible state");
-          return false;
-        }
-        if (data.scope === "STATE" && !data.hostState) {
-          setError("Host state is required for state-level competitions");
           return false;
         }
         return true;
@@ -358,7 +352,6 @@ export default function CreateCompetitionWizard({
         description: data.description,
         scope: data.scope,
         eligibleStates: data.scope === "STATE" ? data.eligibleStates : [],
-        hostState: data.scope === "STATE" ? data.hostState : null,
         categoryId: data.categoryId,
         categoryName: data.categoryName,
         minAge: data.minAge,
@@ -511,37 +504,22 @@ export default function CreateCompetitionWizard({
                 </div>
               </div>
               {data.scope === "STATE" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-cream/80 mb-2">
-                      Eligible States *
-                    </label>
-                    <SearchableSelect
-                      options={stateOptions}
-                      value={data.eligibleStates[0] || ""}
-                      onChange={(state) =>
-                        setData((prev) => ({
-                          ...prev,
-                          eligibleStates: [state],
-                        }))
-                      }
-                      placeholder="Select primary state"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-cream/80 mb-2">
-                      Host State *
-                    </label>
-                    <SearchableSelect
-                      options={stateOptions}
-                      value={data.hostState}
-                      onChange={(state) =>
-                        setData((prev) => ({ ...prev, hostState: state }))
-                      }
-                      placeholder="Select host state"
-                    />
-                  </div>
-                </>
+                <div>
+                  <label className="block text-sm font-semibold text-cream/80 mb-2">
+                    Eligible States *
+                  </label>
+                  <SearchableSelect
+                    options={stateOptions}
+                    value={data.eligibleStates[0] || ""}
+                    onChange={(state) =>
+                      setData((prev) => ({
+                        ...prev,
+                        eligibleStates: [state],
+                      }))
+                    }
+                    placeholder="Select eligible state"
+                  />
+                </div>
               )}
             </div>
           )}
