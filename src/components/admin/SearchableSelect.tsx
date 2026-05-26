@@ -35,6 +35,7 @@ export default function SearchableSelect({
   const panelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [panelPosition, setPanelPosition] = useState({ top: 0, left: 0, width: 0 });
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -44,10 +45,17 @@ export default function SearchableSelect({
   );
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && triggerRef.current) {
       searchInputRef.current?.focus();
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setHighlightedIndex(0);
+      // Calculate position for fixed positioning
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPanelPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
     }
   }, [isOpen]);
 
@@ -123,7 +131,12 @@ export default function SearchableSelect({
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-charcoal border border-terracotta/30 rounded shadow-lg z-[9999] overflow-hidden"
+          className="fixed bg-charcoal border border-terracotta/30 rounded shadow-lg z-[9999] overflow-hidden"
+          style={{
+            top: `${panelPosition.top}px`,
+            left: `${panelPosition.left}px`,
+            width: `${panelPosition.width}px`,
+          }}
         >
           {/* Search Input */}
           <div className="p-2 border-b border-terracotta/10 bg-charcoal-light">
