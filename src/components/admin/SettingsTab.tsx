@@ -237,7 +237,7 @@ export default function SettingsTab({
               : "text-cream/60 hover:bg-cream/5 hover:text-cream"
           }`}
         >
-          ⚙️ General Configuration
+          ⚙️ General
         </button>
         <button
           onClick={() => handleSubTabChange("categories")}
@@ -247,7 +247,7 @@ export default function SettingsTab({
               : "text-cream/60 hover:bg-cream/5 hover:text-cream"
           }`}
         >
-          🏷️ Category Specializations
+          🏷️ Specialization
         </button>
         <button
           onClick={() => handleSubTabChange("banners")}
