@@ -28,7 +28,7 @@ export default function AdminSidebar({
   ];
 
   return (
-    <aside className={`${sidebarOpen ? "w-64" : "w-16"} bg-charcoal-light border-r border-terracotta/15 flex flex-col transition-all duration-300 z-30`}>
+    <aside className={`${sidebarOpen ? "w-48" : "w-16"} bg-charcoal-light border-r border-terracotta/15 flex flex-col transition-all duration-300 z-30`}>
       <div className="p-4 border-b border-terracotta/15 flex items-center justify-between">
         <span className={`${sidebarOpen ? "block" : "hidden"} text-sm font-bold uppercase tracking-wider text-gold`}>
           Control Deck
