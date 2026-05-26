@@ -22,12 +22,6 @@ export async function GET(
         registrationDeadline: true,
         startDate: true,
         endDate: true,
-        categories: {
-          select: { id: true },
-        },
-        assignedJudges: {
-          select: { id: true },
-        },
       },
     });
 
@@ -37,6 +31,18 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    // Count registrations for this competition
+    const totalParticipants = await prisma.registration.count({
+      where: {
+        competitionCategory: { competitionId },
+      },
+    });
+
+    // Count assigned judges
+    const totalJudges = await prisma.competitionJudge.count({
+      where: { competitionId },
+    });
 
     const categoryNames = await prisma.competitionCategory.findMany({
       where: { competitionId },
@@ -54,8 +60,8 @@ export async function GET(
       registrationDeadline: competition.registrationDeadline.toISOString(),
       startDate: competition.startDate.toISOString(),
       endDate: competition.endDate.toISOString(),
-      totalParticipants: competition.categories.length,
-      totalJudges: competition.assignedJudges.length,
+      totalParticipants,
+      totalJudges,
     });
   } catch (err) {
     console.error("Failed to fetch competition metadata:", err);

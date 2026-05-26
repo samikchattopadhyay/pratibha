@@ -26,6 +26,7 @@ export async function GET(
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
+    const statusFilter = url.searchParams.get("status") || "ALL";
 
     const skip = (page - 1) * limit;
 
@@ -36,12 +37,8 @@ export async function GET(
       },
     };
 
-    // Fetch total count
-    const totalCount = await prisma.certificate.count({ where });
-    const totalPages = Math.ceil(totalCount / limit);
-
-    // Fetch certificates
-    const certificates = await prisma.certificate.findMany({
+    // Fetch total count (all certificates, status filtering done in-memory)
+    const allCertificates = await prisma.certificate.findMany({
       where,
       select: {
         id: true,
@@ -54,22 +51,33 @@ export async function GET(
         type: true,
         certificateId: true,
         certificateUrl: true,
+        qrCodeUrl: true,
         issuedAt: true,
       },
-      skip,
-      take: limit,
       orderBy: { issuedAt: "desc" },
     });
 
+    // Filter by status in-memory
+    const filteredCerts = statusFilter === "ALL"
+      ? allCertificates
+      : allCertificates.filter(cert => {
+          const status = cert.certificateUrl ? "GENERATED" : "PENDING";
+          return status === statusFilter;
+        });
+
+    const totalCount = filteredCerts.length;
+    const totalPages = Math.ceil(totalCount / limit);
+    const paginatedCerts = filteredCerts.slice(skip, skip + limit);
+
     return NextResponse.json({
-      data: certificates.map((cert) => ({
+      data: paginatedCerts.map((cert) => ({
         id: cert.id,
         registrationId: cert.registration.registrationId,
         studentName: cert.registration.student.name,
         type: cert.type,
         status: cert.certificateUrl ? "GENERATED" : "PENDING",
         certificateId: cert.certificateId,
-        certificateUrl: cert.certificateUrl,
+        qrCodeUrl: cert.qrCodeUrl,
         generatedAt: cert.issuedAt.toISOString(),
       })),
       pagination: {

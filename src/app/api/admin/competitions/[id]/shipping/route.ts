@@ -30,6 +30,15 @@ export async function GET(
 
     const skip = (page - 1) * limit;
 
+    // Map UI status to database status
+    const statusMap: Record<string, ShipmentStatus | undefined> = {
+      PENDING: "PENDING",
+      LABEL_GENERATED: "LABEL_GENERATED",
+      PICKED_UP: "PICKUP_SCHEDULED",
+      IN_TRANSIT: "IN_TRANSIT",
+      DELIVERED: "DELIVERED",
+    };
+
     // Build filter conditions for PhysicalPrizeOrder
     const where: Prisma.PhysicalPrizeOrderWhereInput = {
       prizeAward: {
@@ -39,20 +48,8 @@ export async function GET(
       },
     };
 
-    if (statusFilter !== "ALL") {
-      const validStatuses: ShipmentStatus[] = [
-        "PENDING",
-        "LABEL_GENERATED",
-        "PICKUP_SCHEDULED",
-        "IN_TRANSIT",
-        "OUT_FOR_DELIVERY",
-        "DELIVERED",
-        "DELIVERY_FAILED",
-        "RETURNED",
-      ];
-      if (validStatuses.includes(statusFilter as ShipmentStatus)) {
-        where.status = statusFilter as ShipmentStatus;
-      }
+    if (statusFilter !== "ALL" && statusMap[statusFilter]) {
+      where.status = statusMap[statusFilter]!;
     }
 
     // Fetch total count
@@ -85,13 +82,25 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
 
+    // Map database status to UI status
+    const reverseStatusMap: Record<ShipmentStatus, string> = {
+      PENDING: "PENDING",
+      LABEL_GENERATED: "LABEL_GENERATED",
+      PICKUP_SCHEDULED: "PICKED_UP",
+      IN_TRANSIT: "IN_TRANSIT",
+      OUT_FOR_DELIVERY: "IN_TRANSIT",
+      DELIVERED: "DELIVERED",
+      DELIVERY_FAILED: "DELIVERED",
+      RETURNED: "DELIVERED",
+    };
+
     return NextResponse.json({
       data: shipments.map((ship) => ({
         id: ship.id,
         registrationId: ship.prizeAward.registration.registrationId,
         studentName: ship.prizeAward.registration.student.name,
         shipmentId: ship.awbNumber,
-        status: ship.status,
+        status: reverseStatusMap[ship.status] || ship.status,
         carrier: ship.courierName,
         trackingUrl: ship.shiprocketLabelUrl,
         estimatedDelivery: ship.estimatedDelivery?.toISOString() || null,
