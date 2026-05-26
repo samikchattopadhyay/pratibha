@@ -418,8 +418,8 @@ export default function CreateCompetitionWizard({
             </button>
           </div>
 
-          <div className="px-4 pb-3">
-            <div className="flex-1 h-1.5 bg-charcoal-light rounded-full overflow-hidden relative flex items-center justify-end pr-2">
+          <div className="px-4">
+            <div className="flex-1 h-6 bg-charcoal-light rounded-full overflow-hidden relative flex items-center justify-end pr-2">
               <div
                 className="h-full bg-gradient-to-r from-terracotta to-gold transition-all absolute left-0 top-0"
                 style={{ width: `${(currentStep / 10) * 100}%` }}
