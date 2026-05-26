@@ -411,7 +411,7 @@ export default function CreateCompetitionWizard({
             </button>
           </div>
 
-          <div className="px-4">
+          <div>
             <div className="flex-1 h-4 bg-charcoal-light overflow-hidden relative flex items-center justify-end pr-2">
               <div
                 className="h-full bg-gradient-to-r from-terracotta to-gold transition-all absolute left-0 top-0"
