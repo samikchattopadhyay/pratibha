@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 
@@ -10,9 +11,27 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  const getActiveTab = () => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) return tabParam;
+
+    if (pathname.includes("/competitions")) return "competitions";
+    if (pathname.includes("/judges")) return "judges";
+    if (pathname.includes("/finance")) return "finance";
+    if (pathname.includes("/facebook")) return "facebook";
+    if (pathname.includes("/settings")) return "settings";
+
+    return "dashboard";
+  };
+
+  const activeTab = getActiveTab();
 
   const navigateToTab = (tab: string) => {
-    // Navigation handled by Header/Sidebar onClick handlers
+    router.push(`/admin/dashboard?tab=${tab}`);
   };
 
   return (
@@ -22,12 +41,12 @@ export default function AdminLayout({
         <AdminSidebar
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
-          activeTab=""
+          activeTab={activeTab}
           navigateToTab={navigateToTab}
         />
-        <main className="flex-1 bg-charcoal overflow-y-auto">
+        <div className="flex-1 bg-charcoal overflow-y-auto">
           {children}
-        </main>
+        </div>
       </div>
     </div>
   );
