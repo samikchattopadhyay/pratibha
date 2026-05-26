@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Star } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
 import BannerTemplatePicker from "./BannerTemplatePicker";
@@ -26,6 +26,7 @@ interface PrizeEntry {
 interface DbCategory {
   id: string;
   name: string;
+  slug?: string;
   grouping?: string | null;
   icon?: string | null;
 }
@@ -95,8 +96,15 @@ export default function CreateCompetitionWizard({
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [availableJudges, setAvailableJudges] = useState<Array<{id: string; name: string; tier: string; specializations: string[]}>>([]);
-
+  const [availableJudges, setAvailableJudges] = useState<Array<{
+    id: string;
+    name: string;
+    tier: string;
+    specializations: string[];
+    states?: string[];
+    languages?: string[];
+    profileImageUrl?: string | null;
+  }>>([]);
   const [data, setData] = useState<WizardData>({
     title: "",
     description: "",
@@ -108,8 +116,8 @@ export default function CreateCompetitionWizard({
     resultDate: "",
     categoryId: "",
     categoryName: "",
-    minAge: 4,
-    maxAge: 18,
+    minAge: 0,
+    maxAge: 0,
     language: "Any",
     capacity: "",
     facebookGroupUrl: "",
@@ -118,10 +126,82 @@ export default function CreateCompetitionWizard({
     entryFeePreset: "50",
     bannerSlug: "",
     selectedJudgeIds: [],
-    rules: "",
+    rules: `<h2>Rules & Regulations</h2><ol><li><strong>Eligibility</strong>: Participants must belong to the selected age group.</li><li><strong>Originality</strong>: All submissions must be the original work of the participant. Plagiarism will lead to disqualification.</li><li><strong>Submissions</strong>: Entries must be submitted in the format specified for the category before the deadline.</li><li><strong>Jury Decision</strong>: The decision of the panel of judges is final and binding.</li></ol>`,
     criteriaConfig: [],
     prizes: [],
   });
+  const [judgeSearch, setJudgeSearch] = useState("");
+  const [judgeTierFilter, setJudgeTierFilter] = useState("ALL");
+  const [judgeSpecFilter, setJudgeSpecFilter] = useState("ALL");
+
+  useEffect(() => {
+    if (currentStep === 7) {
+      if (availableJudges.length === 0) {
+        handleEnterStep2();
+      }
+      if (data.categoryId) {
+        const cat = dbCategories.find((c) => c.id === data.categoryId);
+        if (cat) {
+          const catSlug = (cat.slug || cat.name)
+            .toLowerCase()
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "-");
+          setJudgeSpecFilter(catSlug);
+        }
+      }
+    }
+  }, [currentStep, data.categoryId, dbCategories, availableJudges.length]);
+
+  const judgeTiers = useMemo(() => {
+    const tiers = new Set<string>();
+    availableJudges.forEach((j) => {
+      if (j.tier) tiers.add(j.tier);
+    });
+    return Array.from(tiers).sort();
+  }, [availableJudges]);
+
+  const judgeSpecializations = useMemo(() => {
+    const specs = new Set<string>();
+    availableJudges.forEach((j) => {
+      j.specializations.forEach((s) => {
+        if (s) specs.add(s.trim().toLowerCase());
+      });
+    });
+    return Array.from(specs).sort();
+  }, [availableJudges]);
+
+  const filteredJudges = useMemo(() => {
+    return availableJudges.filter((judge) => {
+      const matchesSearch =
+        judge.name.toLowerCase().includes(judgeSearch.toLowerCase()) ||
+        judge.specializations.some((s) => s.toLowerCase().includes(judgeSearch.toLowerCase()));
+      const matchesTier = judgeTierFilter === "ALL" || judge.tier === judgeTierFilter;
+      const matchesSpec =
+        judgeSpecFilter === "ALL" || judge.specializations.some((s) => s.toLowerCase() === judgeSpecFilter);
+
+      let matchesScopeStates = true;
+      if (data.scope === "STATE" && data.eligibleStates.length > 0) {
+        // Only show judges that have matching eligible states, or if their states list is empty/unconfigured
+        matchesScopeStates =
+          !judge.states ||
+          judge.states.length === 0 ||
+          data.eligibleStates.some((state) => judge.states?.includes(state));
+      }
+
+      let matchesLanguage = true;
+      if (data.language && data.language !== "Any") {
+        // Show judges who speak this language, or if they have no explicit languages configured
+        matchesLanguage =
+          !judge.languages ||
+          judge.languages.length === 0 ||
+          judge.languages.includes(data.language);
+      }
+
+      return matchesSearch && matchesTier && matchesSpec && matchesScopeStates && matchesLanguage;
+    });
+  }, [availableJudges, judgeSearch, judgeTierFilter, judgeSpecFilter, data.scope, data.eligibleStates, data.language]);
+
+
 
   const categoryOptions = useMemo(
     () =>
@@ -174,7 +254,7 @@ export default function CreateCompetitionWizard({
   // Fetch available judges when Step 2 is entered
   const handleEnterStep2 = async () => {
     try {
-      const res = await fetch("/api/admin/judges?verified=true");
+      const res = await fetch("/api/admin/judges");
       if (res.ok) {
         const result = await res.json() as { judges?: Array<{id: string; name: string; tier: string; specializations: string[]} > };
         setAvailableJudges(result.judges || []);
@@ -189,6 +269,13 @@ export default function CreateCompetitionWizard({
       case 1:
         if (!data.title) {
           setError("Competition title is required");
+          return false;
+        }
+        const isValidAgeGroup = AGE_GROUPS.some(
+          (group) => group.min === data.minAge && group.max === data.maxAge
+        );
+        if (!isValidAgeGroup) {
+          setError("Age group is required");
           return false;
         }
         return true;
@@ -222,6 +309,19 @@ export default function CreateCompetitionWizard({
           return false;
         }
         return true;
+      case 7:
+        const minJudges = data.scope === "NATIONAL" ? 5 : 2;
+        if (data.selectedJudgeIds.length < minJudges) {
+          setError(`Select at least ${minJudges} judges for a ${data.scope.toLowerCase()} competition`);
+          return false;
+        }
+        return true;
+      case 8:
+        if (!data.rules || data.rules.replace(/<[^>]*>/g, "").trim().length < 10) {
+          setError("Rules & Regulations are required (at least 10 characters)");
+          return false;
+        }
+        return true;
       default:
         return true;
     }
@@ -230,7 +330,6 @@ export default function CreateCompetitionWizard({
   const handleNext = () => {
     setError("");
     if (!validateStep(currentStep)) return;
-    if (currentStep === 8) handleEnterStep2();
     if (currentStep < 10) {
       setCurrentStep(currentStep + 1);
     }
@@ -243,10 +342,26 @@ export default function CreateCompetitionWizard({
 
   const handleCategorySelect = (categoryId: string) => {
     const cat = dbCategories.find((c) => c.id === categoryId);
+    const catName = cat?.name || "";
+    
+    // Check for implicit language
+    const nameLower = catName.toLowerCase();
+    let implicitLanguage = "";
+    if (nameLower.includes("bengali") || nameLower.includes("rabindra") || nameLower.includes("nazrul")) {
+      implicitLanguage = "Bengali";
+    } else if (nameLower.includes("hindi")) {
+      implicitLanguage = "Hindi";
+    } else if (nameLower.includes("sanskrit")) {
+      implicitLanguage = "Sanskrit";
+    } else if (nameLower.includes("english")) {
+      implicitLanguage = "English";
+    }
+
     setData((prev) => ({
       ...prev,
       categoryId,
-      categoryName: cat?.name || "",
+      categoryName: catName,
+      language: implicitLanguage || "Any",
     }));
   };
 
@@ -625,24 +740,39 @@ export default function CreateCompetitionWizard({
                   placeholder="Search category..."
                 />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Language
-                </label>
-                <select
-                  value={data.language}
-                  onChange={(e) =>
-                    setData((prev) => ({ ...prev, language: e.target.value }))
-                  }
-                  className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                >
-                  {languageOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {(() => {
+                const nameLower = data.categoryName.toLowerCase();
+                const isImplicit = nameLower.includes("bengali") || nameLower.includes("rabindra") || nameLower.includes("nazrul") || nameLower.includes("hindi") || nameLower.includes("sanskrit") || nameLower.includes("english");
+                
+                if (isImplicit) {
+                  return (
+                    <div className="p-3 bg-charcoal-light border border-terracotta/10 rounded text-xs text-cream/70">
+                      Language: <strong className="text-gold">{data.language}</strong> (implicitly set by category)
+                    </div>
+                  );
+                }
+
+                return (
+                  <div>
+                    <label className="block text-sm font-semibold text-cream/80 mb-2">
+                      Language
+                    </label>
+                    <select
+                      value={data.language}
+                      onChange={(e) =>
+                        setData((prev) => ({ ...prev, language: e.target.value }))
+                      }
+                      className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                    >
+                      {languageOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -650,6 +780,36 @@ export default function CreateCompetitionWizard({
           {currentStep === 5 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Dates & Capacity</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-cream/80 mb-2">
+                    Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={data.startDate}
+                    onChange={(e) =>
+                      setData((prev) => ({ ...prev, startDate: e.target.value }))
+                    }
+                    onClick={(e) => e.currentTarget.showPicker()}
+                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-cream/80 mb-2">
+                    End Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={data.endDate}
+                    onChange={(e) =>
+                      setData((prev) => ({ ...prev, endDate: e.target.value }))
+                    }
+                    onClick={(e) => e.currentTarget.showPicker()}
+                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-cream/80 mb-2">
@@ -664,35 +824,8 @@ export default function CreateCompetitionWizard({
                         registrationDeadline: e.target.value,
                       }))
                     }
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={data.startDate}
-                    onChange={(e) =>
-                      setData((prev) => ({ ...prev, startDate: e.target.value }))
-                    }
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    End Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={data.endDate}
-                    onChange={(e) =>
-                      setData((prev) => ({ ...prev, endDate: e.target.value }))
-                    }
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                    onClick={(e) => e.currentTarget.showPicker()}
+                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
                   />
                 </div>
                 <div>
@@ -708,7 +841,8 @@ export default function CreateCompetitionWizard({
                         resultDate: e.target.value,
                       }))
                     }
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                    onClick={(e) => e.currentTarget.showPicker()}
+                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
                   />
                 </div>
               </div>
@@ -766,36 +900,95 @@ export default function CreateCompetitionWizard({
           {currentStep === 7 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Judge Selection</h3>
-              <p className="text-sm text-cream/70">
-                Selected: {data.selectedJudgeIds.length} judges
-              </p>
+              <div className="flex flex-wrap gap-2 items-center justify-between text-sm text-cream/70">
+                <span>Selected: {data.selectedJudgeIds.length} judges</span>
+                <span className="text-xs">Showing {filteredJudges.length} of {availableJudges.length}</span>
+              </div>
 
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {availableJudges.length > 0 ? (
-                  availableJudges.map((judge) => (
-                    <label
-                      key={judge.id}
-                      className="flex items-start gap-3 p-3 bg-charcoal-light border border-terracotta/20 rounded hover:border-terracotta/50 cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={data.selectedJudgeIds.includes(judge.id)}
-                        onChange={() => handleJudgeToggle(judge.id)}
-                        className="accent-gold mt-1 cursor-pointer"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-cream">{judge.name}</p>
-                        <p className="text-xs text-cream/60">{judge.tier}</p>
-                        {judge.specializations.length > 0 && (
-                          <p className="text-xs text-cream/50">
-                            {judge.specializations.join(", ")}
-                          </p>
-                        )}
-                      </div>
-                    </label>
-                  ))
+              {/* Filters bar */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="Search name/specialization..."
+                  value={judgeSearch}
+                  onChange={(e) => setJudgeSearch(e.target.value)}
+                  className="flex-1 min-w-[150px] bg-charcoal border border-terracotta/20 rounded px-2.5 py-1 text-cream text-xs focus:outline-none focus:border-terracotta"
+                />
+                <select
+                  value={judgeTierFilter}
+                  onChange={(e) => setJudgeTierFilter(e.target.value)}
+                  className="bg-charcoal border border-terracotta/20 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta"
+                >
+                  <option value="ALL">All Tiers</option>
+                  {judgeTiers.map((tier) => (
+                    <option key={tier} value={tier}>
+                      {tier}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={judgeSpecFilter}
+                  onChange={(e) => setJudgeSpecFilter(e.target.value)}
+                  className="bg-charcoal border border-terracotta/20 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta capitalize"
+                >
+                  <option value="ALL">All Specializations</option>
+                  {judgeSpecializations.map((spec) => (
+                    <option key={spec} value={spec}>
+                      {spec}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
+                {filteredJudges.length > 0 ? (
+                  filteredJudges.map((judge) => {
+                    const isSelected = data.selectedJudgeIds.includes(judge.id);
+                    return (
+                      <label
+                        key={judge.id}
+                        className={`flex items-start gap-3 p-3 rounded cursor-pointer transition-all border ${
+                          isSelected
+                            ? "bg-gold/10 border-gold shadow-lg ring-1 ring-gold/20"
+                            : "bg-charcoal-light border-terracotta/20 hover:border-terracotta/50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleJudgeToggle(judge.id)}
+                          className="sr-only"
+                        />
+                        {/* Profile Image/Avatar */}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-terracotta/10 border border-terracotta/20 flex items-center justify-center">
+                          {judge.profileImageUrl ? (
+                            <img
+                              src={judge.profileImageUrl}
+                              alt={judge.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-cream text-xs font-bold">
+                              {judge.name.replace(/^(Prof\.|Smt\.|Dr\.|Mr\.|Ms\.)\s+/i, "").charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-cream truncate" title={judge.name}>{judge.name}</p>
+                          <p className="text-xs text-cream/60">{judge.tier}</p>
+                          {judge.specializations.length > 0 && (
+                            <p className="text-xs text-cream/50 truncate" title={judge.specializations.join(", ")}>
+                              {judge.specializations.join(", ")}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })
                 ) : (
-                  <p className="text-sm text-cream/40 italic">Loading judges...</p>
+                  <p className="text-sm text-cream/40 italic col-span-3 text-center py-4">
+                    {availableJudges.length === 0 ? "Loading judges..." : "No judges match the filters"}
+                  </p>
                 )}
               </div>
             </div>
@@ -808,18 +1001,17 @@ export default function CreateCompetitionWizard({
               <p className="text-xs text-cream/60">
                 This rulebook will be visible to all participants
               </p>
-              <textarea
+              <RichTextEditor
                 value={data.rules}
-                onChange={(e) =>
-                  setData((prev) => ({ ...prev, rules: e.target.value }))
+                onChange={(html) =>
+                  setData((prev) => ({
+                    ...prev,
+                    rules: html,
+                  }))
                 }
-                className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta resize-none"
-                rows={12}
-                placeholder="1. Participants must register before the deadline
-2. Original work is mandatory
-3. ...
-
-Markdown formatting is supported."
+                placeholder="1. Participants must register before the deadline.
+2. Original work is mandatory.
+3. ..."
               />
             </div>
           )}

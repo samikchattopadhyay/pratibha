@@ -78,7 +78,7 @@ export default function BannerTemplatePicker({
 
       {/* Template Grid */}
       {filteredTemplates.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {filteredTemplates.map((template) => (
             <button
               key={template.id}

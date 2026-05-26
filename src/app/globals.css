@@ -92,3 +92,21 @@ body {
   background-color: var(--scrollbar-thumb-hover);
 }
 
+/* Make calendar picker icon white and the popup dark for dark date inputs */
+.dark input[type="date"],
+input.bg-charcoal[type="date"] {
+  color-scheme: dark;
+}
+
+/* Force cursor pointer over the entire date input component including browser shadow DOM */
+input[type="date"],
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  cursor: pointer !important;
+}
+

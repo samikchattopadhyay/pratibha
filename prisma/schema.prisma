@@ -356,6 +356,8 @@ model Judge {
   bio                 String?
   credentials         String?
   stateOfResidence    String?
+  states              String[]          @default([])
+  languages           String[]          @default([])
   yearsOfExperience   Int?
   isVerified          Boolean           @default(false)
   isAvailable         Boolean           @default(true)

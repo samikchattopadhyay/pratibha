@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!title) return NextResponse.json({ error: "Competition title is required" }, { status: 400 });
+    if (!minAge || !maxAge) return NextResponse.json({ error: "Age group is required" }, { status: 400 });
 
     // Plan 01 — scope-based validation
     if (scope === "STATE" && (!eligibleStates || eligibleStates.length === 0)) {

@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
         bio: j.bio,
         credentials: j.credentials,
         stateOfResidence: j.stateOfResidence,
+        states: (j as any).states || [],
+        languages: (j as any).languages || [],
         yearsOfExperience: j.yearsOfExperience,
         isVerified: j.isVerified,
         isAvailable: j.isAvailable,
