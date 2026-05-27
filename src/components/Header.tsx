@@ -243,7 +243,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-cream/90 backdrop-blur-md border-b border-terracotta/10 dark:bg-charcoal-light dark:border-terracotta/10 transition-colors duration-300">
+    <header className="sticky top-0 z-50 bg-cream/90 backdrop-blur-md border-b-4 border-terracotta/10 dark:bg-charcoal-light dark:border-terracotta/10 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20">
           <div className="flex items-center">
