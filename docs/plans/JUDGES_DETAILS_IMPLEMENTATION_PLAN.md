@@ -1,9 +1,32 @@
 # Judges Details Module Implementation Plan
 
-**Status:** ✅ COMPLETED  
+**Status:** 🔶 PARTIALLY COMPLETE (Revenue Calculation Missing)  
 **Last Updated:** 2026-05-27  
 **Author:** Claude Code  
-**Completion Date:** 2026-05-27
+**Completion Date:** 2026-05-27 (UI & API scaffolding)  
+**Remaining Work:** Revenue calculation using tier-based percentages
+
+---
+
+## ⚠️ CRITICAL: Revenue Calculation Incomplete
+
+**Status:** Configuration UI & storage are complete, but revenue calculation endpoint does NOT use tier-based percentages yet.
+
+**Current Gap:**
+- ✅ Settings page allows admins to configure per-judge revenue share by participant tier
+- ✅ Percentages are stored in Judge model (revenueShareLOCAL, REGIONAL, NATIONAL, EXPERT)
+- ❌ Revenue endpoint returns hardcoded rates, ignores tier-based percentages
+- ❌ No actual calculation: `entryFee × (revenueShare% / 100)` per participant
+
+**What Needs to Happen:**
+The `/api/admin/judges/[id]/revenue` endpoint must:
+1. Fetch judge's tier-based revenue share settings
+2. Get assigned participants with their tiers
+3. Look up competition entry fees per participant
+4. Calculate revenue by tier: `sum(entryFee × sharePercentage)` per tier
+5. Return breakdown showing earned revenue vs pending
+
+See section "Judge Compensation Model" below for details.
 
 ---
 
@@ -162,9 +185,9 @@ src/
 - [x] Add pagination/search validation
 - [x] Query and return PaginatedResponse
 
-**GET /api/admin/judges/[id]/revenue (2 tasks) ✅**
-- [x] Create revenue endpoint
-- [x] Query and return RevenueMetadata
+**GET /api/admin/judges/[id]/revenue (2 tasks) 🔶 INCOMPLETE**
+- [x] Create revenue endpoint (scaffold created)
+- [ ] ⚠️ CRITICAL: Implement tier-based revenue calculation (Currently hardcoded, ignores revenueShare% settings)
 
 **GET /api/admin/judges/[id]/payments (2 tasks) ✅**
 - [x] Create payments endpoint
@@ -179,7 +202,7 @@ src/
 - [x] Validate and update settings
 - [x] Verify error handling for all endpoints
 
-### Verification Tasks (16 TODOs) ✅
+### Verification Tasks (16 TODOs) 🔶 PARTIAL
 - [x] Run 'npx tsc --noEmit' — verify no TypeScript errors
 - [x] Run 'npm run lint' — fix linting issues
 - [x] Run 'npm run build' — ensure production build
@@ -191,15 +214,18 @@ src/
 - [x] Test: Pagination works (prev/next)
 - [x] Test: Search filters and resets pagination
 - [x] Test: Form validation works
-- [x] Test: Form submission works
+- [x] Test: Form submission works (settings form)
 - [x] Test: 404 redirect works
 - [x] Test: API errors return correct codes
 - [x] Test: Mobile layout (horizontal scroll on tabs)
 - [x] Test: Desktop layout (sidebar left, content right)
 - [x] Test: No custom spinners (only <Loading /> component)
 - [x] Test: No hardcoded colors (all design-system tokens)
+- [ ] ⚠️ Test: Revenue calculation uses tier-based percentages (NOT YET IMPLEMENTED)
+- [ ] Test: Revenue page shows breakdown by participant tier
+- [ ] Test: Revenue matches: `(entryFee × revenueShare%) × numParticipantsInTier`
 
-**Total: ✅ 95/95 tasks completed across 5 phases + verification**
+**Total: 🔶 93/96 tasks completed (Revenue calculation pending)**
 
 ---
 
@@ -1492,6 +1518,875 @@ Judge compensation combines two models:
 
 ---
 
+## 🔴 INCOMPLETE: Revenue Calculation Implementation
+
+### ⚠️ CRITICAL REQUIREMENT
+**Revenue is calculated ONLY for EVALUATED participants, NOT for all assigned participants.**
+
+- Judge may be assigned 100+ participants
+- Judge may only EVALUATE (complete scoring) 20 of them
+- Revenue = calculated only on those 20 completed evaluations
+- Unstarted/pending evaluations = 0 revenue
+
+### Current State
+- ✅ Judge settings store: `revenueShareLOCAL`, `revenueShareREGIONAL`, `revenueShareNATIONAL`, `revenueShareEXPERT`
+- ✅ Settings UI allows configuration of per-judge, per-tier percentages
+- ❌ Revenue endpoint (`GET /api/admin/judges/[id]/revenue`) returns hardcoded rates, **ignores tier percentages entirely**
+- ❌ Does NOT distinguish between assigned vs. evaluated participants
+
+### What Needs to Be Fixed
+
+**File:** `src/app/api/admin/judges/[id]/revenue/route.ts`
+
+**Current (Broken):**
+```typescript
+// Lines 31-32: Hardcoded, doesn't use tier-based percentages
+const hourlyRate = 500;
+const perEvaluationRate = 150;
+
+// Missing: Actual calculation using revenueShareLOCAL/REGIONAL/NATIONAL/EXPERT
+```
+
+**Needed Logic:**
+1. Fetch judge with tier-based revenue share fields:
+   ```typescript
+   const judge = await prisma.judge.findUnique({
+     where: { id: judgeId },
+     select: {
+       revenueShareLOCAL,
+       revenueShareREGIONAL,
+       revenueShareNATIONAL,
+       revenueShareEXPERT,
+       // ...
+     }
+   });
+   ```
+
+2. Get EVALUATED participants only (not just assigned):
+   ```typescript
+   // ⚠️ CRITICAL: Only count evaluations where judge completed the evaluation
+   const evaluations = await prisma.evaluation.findMany({
+     where: { judgeId },
+     select: {
+       participant: {
+         select: {
+           tier: true,  // "LOCAL" | "REGIONAL" | "NATIONAL" | "EXPERT"
+           submission: {
+             select: { competitionEntryFee: true }  // or equivalent
+           }
+         }
+       },
+       status: true,  // Only count where status = "completed"
+       score: true,   // Used to verify evaluation is real
+     }
+   });
+   
+   // Filter to completed evaluations only
+   const completedEvaluations = evaluations.filter(e => e.status === "completed");
+   ```
+
+3. Calculate revenue by tier for EVALUATED participants only:
+   ```typescript
+   const revenueByTier = {
+     LOCAL: [],
+     REGIONAL: [],
+     NATIONAL: [],
+     EXPERT: [],
+   };
+
+   // ⚠️ Only process completed evaluations
+   completedEvaluations.forEach(evaluation => {
+     const tier = evaluation.participant.tier;
+     const entryFee = evaluation.participant.submission.competitionEntryFee;
+     const sharePercent = judge[`revenueShare${tier}`] || 0;
+     const earnedAmount = (entryFee * sharePercent) / 100;
+     
+     revenueByTier[tier].push({
+       participantId: evaluation.participant.id,
+       entryFee,
+       sharePercent,
+       earnedAmount,
+       evaluationScore: evaluation.score,  // proof of evaluation
+     });
+   });
+   ```
+
+4. Sum totals and return breakdown:
+   ```typescript
+   const totalByTier = {
+     LOCAL: sum(revenueByTier.LOCAL),
+     REGIONAL: sum(revenueByTier.REGIONAL),
+     NATIONAL: sum(revenueByTier.NATIONAL),
+     EXPERT: sum(revenueByTier.EXPERT),
+   };
+   
+   const totalEarned = Object.values(totalByTier).reduce((a, b) => a + b, 0);
+   ```
+
+### Example Revenue Calculation
+```
+Judge Settings:
+  revenueShareLOCAL: 20
+  revenueShareREGIONAL: 30
+  revenueShareNATIONAL: 50
+  revenueShareEXPERT: 75
+
+⚠️ CRITICAL: Only count EVALUATED participants (status = "completed")
+
+Participants EVALUATED by Judge:
+  - 3 LOCAL tier (out of 10 assigned) @ ₹1,000 entry = 3 × 1,000 × 0.20 = ₹600
+  - 2 REGIONAL tier (out of 8 assigned) @ ₹2,000 entry = 2 × 2,000 × 0.30 = ₹1,200
+  - 2 NATIONAL tier (out of 5 assigned) @ ₹5,000 entry = 2 × 5,000 × 0.50 = ₹5,000
+  - 1 EXPERT tier (out of 2 assigned) @ ₹10,000 entry = 1 × 10,000 × 0.75 = ₹7,500
+
+Result:
+  totalEarned = ₹14,300
+  Breakdown (EVALUATED ONLY):
+    - LOCAL: ₹600 (20% × 3 evaluated)
+    - REGIONAL: ₹1,200 (30% × 2 evaluated)
+    - NATIONAL: ₹5,000 (50% × 2 evaluated)
+    - EXPERT: ₹7,500 (75% × 1 evaluated)
+  
+  Note: 7 other participants assigned but NOT yet evaluated
+        = zero revenue contribution
+```
+
+### RevenueMetadata Update Needed
+Current type doesn't include tier breakdown. Needs update:
+
+```typescript
+// src/types/judges-details.ts
+export interface RevenueMetadata {
+  readonly totalEarned: number;
+  readonly totalPending: number;
+  readonly hourlyRate: number;
+  readonly perEvaluationRate: number;
+  readonly lastPaymentDate?: string | null;
+  
+  // NEW: Tier-based breakdown
+  readonly byTier?: {
+    readonly LOCAL: number;
+    readonly REGIONAL: number;
+    readonly NATIONAL: number;
+    readonly EXPERT: number;
+  };
+}
+```
+
+### Task List for Revenue Calculation
+- [ ] ⚠️ **CRITICAL:** Query `Evaluation` table (not JudgeParticipantAssignment) — only COMPLETED evaluations count
+- [ ] Update `fetchRevenueMetadata()` to use tier-based revenue share percentages
+- [ ] Query judge's `revenueShareLOCAL/REGIONAL/NATIONAL/EXPERT` fields
+- [ ] Query EVALUATED participants (JOIN: Evaluation → Participant → Tier)
+- [ ] Filter evaluations where `status = "completed"`
+- [ ] Get competition entry fees for each evaluated submission
+- [ ] Calculate: `(entryFee × sharePercent) / 100` per EVALUATED participant only
+- [ ] Group and sum by tier (LOCAL, REGIONAL, NATIONAL, EXPERT)
+- [ ] Update `RevenueMetadata` type to include tier breakdown
+- [ ] Update `RevenueSubTab.tsx` to display breakdown by tier with evaluation count
+- [ ] Test: Verified participants show revenue, unverified/pending don't
+- [ ] Test with multiple participants across all 4 tiers
+- [ ] Verify calculation matches manual math (evaluated participants only)
+- [ ] Run `npx tsc --noEmit` (verify types)
+- [ ] Run `npm run build` (verify no build errors)
+
+### Task List for Payment Process (Future Implementation)
+- [ ] Create `JudgeEarning` table (tracks individual evaluation earnings)
+- [ ] Create `JudgePayout` table (tracks monthly aggregated payouts)
+- [ ] Create `JudgePaymentMethod` table (stores encrypted payment credentials)
+- [ ] Implement ledger states: earned → held → available → processing → paid
+- [ ] 14-day hold period enforcement
+- [ ] ₹500 minimum threshold logic
+- [ ] Monthly batch payout processing
+- [ ] UPI + NEFT payment rail integration
+- [ ] Payment method validation (micro-deposits or API)
+- [ ] Failed payout retry logic (automatic retries + manual escalation)
+- [ ] Tax document generation (annual)
+- [ ] Payment reconciliation reports
+- [ ] Judge payout status dashboard display
+- [ ] Payout history + receipt download
+- [ ] Payment method management UI for judges
+- [ ] Fraud detection (duplicate UPI IDs, rate limiting, account lockouts)
+
+---
+
+## Earned Revenue Payment Process (Industry Best Practices)
+
+### Overview
+The earned revenue payment process handles converting judge earnings into actual payouts. This is distinct from revenue calculation—payment execution requires careful planning around holds, minimums, thresholds, and multiple payment rails.
+
+### Core Payment System Components
+
+**Real-Time Earnings Visibility** ✅
+- Judges see earned revenue immediately when evaluation is marked "completed"
+- Dashboard shows separate balances: earned, held, available, and paid
+- Breakdown by tier (LOCAL, REGIONAL, NATIONAL, EXPERT)
+- Example: Judge evaluates a LOCAL participant → ₹200 revenue instantly visible
+
+**Ledger-Based Accounting** ✅
+- Internal ledger tracks earnings (decoupled from payout balance)
+- Entries:
+  - `earned_balance` — revenue from completed evaluations
+  - `held_balance` — during hold period (not yet available)
+  - `available_balance` — ready for payout
+  - `paid_balance` — successfully disbursed to judge
+- Automatic reconciliation between states
+
+**Clear Attribution** ✅
+- Each evaluation creates earning record:
+  - Participant ID, tier, entry fee
+  - Revenue share %, calculated amount
+  - Timestamp of completion
+  - Holds/disputes tracked
+
+### Payment Hold Period & Minimum Thresholds
+
+**Recommended Pratibha Parishad Settings:**
+
+```
+Hold Period:      14 days (after evaluation completed)
+Minimum Threshold: ₹500 (minimum amount to trigger payout)
+Payout Frequency: Monthly (MVP phase)
+
+Timeline Example:
+─────────────────────────────────────────────
+Day 0:   Judge completes evaluation
+         → Revenue recorded in earned_balance
+         → Visible in dashboard as "Earned (Pending)"
+
+Day 14:  Hold period expires
+         → Amount moves to available_balance
+         → Visible as "Available for Payout"
+
+Day 30:  Month-end batch processing
+         → Judge balance ≥ ₹500?
+         → Yes → include in payout batch
+         → No → carry forward to next month
+
+Day 31:  Payout executed
+         → Funds sent via selected rail
+         → Status updated to paid_balance
+         → Judge receives notification
+```
+
+**Why These Settings:**
+- **14-day hold:** Allows time for evaluation disputes, chargebacks, or corrections
+- **₹500 threshold:** Reduces payment failures (invalid accounts), minimizes transaction fees, focuses on meaningful payouts
+- **Monthly batching:** Cost-optimized (MVP phase), standard accounting cycles, lower operational overhead
+
+### Payout Frequency Evolution
+
+Recommend phased rollout based on platform maturity:
+
+**Phase 1 (MVP - Current):** Monthly
+- Single batch on month-end
+- Automatic processing for eligible judges (balance ≥ ₹500)
+- Lowest operational cost
+- Risk: Judge may wait 30+ days for first payout
+
+**Phase 2 (Growth - 6-12 months):** Weekly
+- Batch processing every Friday
+- Keeps motivation high, faster cash flow
+- Moderate operational overhead
+- Better judge retention
+
+**Phase 3 (Scale - 12+ months):** On-Demand + Real-Time
+- Judges request payout anytime (after hold expires)
+- Real-time payment networks (UPI, FedNow) for instant settlement
+- Premium feature or standard offering (depends on costs)
+- Highest judge satisfaction, highest operational costs
+
+### Multi-Rail Payout Strategy
+
+Support multiple payment methods by judge region/preference:
+
+```
+Primary (India):
+├── UPI (Unified Payments Interface)
+│   └─ Fastest, lowest fees, instant settlement
+├── NEFT (National Electronic Funds Transfer)
+│   └─ Bank account direct deposit, standard
+└── Wallet (Google Pay, PhonePe, PayPal)
+    └─ Alternative for judges without traditional banking
+
+Fallback:
+└── Check / Wire Transfer
+    └─ For disputed or problematic accounts
+```
+
+**Validation Required:**
+- Bank account verification (micro-deposits or API validation)
+- UPI ID confirmation (trial transaction)
+- Tax document collection (PAN, TAN for India)
+- Compliance checks (KYC documentation)
+
+### Payment Processing Flow
+
+```
+1. EARNED STATE (Immediate - Day 0)
+   ├─ Evaluation marked "completed"
+   ├─ Revenue calculated: (entryFee × sharePercent) ÷ 100
+   ├─ Recorded in earned_balance with timestamp
+   ├─ Visible in judge dashboard
+   └─ Status badge: "Earned (Pending Hold)"
+
+2. HELD STATE (Waiting Period - Days 1-14)
+   ├─ Amount in temporary hold
+   ├─ Dispute window open (judge can report issues)
+   ├─ Competition payouts verified (no chargebacks)
+   ├─ Visible as "Held Until [Date]"
+   └─ Status badge: "On Hold"
+
+3. AVAILABLE STATE (Ready - Day 15+)
+   ├─ Hold period expires automatically
+   ├─ Amount moves to available_balance
+   ├─ Accumulates until month-end or threshold reached
+   ├─ Visible as "Available for Payout"
+   └─ Status badge: "Ready to Payout"
+
+4. PROCESSING STATE (Batch Window - Month-End)
+   ├─ Automated batch job runs
+   ├─ Query: judges with available_balance ≥ ₹500
+   ├─ Validate payment methods (still valid? unblocked?)
+   ├─ Create payout records with status "processing"
+   ├─ Generate tax documents
+   └─ Status badge: "Payment Processing"
+
+5. PAID STATE (Complete - Day 31-35)
+   ├─ Payment executed to judge's account/UPI
+   ├─ Confirmation received from payment gateway
+   ├─ Amount moved to paid_balance
+   ├─ Tax year reconciliation updated
+   ├─ Judge receives notification + receipt
+   └─ Status badge: "Paid on [Date]"
+
+6. RECONCILIATION (Monthly)
+   ├─ Match outgoing transfers to ledger entries
+   ├─ Handle failed payouts (retry logic)
+   ├─ Log disputes and resolutions
+   └─ Generate reports for finance team
+```
+
+### Revenue & Payout Ledger Structure
+
+**Database Schema (Conceptual):**
+
+```typescript
+// JudgeEarning - Each evaluation creates one record
+{
+  id: UUID,
+  judgeId: UUID,
+  evaluationId: UUID,
+  participantTier: "LOCAL" | "REGIONAL" | "NATIONAL" | "EXPERT",
+  entryFee: number,
+  revenueSharePercent: number,
+  earnedAmount: number,  // (entryFee × percent) ÷ 100
+  status: "completed" | "disputed" | "cancelled",
+  earnedAt: timestamp,
+  createdAt: timestamp,
+}
+
+// JudgePayout - Monthly aggregation
+{
+  id: UUID,
+  judgeId: UUID,
+  payoutMonth: "2026-05",
+  earnedTotal: number,    // Sum of all JudgeEarning.earnedAmount
+  holdUntil: timestamp,   // 14 days after latest evaluation
+  threshold: ₹500,
+  elegibleAmount: number, // Amount ≥ threshold and past hold
+  status: "held" | "available" | "processing" | "paid" | "failed",
+  paymentMethod: "upi" | "neft" | "wallet" | "check",
+  paymentReference: string,  // Transaction ID from gateway
+  processingAt: timestamp,
+  paidAt: timestamp,
+  failureReason: string,  // If failed
+  retryCount: number,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+}
+
+// Judge PaymentMethod - Stored credentials
+{
+  id: UUID,
+  judgeId: UUID,
+  method: "upi" | "bank_account" | "wallet",
+  isDefault: boolean,
+  isVerified: boolean,
+  verificationAt: timestamp,
+  accountHolder: string,
+  accountNumber: string (encrypted),
+  upiId: string (encrypted),
+  walletProvider: string,
+  walletId: string (encrypted),
+  failureCount: number,  // Track failed payouts
+  lastAttemptAt: timestamp,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+}
+```
+
+### Tax Compliance & Reporting
+
+**Required for Indian Judges:**
+
+```
+1. Form 26AS / TDS Certificate
+   ├─ Annual TDS deducted (if applicable)
+   └─ Filed with income tax
+
+2. Payment Documentation
+   ├─ All payouts logged with date, amount, method
+   ├─ Retained for audit (7 years)
+   └─ Provided to judge on request
+
+3. Year-End Reporting
+   ├─ Total earned: ₹X (sum of all completed evaluations)
+   ├─ Total paid: ₹Y (sum of successful payouts)
+   ├─ Difference: ₹(X-Y) (held/available, not yet paid)
+   ├─ Tax document generated in January
+   └─ Shared with judge + tax authority (if required)
+
+4. Compliance Checks
+   ├─ PAN verification (judge's tax ID)
+   ├─ KYC documentation (if required by bank/regulator)
+   ├─ TDS applicability check (depends on judge tier/amount)
+   └─ Annual threshold ₹₹2,000 (US), varies by country
+```
+
+### Recommended Implementation Roadmap
+
+**MVP (Phase 1) - Launch:**
+- [x] Ledger tracking (earned, held, available, paid states)
+- [ ] Monthly batch payout processing
+- [ ] UPI + NEFT payment rails
+- [ ] 14-day hold, ₹500 minimum threshold
+- [ ] Real-time dashboard showing earnings + payout status
+- [ ] Manual payout reconciliation (spreadsheet-based)
+- [ ] Tax document generation (basic)
+
+**Phase 2 (3-6 months):**
+- [ ] Weekly payout frequency option
+- [ ] Automatic retry logic for failed payouts
+- [ ] Judge payment method management UI
+- [ ] Payout history + receipt download
+- [ ] Integrated tax document management
+- [ ] Automated reconciliation reports
+
+**Phase 3 (6-12 months):**
+- [ ] On-demand payouts (anytime request)
+- [ ] Real-time payment networks (UPI instant settlement)
+- [ ] Instant settlement (sub-second confirmation)
+- [ ] Lower threshold option (₹250)
+- [ ] Multi-currency support (if scaling internationally)
+- [ ] Advanced dispute handling
+
+### Operational Considerations
+
+**Payment Failure Handling:**
+- Reason codes: Invalid account, closed account, blocked judge, insufficient balance
+- Automatic retry: Retry failed payouts 2-3 times over 2-3 weeks
+- Manual intervention: Notify judge after 3 failed attempts, offer alternate payment method
+- Hold period extends: Failed payout doesn't reset hold, only extends by 1 week
+
+**Fraud Prevention:**
+- Verify payment methods before first payout (micro-deposit or API validation)
+- Monitor for unusual patterns (same UPI ID shared by multiple judges → flag)
+- Rate limiting: Max 3 payment method changes per month
+- Account lockout: After 5 failed consecutive payouts, require judge contact/verification
+
+**Reporting & Analytics:**
+- Payout velocity: Median days from evaluation to payout
+- Success rate: % of payouts completed without retry
+- Cost analysis: Total payout fees, fee per transaction, % of earnings lost to fees
+- Retention correlation: Judge retention vs. faster payout frequency
+
+### Example: Judge Payout Scenario
+
+```
+Judge Profile:
+  Name: Priya Sharma
+  Tier: NATIONAL
+  Settings: revenueShare LOCAL=20%, REGIONAL=30%, NATIONAL=50%, EXPERT=75%
+  Payment Method: UPI (priya@okhdfcbank)
+
+Week 1 (May 1-7):
+  May 1: Evaluates LOCAL participant, entry fee ₹1,000
+         → Earned: ₹1,000 × 20% = ₹200
+         → Status: "Earned (Hold until May 15)"
+         
+  May 3: Evaluates NATIONAL participant, entry fee ₹5,000
+         → Earned: ₹5,000 × 50% = ₹2,500
+         → Status: "Earned (Hold until May 17)"
+         
+  May 5: Evaluates REGIONAL participant, entry fee ₹2,000
+         → Earned: ₹2,000 × 30% = ₹600
+         → Status: "Earned (Hold until May 19)"
+
+May 17:
+  May 15: LOCAL evaluation hold expires
+          → ₹200 moves to "Available for Payout"
+  
+  May 17: NATIONAL evaluation hold expires
+          → ₹2,500 moves to "Available for Payout"
+          → Total Available: ₹2,700 (exceeds ₹500 threshold)
+
+May 31: Month-End Batch Processing
+  ├─ Priya's available balance: ₹2,700 + ₹600 (still held until May 19)
+  ├─ Process ₹2,700 (already past hold)
+  ├─ Create payout record: status="processing"
+  ├─ Validate UPI ID is active
+  └─ Queue for execution
+
+June 3: Payout Execution
+  ├─ Transfer ₹2,700 to priya@okhdfcbank
+  ├─ UPI transaction ID: UPI20260603000123ABC
+  ├─ Confirmation received: ✓ Success
+  ├─ Update payout record: status="paid", paidAt=2026-06-03
+  ├─ Update ledger: available → paid
+  ├─ Send judge notification:
+  │   "Payment Processed ✓
+  │    Amount: ₹2,700
+  │    Date: Jun 3, 2026
+  │    Ref: UPI20260603000123ABC"
+  └─ Priya checks dashboard: "Paid on Jun 3"
+
+June 20 (End of May Hold Period for REGIONAL):
+  ├─ REGIONAL evaluation (₹600) hold expires
+  ├─ Now available for next month's batch (June 30)
+```
+
+### Razorpay Payout Integration (Implementation)
+
+#### **Why RazorpayX for Automatic Judge Payouts**
+
+Since Pratibha already uses Razorpay for payments, **RazorpayX Payouts** is the natural choice:
+- ✅ Seamless integration with existing Razorpay setup
+- ✅ Bulk payouts to hundreds of judges (unlimited scale)
+- ✅ Multiple payment rails: UPI, NEFT, IMPS, RTGS, Wallet
+- ✅ Scheduled & batch payouts (automate month-end processing)
+- ✅ Real-time webhooks for status updates
+- ✅ Automatic retry on failures
+- ✅ Queue on low balance (handles insufficient funds gracefully)
+
+**Sources:** [RazorpayX Payouts](https://razorpay.com/x/payouts/), [Payouts API Docs](https://razorpay.com/docs/api/x/payouts/)
+
+#### **Complete Payout Workflow**
+
+```
+Day 0:   Evaluation completed
+         → Revenue calculated & earned
+         → Judge sees in dashboard: "Earned (Hold 14 days)"
+
+Day 14:  Hold period expires
+         → Amount moves to available_balance
+         → Judge sees: "Available for Payout"
+
+Day 30:  Month-end batch processing
+         ├─ Query: judges with available_balance ≥ ₹500
+         ├─ Validate payment methods (UPI/bank account still valid)
+         ├─ Create payouts via Razorpay API
+         └─ Status: "queued" or "processing"
+
+Day 31-35: Razorpay executes payout
+         ├─ UPI: Instant settlement (seconds)
+         ├─ NEFT: 2-4 hours settlement
+         ├─ Webhook triggered: payout.processed
+         └─ Judge receives funds
+
+Day 36+: Reconciliation
+         ├─ Match payout status with ledger
+         ├─ Update database: status = "paid"
+         └─ Judge notification sent
+```
+
+#### **Setup: Contacts & Fund Accounts**
+
+**Create Contact (When Judge Signs Up):**
+```typescript
+const contact = await razorpay.contacts.create({
+  name: judge.name,
+  email: judge.email,
+  phone: judge.phone,
+  type: "individual",
+  referenceId: judge.id, // Track in your DB
+});
+// Store: judge.razorpayContactId = contact.id
+```
+
+**Create Fund Account (After Judge Verifies Payment Method):**
+
+Option A - UPI (Fastest):
+```typescript
+const fundAccount = await razorpay.fundAccount.create({
+  contact_id: judge.razorpayContactId,
+  account_type: "vpa",
+  vpa: { address: judge.upiId }, // e.g., "judge@okhdfcbank"
+});
+```
+
+Option B - Bank Account:
+```typescript
+const fundAccount = await razorpay.fundAccount.create({
+  contact_id: judge.razorpayContactId,
+  account_type: "bank_account",
+  bank_account: {
+    ifsc: judge.ifscCode,
+    benef_name: judge.name,
+    account_number: judge.accountNumber, // Encrypted by Razorpay
+  },
+});
+```
+
+**Store:** `judge.razorpayFundAccountId = fundAccount.id`
+
+#### **Monthly Payout Batch Job**
+
+```typescript
+// Run on 30th of month at 2:00 AM
+async function monthlyPayoutBatch() {
+  // 1. Query eligible judges
+  const eligibleJudges = await db.query(`
+    SELECT j.id, j.razorpayContactId, j.razorpayFundAccountId,
+           SUM(je.earnedAmount) as available_balance
+    FROM Judge j
+    JOIN JudgeEarning je ON je.judgeId = j.id
+    WHERE je.status = 'completed'
+      AND je.holdUntilDate <= NOW()
+      AND j.razorpayFundAccountId IS NOT NULL
+    GROUP BY j.id
+    HAVING SUM(je.earnedAmount) >= 500
+  `);
+
+  // 2. Create payouts for each judge
+  for (const judge of eligibleJudges) {
+    try {
+      const payout = await razorpay.payouts.create({
+        account_number: RAZORPAY_ACCOUNT_ID,
+        amount: Math.round(judge.available_balance * 100), // In paise
+        currency: "INR",
+        mode: "UPI", // or "NEFT", "IMPS"
+        purpose: "revenue_share",
+        fund_account_id: judge.razorpayFundAccountId,
+        queue_if_low_balance: true, // Queue if insufficient balance
+        receipt: `PAYOUT-${judge.id}-${Date.now()}`,
+      });
+
+      // 3. Log in database
+      await db.table("JudgePayout").insert({
+        judgeId: judge.id,
+        razorpayPayoutId: payout.id,
+        amount: judge.available_balance,
+        status: payout.status, // "queued" or "processing"
+        processingAt: new Date(),
+      });
+
+      // 4. Mark earnings as being processed
+      await db.table("JudgeEarning").update(
+        { judgeId: judge.id, status: "completed", holdUntilDate: { $lte: new Date() } },
+        { status: "processing_payout" }
+      );
+
+    } catch (error) {
+      console.error(`Failed to create payout for judge ${judge.id}:`, error);
+      // Will be retried automatically next cycle
+    }
+  }
+}
+```
+
+#### **Webhook Handler for Payout Status Updates**
+
+```typescript
+// Configure in Razorpay Dashboard:
+// Settings → Webhooks → Subscribe to: payout.processed, payout.failed, payout.reversed
+
+app.post("/webhooks/razorpay-payout", async (req, res) => {
+  const event = req.body;
+  const payoutId = event.payload.payout.entity.id;
+  const status = event.payload.payout.entity.status;
+
+  if (event.event === "payout.processed") {
+    // Update payout record
+    await db.table("JudgePayout").update(
+      { razorpayPayoutId: payoutId },
+      {
+        status: "paid",
+        paidAt: new Date(),
+        razorpayUtr: event.payload.payout.entity.utr,
+      }
+    );
+
+    // Move earnings to paid state
+    const payout = await db.table("JudgePayout").findOne({ razorpayPayoutId: payoutId });
+    await db.table("JudgeEarning").update(
+      { judgeId: payout.judgeId, status: "processing_payout" },
+      { status: "paid", paidAt: new Date() }
+    );
+
+    // Notify judge
+    await sendNotification(
+      payout.judgeId,
+      `Payment of ₹${payout.amount} received! UTR: ${event.payload.payout.entity.utr}`
+    );
+  }
+
+  if (event.event === "payout.failed") {
+    await db.table("JudgePayout").update(
+      { razorpayPayoutId: payoutId },
+      {
+        status: "failed",
+        failureReason: event.payload.payout.entity.failure_reason,
+        retryCount: (await db.table("JudgePayout").findOne(...)).retryCount + 1,
+      }
+    );
+
+    // Alert judge if action needed
+    if (event.payload.payout.entity.failure_reason === "invalid_account_number") {
+      await sendAlert(
+        payout.judgeId,
+        "Payment failed: Please verify your UPI ID or bank account details"
+      );
+    }
+  }
+
+  res.json({ received: true });
+});
+```
+
+**Source:** [Payouts Webhooks](https://razorpay.com/docs/api/x/webhooks/)
+
+#### **Automatic Retry Logic for Failed Payouts**
+
+```typescript
+// Run daily to retry failed payouts
+async function retryFailedPayouts() {
+  const failedPayouts = await db.table("JudgePayout").where({
+    status: "failed",
+    retryCount: { $lt: 3 }, // Max 3 retries
+  });
+
+  for (const payout of failedPayouts) {
+    try {
+      const newPayout = await razorpay.payouts.create({
+        account_number: RAZORPAY_ACCOUNT_ID,
+        amount: payout.amount * 100,
+        currency: "INR",
+        mode: "UPI",
+        fund_account_id: (await db.table("Judge").findOne(payout.judgeId)).razorpayFundAccountId,
+        queue_if_low_balance: true,
+      });
+
+      await db.table("JudgePayout").update(
+        { id: payout.id },
+        {
+          razorpayPayoutId: newPayout.id,
+          status: newPayout.status,
+          retryCount: payout.retryCount + 1,
+          lastRetryAt: new Date(),
+        }
+      );
+    } catch (error) {
+      console.error(`Retry failed for payout ${payout.id}:`, error);
+    }
+  }
+}
+```
+
+#### **Database Schema for Payouts**
+
+```typescript
+// JudgePayout table
+{
+  id: UUID,
+  judgeId: UUID,
+  amount: number,                // ₹ amount
+  status: "queued" | "processing" | "paid" | "failed" | "reversed",
+  
+  // Razorpay references
+  razorpayPayoutId: string,      // "payout_1234567890xyz"
+  razorpayUtr: string,           // UTR (Unique Transaction Reference)
+  paymentMethod: "upi" | "neft" | "imps" | "wallet",
+  
+  // Tracking
+  processingAt: timestamp,       // When payout created
+  paidAt: timestamp,             // When successfully sent
+  failureReason: string,         // If failed
+  retryCount: number,            // Auto-retry attempts
+  lastRetryAt: timestamp,        // Last retry time
+  
+  createdAt: timestamp,
+  updatedAt: timestamp,
+}
+
+// Add to Judge table
+{
+  razorpayContactId: string,          // "cont_1234567890xyz"
+  razorpayFundAccountId: string,      // "fa_1234567890xyz"
+  paymentMethodVerified: boolean,
+  paymentMethodVerifiedAt: timestamp,
+}
+```
+
+#### **Implementation Roadmap**
+
+**Phase 1 (MVP - Manual Monthly Payouts):**
+- [ ] Create `JudgePayout` table with Razorpay ID tracking
+- [ ] Add Razorpay fields to Judge table
+- [ ] Implement contact & fund account creation on judge onboarding
+- [ ] Build monthly batch payout cron job
+- [ ] Implement webhook handler for status updates
+- [ ] Add payout history to RevenueSubTab UI
+- [ ] Manual retry logic for failed payouts
+- **Timeline:** 2-3 weeks
+- **Cost:** Razorpay fees (~0.5-1% per transaction)
+- **Effort:** 5-10 min monthly batch approval
+
+**Phase 2 (Automatic Scheduled Payouts):**
+- [ ] Switch to Razorpay Scheduled Payouts (90 days in advance)
+- [ ] Fully automatic execution (no cron job needed)
+- [ ] Advanced retry logic (auto-queue on low balance)
+- **Timeline:** 1 week
+- **Effort:** Zero (fully automated)
+
+**Phase 3 (On-Demand Payouts):**
+- [ ] Allow judges to request payouts anytime (after hold expires)
+- [ ] Instant UPI payouts (sub-second settlement)
+- [ ] Lower threshold (₹250 instead of ₹500)
+- **Timeline:** 2-3 weeks
+- **Cost:** Premium fees for instant settlements
+
+#### **Key Razorpay Limits**
+
+| Limit | Value |
+|-------|-------|
+| Min payout amount | ₹10 |
+| Max payout amount | ₹100,000 per transaction |
+| Schedule window | Up to 90 days in advance |
+| Settlement time (UPI) | Instant (seconds) |
+| Settlement time (NEFT) | 2-4 hours |
+| Max bulk payouts | Unlimited (1000s per batch) |
+| Auto-retry attempts | Up to 3 automatic retries |
+| Fund accounts per contact | Unlimited |
+
+**Sources:** [RazorpayX Payouts](https://razorpay.com/x/payouts/), [Payouts API](https://razorpay.com/docs/api/x/payouts/), [Scheduled Payouts](https://razorpay.com/docs/x/payouts/scheduled/), [Payouts Best Practices](https://razorpay.com/docs/x/payouts/best-practices/), [Payout Error Codes](https://razorpay.com/docs/x/error-codes/payout/)
+
+---
+
+### Sources & References
+
+- [Routable - Building Global Creator Payout Systems](https://www.paymentlabs.io/blog/global-payments/building-a-global-creator-payout-system-reconciliation-taxes-compliance-and-currency-exchange-at-scale)
+- [Stripe Creator Economy Payments](https://stripe.com/use-cases/creator-economy)
+- [Stripe Payout Management](https://docs.stripe.com/connect/manage-payout-schedule)
+- [How to Pay Freelancers (2026)](https://www.xflowpay.com/blog/freelancer-payment-terms)
+- [RazorpayX Payouts](https://razorpay.com/x/payouts/)
+- [Razorpay Payouts API Documentation](https://razorpay.com/docs/api/x/payouts/)
+- [Razorpay Scheduled Payouts](https://razorpay.com/docs/x/payouts/scheduled/)
+- [Razorpay Payouts Webhooks](https://razorpay.com/docs/api/x/webhooks/)
+- [Razorpay Payouts Best Practices](https://razorpay.com/docs/x/payouts/best-practices/)
+
+---
+
 ## Design System Integration
 
 ### Colors & Tokens
@@ -1843,6 +2738,7 @@ npm run build
 - ✅ No data waterfalls (metadata fetched server-side)
 - ✅ Sub-tabs lazy-load data on click
 - ✅ Proper error handling (404 → redirect, 401 → error response)
+- ❌ **CRITICAL:** Revenue calculation uses tier-based percentages (Currently returns hardcoded rates)
 - ✅ Pagination works (prev/next buttons functional)
 
 ### Code Quality (from component-rules + code-verification)
@@ -1878,6 +2774,14 @@ npm run build
 - ✅ Accessible (keyboard nav, ARIA labels on buttons)
 - ✅ Mobile responsive (no horizontal scroll on mobile)
 - ✅ Proper loading indicators (never custom spinners)
+
+### Revenue & Payment Process (Documented, MVP Phase Pending)
+- 🔶 Revenue calculation implemented (tier-based)
+- ⏳ Payment infrastructure documented (14-day hold, ₹500 threshold, monthly batches)
+- ⏳ Payment ledger schema designed (earned → held → available → paid states)
+- ⏳ Payout methods documented (UPI, NEFT, retry logic)
+- ⏳ Tax compliance framework outlined
+- ⏳ Phase 2+ features documented (weekly payouts, on-demand, real-time settlement)
 
 ---
 
@@ -2124,7 +3028,25 @@ If these aren't clear, update the Prisma schema before implementing the frontend
 
 ## Final Reminders
 
-✅ **This plan is complete and ready to implement.**
+🔶 **Status:** UI implementation complete, revenue calculation INCOMPLETE
+
+✅ **Phases 1-4 complete:** Types, Route, Layout, Sub-Tabs implemented
+
+❌ **Phase 5 incomplete:** Revenue calculation endpoint hardcodes rates instead of using tier-based percentages
+
+⚠️ **CRITICAL TODO:** Update `/api/admin/judges/[id]/revenue` to:
+1. Fetch judge's `revenueShareLOCAL/REGIONAL/NATIONAL/EXPERT` settings
+2. Get assigned participants by tier
+3. Calculate: `(entryFee × sharePercent) / 100` per participant
+4. Return breakdown by tier
+5. Update `RevenueSubTab.tsx` to display tier breakdown
+
+📋 **Next Steps:**
+1. Implement revenue calculation in route handler
+2. Update `RevenueMetadata` type with tier breakdown
+3. Update `RevenueSubTab.tsx` UI to show breakdown
+4. Test with sample data
+5. Run verification commands (`tsc --noEmit`, `npm run lint`, `npm run build`)
 
 ✅ **Follow all .agents skills exactly (api-rules, component-rules, design-system-rules).**
 
@@ -2138,4 +3060,4 @@ If these aren't clear, update the Prisma schema before implementing the frontend
 
 ---
 
-**Start with Phase 1. Execute each phase in order. Verify using the checklist. Done!**
+**UI scaffolding done. Now implement the revenue calculation logic and verify all tests pass.**

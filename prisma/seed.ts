@@ -92,19 +92,81 @@ async function main() {
 
   // ─── SEED ADMIN USER ─────────────────────────────────────────────────────────
 
-  const adminPassword = await bcrypt.hash("admin123", 10);
+  const adminPassword = await bcrypt.hash("adminpassword", 10);
 
   const adminUser = await prisma.user.upsert({
-    where: { email: "admin@test.com" },
+    where: { email: "admin@pratibhaparishad.org" },
     update: {},
     create: {
-      email: "admin@test.com",
+      email: "admin@pratibhaparishad.org",
       passwordHash: adminPassword,
       role: "SUPER_ADMIN",
     },
   });
 
-  console.log("✓ Seeded admin user (admin@test.com / admin123)");
+  console.log("✓ Seeded admin user (admin@pratibhaparishad.org / adminpassword)");
+
+  // ─── SEED MODERATOR USERS ─────────────────────────────────────────────────────
+
+  const moderatorPassword = await bcrypt.hash("moderatorpassword", 10);
+
+  await prisma.user.upsert({
+    where: { email: "moderator1@pratibhaparishad.org" },
+    update: {},
+    create: {
+      email: "moderator1@pratibhaparishad.org",
+      passwordHash: moderatorPassword,
+      role: "MODERATOR",
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "moderator2@pratibhaparishad.org" },
+    update: {},
+    create: {
+      email: "moderator2@pratibhaparishad.org",
+      passwordHash: moderatorPassword,
+      role: "MODERATOR",
+    },
+  });
+
+  console.log("✓ Seeded 2 moderator users (moderator1@pratibhaparishad.org, moderator2@pratibhaparishad.org / moderatorpassword)");
+
+  // ─── SEED JUDGE USERS ─────────────────────────────────────────────────────────
+
+  const judgePasswordHash = await bcrypt.hash("judgepassword", 10);
+
+  for (let i = 1; i <= 25; i++) {
+    await prisma.user.upsert({
+      where: { email: `judge${i}@pratibhaparishad.org` },
+      update: {},
+      create: {
+        email: `judge${i}@pratibhaparishad.org`,
+        passwordHash: judgePasswordHash,
+        role: "JUDGE",
+      },
+    });
+  }
+
+  console.log("✓ Seeded 25 judge users (judge1@pratibhaparishad.org to judge25@pratibhaparishad.org / judgepassword)");
+
+  // ─── SEED PARENT USERS ─────────────────────────────────────────────────────────
+
+  const parentPasswordHash = await bcrypt.hash("parentpassword", 10);
+
+  for (let i = 1; i <= 300; i++) {
+    await prisma.user.upsert({
+      where: { email: `parent_${i}@example.com` },
+      update: {},
+      create: {
+        email: `parent_${i}@example.com`,
+        passwordHash: parentPasswordHash,
+        role: "PARENT",
+      },
+    });
+  }
+
+  console.log("✓ Seeded 300 parent users (parent_1@example.com to parent_300@example.com / parentpassword)");
 
   // ─── SEED PARENT & STUDENTS ───────────────────────────────────────────────────
 
