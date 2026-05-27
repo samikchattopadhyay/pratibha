@@ -790,7 +790,6 @@ function AdminDashboardContent() {
           {activeTab === "judges" && (
             <JudgesTab
               judges={judges}
-              registrations={registrations}
               kanbanCards={kanbanCards}
               itemsPerPage={itemsPerPage}
               kanbanPendingPage={kanbanPendingPage}

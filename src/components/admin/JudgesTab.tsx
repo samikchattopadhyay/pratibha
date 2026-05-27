@@ -24,7 +24,6 @@ export interface KanbanCard {
 
 interface JudgesTabProps {
   judges: Judge[];
-  registrations: Registration[];
   kanbanCards: KanbanCard[];
   itemsPerPage: number;
   kanbanPendingPage: number;
@@ -43,7 +42,6 @@ interface JudgesTabProps {
 
 export default function JudgesTab({
   judges,
-  registrations,
   kanbanCards,
   itemsPerPage,
   kanbanPendingPage,
@@ -60,9 +58,6 @@ export default function JudgesTab({
   handleAssignJudge,
 }: JudgesTabProps) {
   const [showHelp, setShowHelp] = useState(false);
-
-  // Decouple Active Queue Pagination from Kanban boards
-  const [queuePage, setQueuePage] = useState(1);
 
   // Local state for jury panel auditing/filters
   const [judgeSearchQuery, setJudgeSearchQuery] = useState("");
@@ -85,50 +80,6 @@ export default function JudgesTab({
       return matchesSearch && matchesSpec;
     });
   }, [judges, judgeSearchQuery, judgeSpecFilter]);
-
-  // Dynamic calculation of discrepancy
-  const calculateDiscrepancy = (assignments: any[]) => {
-    const scores = assignments
-      .map(a => a.score)
-      .filter((s): s is number => s !== null && s !== undefined);
-
-    if (scores.length < 2) {
-      return { label: "N/A", class: "bg-cream/5 text-cream/40" };
-    }
-
-    const diff = Math.max(...scores) - Math.min(...scores);
-    if (diff > 15) {
-      return { label: `High (${diff} pts)`, class: "bg-red-500/10 text-red-400 font-bold border border-red-500/20" };
-    } else if (diff > 5) {
-      return { label: `Medium (${diff} pts)`, class: "bg-yellow-500/10 text-yellow-400 font-medium border border-yellow-500/20" };
-    } else {
-      return { label: `Low (${diff} pts)`, class: "bg-green-500/10 text-green-400 font-medium border border-green-500/20" };
-    }
-  };
-
-  const getPageNumbers = () => {
-    const assignedRegistrations = registrations?.filter(reg => reg.assignments.length > 0) || [];
-    const totalPages = Math.ceil(assignedRegistrations.length / itemsPerPage);
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      const start = Math.max(2, queuePage - 1);
-      const end = Math.min(totalPages - 1, queuePage + 1);
-      if (start > 2) pages.push("...");
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (end < totalPages - 1) pages.push("...");
-      pages.push(totalPages);
-    }
-    return pages;
-  };
-
-  const activeQueueItems = useMemo(() => {
-    return registrations?.filter(reg => reg.assignments.length > 0) || [];
-  }, [registrations]);
-
-  const queueTotalPages = Math.ceil(activeQueueItems.length / itemsPerPage);
 
   return (
     <div className="space-y-6">
@@ -257,121 +208,7 @@ export default function JudgesTab({
         </div>
       </div>
 
-      {/* ACTIVE ASSIGNMENTS QUEUE */}
-      <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-4 shadow-xl">
-        <div className="flex justify-between items-center">
-          <h3 className="font-serif text-lg font-bold text-cream">Active Submissions Queue</h3>
-          <span className="text-xs font-mono bg-terracotta/10 text-gold border border-terracotta/20 px-2 py-0.5 rounded-full">
-            {activeQueueItems.length} Submissions Assigned
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse font-sans">
-            <thead>
-              <tr className="border-b border-terracotta/15 text-cream/50 text-xs font-bold uppercase tracking-wider">
-                <th className="py-3 px-4">Participant & ID</th>
-                <th className="py-3 px-4">Category & Competition</th>
-                <th className="py-3 px-4">Jury Allocation</th>
-                <th className="py-3 px-4">Current Score</th>
-                <th className="py-3 px-4">Jury Discrepancy</th>
-                <th className="py-3 px-4 text-right">Assign/Tie-breaker</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-terracotta/10 text-cream">
-              {activeQueueItems.length > 0 ? (
-                activeQueueItems
-                  .slice((queuePage - 1) * itemsPerPage, queuePage * itemsPerPage)
-                  .map((reg) => {
-                    const discrepancy = calculateDiscrepancy(reg.assignments);
-                    return (
-                      <tr key={reg.id} className="hover:bg-charcoal/30 text-sm transition-colors">
-                        <td className="py-4 px-4 font-semibold">
-                          <div>{reg.studentName}</div>
-                          <div className="text-xs text-cream/40 font-mono mt-0.5">{reg.registrationId}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div>{reg.categoryName}</div>
-                          <div className="text-xs text-cream/40 mt-0.5">{reg.competitionTitle}</div>
-                        </td>
-                        <td className="py-4 px-4 font-medium">
-                          {reg.assignments.map(a => a.judgeName).join(" & ")}
-                        </td>
-                        <td className="py-4 px-4 font-serif text-gold font-bold">
-                          {reg.assignments.map(a => a.score !== null ? `${a.score} pts` : "Pending").join(" / ")}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`px-2.5 py-1 rounded text-xs ${discrepancy.class}`}>
-                            {discrepancy.label}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          {handleAssignJudge && (
-                            <div className="flex justify-end">
-                              <select
-                                onChange={(e) => handleAssignJudge(reg.id, e.target.value)}
-                                defaultValue=""
-                                className="bg-charcoal border border-terracotta/30 rounded px-2.5 py-1.5 text-xs text-cream focus:outline-none focus:border-terracotta cursor-pointer font-sans"
-                              >
-                                <option value="" disabled>+ Alloc Judge</option>
-                                {judges.map(j => (
-                                  <option key={j.id} value={j.id}>{j.name} ({j.tier})</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-cream/40 italic">No assigned submissions in queue.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
 
-        {activeQueueItems.length > itemsPerPage && (
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-terracotta/10">
-            <div className="text-xs text-cream/60 font-sans">
-              Showing {(queuePage - 1) * itemsPerPage + 1} to{" "}
-              {Math.min(queuePage * itemsPerPage, activeQueueItems.length)} of{" "}
-              {activeQueueItems.length} assignments
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              <Button
-                onClick={() => setQueuePage(prev => Math.max(1, prev - 1))}
-                disabled={queuePage === 1}
-                variant="secondary"
-                size="md"
-              >
-                Previous
-              </Button>
-              {getPageNumbers().map((page, idx) => (
-                <Button
-                  key={idx}
-                  onClick={() => typeof page === "number" && setQueuePage(page)}
-                  disabled={page === "..."}
-                  variant={page === queuePage ? "primary" : (page === "..." ? "ghost" : "secondary")}
-                  size="md"
-                  className={page === "..." ? "cursor-default" : ""}
-                >
-                  {page}
-                </Button>
-              ))}
-              <Button
-                onClick={() => setQueuePage(prev => Math.min(queueTotalPages, prev + 1))}
-                disabled={queuePage === queueTotalPages}
-                variant="secondary"
-                size="md"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* KANBAN BOARD */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
