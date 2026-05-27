@@ -5,7 +5,7 @@ import type { PaymentRecord, PaginatedResponse } from "@/types/judges-details";
 
 // ✅ Pattern: Pagination params validation
 const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(0).default(0),
+  page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
@@ -23,7 +23,7 @@ async function fetchPayments(
   const [payouts, total] = await Promise.all([
     prisma.judgePayout.findMany({
       where: { judgeId },
-      skip: pagination.page * pagination.limit,
+      skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       orderBy: { createdAt: "desc" },
       select: {

@@ -5,7 +5,7 @@ import type { ParticipantAssignment, PaginatedResponse } from "@/types/judges-de
 
 // ✅ Pattern: Pagination params validation
 const PaginationSchema = z.object({
-  page: z.coerce.number().int().min(0).default(0),
+  page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().optional(),
 });
@@ -35,7 +35,7 @@ async function fetchParticipants(
   const [assignments, total] = await Promise.all([
     prisma.judgeAssignment.findMany({
       where,
-      skip: pagination.page * pagination.limit,
+      skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       select: {
         id: true,

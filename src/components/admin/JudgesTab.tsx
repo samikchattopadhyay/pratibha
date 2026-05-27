@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, HelpCircle, X, Search, Filter, Plus, Edit } from "lucide-react";
 import Button from "@/components/Button";
 import { Judge } from "./ParticipantsTab";
@@ -21,8 +22,9 @@ export default function JudgesTab({
   onRefresh,
   categories,
 }: JudgesTabProps) {
+  const router = useRouter();
   const [showHelp, setShowHelp] = useState(false);
-  
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingJudge, setEditingJudge] = useState<Judge | null>(null);
@@ -164,10 +166,7 @@ export default function JudgesTab({
             filteredJudges.map((j: Judge) => (
               <div
                 key={j.id}
-                onClick={() => {
-                  navigateToTab("participants");
-                  setSearch(j.name);
-                }}
+                onClick={() => router.push(`/admin/judges/${j.id}`)}
                 className={`p-4 bg-charcoal rounded-xl border cursor-pointer hover:border-terracotta/40 transition-all select-none relative group ${
                   j.isOutlier ? "border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10" : "border-terracotta/5 hover:bg-charcoal-light"
                 }`}
@@ -175,8 +174,7 @@ export default function JudgesTab({
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
-                    navigateToTab("participants");
-                    setSearch(j.name);
+                    router.push(`/admin/judges/${j.id}`);
                   }
                 }}
               >

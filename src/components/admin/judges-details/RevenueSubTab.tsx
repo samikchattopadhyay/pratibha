@@ -13,8 +13,8 @@ export default function RevenueSubTab({ judgeId }: RevenueSubTabProps) {
   const [revenue, setRevenue] = useState<RevenueMetadata | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [totalPayments, setTotalPayments] = useState(0);
-  const [page, setPage] = useState(0);
-  const [limit] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const limit = 10;
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function RevenueSubTab({ judgeId }: RevenueSubTabProps) {
 
         // Fetch payment history
         const paymentsRes = await fetch(
-          `/api/admin/judges/${judgeId}/payments?page=${page}&limit=${limit}`,
+          `/api/admin/judges/${judgeId}/payments?page=${currentPage}&limit=${limit}`,
           { cache: "no-store" }
         );
 
@@ -51,7 +51,7 @@ export default function RevenueSubTab({ judgeId }: RevenueSubTabProps) {
     };
 
     fetchRevenueData();
-  }, [judgeId, page, limit]);
+  }, [judgeId, currentPage, limit]);
 
   const totalPages = Math.ceil(totalPayments / limit);
 
@@ -171,19 +171,19 @@ export default function RevenueSubTab({ judgeId }: RevenueSubTabProps) {
         {totalPages > 1 && (
           <div className="flex justify-between items-center pt-4 border-t border-cream/10">
             <p className="text-sm text-cream/60">
-              Showing {page * limit + 1} to {Math.min((page + 1) * limit, totalPayments)} of {totalPayments}
+              Showing {totalPayments === 0 ? 0 : (currentPage - 1) * limit + 1} to {Math.min(currentPage * limit, totalPayments)} of {totalPayments}
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
+                onClick={() => setCurrentPage((p: number) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
                 className="p-2 rounded hover:bg-cream/5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page === totalPages - 1}
+                onClick={() => setCurrentPage((p: number) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
                 className="p-2 rounded hover:bg-cream/5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-4 h-4" />
