@@ -45,33 +45,30 @@ export default function JudgesTab({
       {/* Workload Tracker & Jury Auditing */}
       <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-6 shadow-xl">
         {/* Title, Subtitle, and Help Trigger */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-terracotta/10 pb-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-serif text-xl font-bold tracking-wide text-cream">
-                Jury Panel Workload & Outlier Audit
-              </h3>
-              <button
-                onClick={() => setShowHelp(true)}
-                className="text-cream/40 hover:text-gold transition-colors focus:outline-none p-1 rounded hover:bg-cream/5 inline-flex items-center"
-                title="Show Jury Guidelines"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-cream/50 font-sans leading-relaxed max-w-2xl">
-              Monitor individual judge evaluation speeds, active queue levels, and scoring deviances from the panel average to maintain competition grading standards.
-            </p>
+        <div className="border-b border-terracotta/10 pb-4 space-y-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h3 className="font-serif text-xl font-bold tracking-wide text-cream">
+              Jury Panel Workload & Outlier Audit
+            </h3>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="text-cream/40 hover:text-gold transition-colors focus:outline-none p-1 rounded hover:bg-cream/5 inline-flex items-center"
+              title="Show Jury Guidelines"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="text-cream/40 hover:text-gold transition-colors focus:outline-none p-1 rounded hover:bg-cream/5 inline-flex items-center"
+              title="Jury Audit Rules"
+              aria-label="Jury Audit Rules"
+            >
+              <Shield className="w-4 h-4" />
+            </button>
           </div>
-
-          <button
-            onClick={() => setShowHelp(true)}
-            className="p-2.5 rounded-xl border border-cream/15 hover:border-gold text-cream/70 hover:text-gold bg-charcoal hover:bg-cream/5 transition-all duration-200 focus:outline-none flex items-center justify-center self-start md:self-center"
-            title="Jury Audit Rules"
-            aria-label="Jury Audit Rules"
-          >
-            <Shield className="w-4 h-4" />
-          </button>
+          <p className="text-xs text-cream/50 font-sans leading-relaxed max-w-2xl">
+            Monitor individual judge evaluation speeds, active queue levels, and scoring deviances from the panel average to maintain competition grading standards.
+          </p>
         </div>
 
         {/* Filter and Control Bar */}
