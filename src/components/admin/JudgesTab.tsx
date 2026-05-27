@@ -207,11 +207,16 @@ export default function JudgesTab({
           )}
         </div>
       </div>
+      {/* EVALUATION LIFECYCLE (KANBAN BOARD) */}
+      <div className="space-y-4 pt-4 border-t border-terracotta/10">
+        <div>
+          <h3 className="font-serif text-lg font-bold text-cream">Jury Evaluation Lifecycle</h3>
+          <p className="text-xs text-cream/50 mt-1 font-sans">
+            Track and route submissions through the grading pipeline, review active scores, and resolve flagged conflicts.
+          </p>
+        </div>
 
-
-
-      {/* KANBAN BOARD */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         
         {/* PENDING COLUMN */}
         {(() => {
@@ -519,6 +524,7 @@ export default function JudgesTab({
           );
         })()}
       </div>
+    </div>
 
       {/* Help Modal */}
       {showHelp && (
