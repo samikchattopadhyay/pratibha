@@ -99,7 +99,15 @@ export async function GET() {
       })),
     });
   } catch (error: any) {
-    console.error("Dashboard fetch error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Dashboard fetch error:", error?.message || error);
+    console.error("Error details:", {
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack?.split('\n')[0],
+    });
+    return NextResponse.json(
+      { error: error?.message || "Internal server error" },
+      { status: 500 }
+    );
   }
 }

@@ -91,12 +91,31 @@ const mockRegistrations = [
 ];
 
 function ParentDashboardContent() {
-  const { status: sessionStatus } = useSession();
+  const { status: sessionStatus, data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = (searchParams.get("tab") || "students") as "students" | "entries";
 
   const activeTab = tabFromUrl;
+  const [isValidRole, setIsValidRole] = useState(false);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+
+    if (sessionStatus === "unauthenticated") {
+      router.push("/login");
+      return;
+    }
+
+    if (sessionStatus === "authenticated" && session?.user) {
+      const userRole = (session.user as { role?: string }).role;
+      if (userRole === "PARENT") {
+        setIsValidRole(true);
+      } else {
+        router.push(userRole === "SUPER_ADMIN" || userRole === "MODERATOR" ? "/admin" : "/judge/dashboard");
+      }
+    }
+  }, [sessionStatus, session, router]);
 
   const handleTabChange = (tab: "students" | "entries") => {
     router.push(`/parent/dashboard?tab=${tab}`);
@@ -151,14 +170,12 @@ function ParentDashboardContent() {
   }, []);
 
   useEffect(() => {
-    if (sessionStatus === "unauthenticated") {
-      router.push("/login");
-    } else if (sessionStatus === "authenticated") {
+    if (isValidRole && sessionStatus === "authenticated") {
       Promise.resolve().then(() => {
         fetchDashboardData();
       });
     }
-  }, [sessionStatus, router, fetchDashboardData]);
+  }, [isValidRole, sessionStatus, fetchDashboardData]);
 
   const handleDisciplineToggle = (name: string) => {
     setStudentForm(prev => {
@@ -228,7 +245,7 @@ function ParentDashboardContent() {
     return age;
   };
 
-  if (sessionStatus === "loading" || loading) {
+  if (sessionStatus === "loading" || !isValidRole || loading) {
     return <Loading variant="screen" text="Loading dashboard..." />;
   }
 
