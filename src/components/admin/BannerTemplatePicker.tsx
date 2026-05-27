@@ -8,12 +8,23 @@ interface BannerTemplatePickerProps {
   templates: BannerTemplate[];
   value: string;
   onChange: (slug: string) => void;
+  categoryGrouping?: string;
 }
+
+const GROUPING_TO_TAGS: Record<string, string[]> = {
+  MUSIC_VOCAL: ["music", "singing", "classical"],
+  MUSIC_INSTRUMENTAL: ["music", "classical"],
+  VISUAL_ARTS: ["art", "drawing", "visual"],
+  LITERARY_ARTS: ["literature", "recitation", "speaking"],
+  PERFORMING_ARTS: ["music", "classical", "art"],
+  SPOKEN_WORD: ["literature", "recitation", "speaking"],
+};
 
 export default function BannerTemplatePicker({
   templates,
   value,
   onChange,
+  categoryGrouping,
 }: BannerTemplatePickerProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -34,9 +45,13 @@ export default function BannerTemplatePicker({
       const matchesTags =
         selectedTags.length === 0 ||
         selectedTags.some((tag) => template.tags.includes(tag));
-      return matchesSearch && matchesTags && template.isActive;
+
+      const groupingTags = categoryGrouping ? GROUPING_TO_TAGS[categoryGrouping] || [] : [];
+      const matchesGrouping = !categoryGrouping || groupingTags.some((tag) => template.tags.includes(tag));
+
+      return matchesSearch && matchesTags && matchesGrouping && template.isActive;
     });
-  }, [templates, searchTerm, selectedTags]);
+  }, [templates, searchTerm, selectedTags, categoryGrouping]);
 
   const selectedTemplate = templates.find((t) => t.slug === value);
 

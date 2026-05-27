@@ -126,7 +126,7 @@ export default function CreateCompetitionWizard({
     entryFeePreset: "50",
     bannerSlug: "",
     selectedJudgeIds: [],
-    rules: `<h2>Rules & Regulations</h2><ol><li><strong>Eligibility</strong>: Participants must belong to the selected age group.</li><li><strong>Originality</strong>: All submissions must be the original work of the participant. Plagiarism will lead to disqualification.</li><li><strong>Submissions</strong>: Entries must be submitted in the format specified for the category before the deadline.</li><li><strong>Jury Decision</strong>: The decision of the panel of judges is final and binding.</li></ol>`,
+    rules: "",
     criteriaConfig: [],
     prizes: [],
   });
@@ -151,10 +151,14 @@ export default function CreateCompetitionWizard({
   }, []);
 
   useEffect(() => {
-    if (currentStep === 7) {
-      if (availableJudges.length === 0) {
-        handleEnterStep2();
-      }
+    if (currentStep === 7 && availableJudges.length === 0) {
+      handleEnterStep2();
+    }
+  }, [currentStep, availableJudges.length]);
+
+  useEffect(() => {
+    if (currentStep === 7 && availableJudges.length > 0) {
+      // Auto-filter judges by selected category specialization
       if (data.categoryId) {
         const cat = dbCategories.find((c) => c.id === data.categoryId);
         if (cat) {
@@ -164,6 +168,8 @@ export default function CreateCompetitionWizard({
             .replace(/\s+/g, "-");
           setJudgeSpecFilter(catSlug);
         }
+      } else {
+        setJudgeSpecFilter("ALL");
       }
     }
   }, [currentStep, data.categoryId, dbCategories, availableJudges.length]);
@@ -332,11 +338,6 @@ export default function CreateCompetitionWizard({
         }
         return true;
       case 7:
-        const minJudges = data.scope === "NATIONAL" ? 5 : 2;
-        if (data.selectedJudgeIds.length < minJudges) {
-          setError(`Select at least ${minJudges} judges for a ${data.scope.toLowerCase()} competition`);
-          return false;
-        }
         return true;
       case 8:
         if (!data.rules || data.rules.replace(/<[^>]*>/g, "").trim().length < 10) {
@@ -953,6 +954,7 @@ export default function CreateCompetitionWizard({
                 onChange={(slug) =>
                   setData((prev) => ({ ...prev, bannerSlug: slug }))
                 }
+                categoryGrouping={dbCategories.find((c) => c.id === data.categoryId)?.grouping || undefined}
               />
             </div>
           )}

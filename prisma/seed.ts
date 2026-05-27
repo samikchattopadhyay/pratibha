@@ -52,44 +52,43 @@ async function main() {
   const categories: Array<{
     name: string;
     slug: string;
-    icon: string;
-    grouping: "MUSIC_VOCAL" | "MUSIC_INSTRUMENTAL" | "VISUAL_ARTS" | "LITERARY_ARTS";
+    icon?: string;
+    grouping: "MUSIC_VOCAL" | "MUSIC_INSTRUMENTAL" | "VISUAL_ARTS" | "LITERARY_ARTS" | "PERFORMING_ARTS" | "SPOKEN_WORD";
   }> = [
-    {
-      name: "Classical Vocal",
-      slug: "classical-vocal",
-      icon: "Music",
-      grouping: "MUSIC_VOCAL",
-    },
-    {
-      name: "Classical Instrumental",
-      slug: "classical-instrumental",
-      icon: "Music",
-      grouping: "MUSIC_INSTRUMENTAL",
-    },
-    {
-      name: "Drawing & Painting",
-      slug: "drawing-painting",
-      icon: "Paintbrush",
-      grouping: "VISUAL_ARTS",
-    },
-    {
-      name: "Poetry Recitation",
-      slug: "poetry-recitation",
-      icon: "BookOpen",
-      grouping: "LITERARY_ARTS",
-    },
+    { name: "Bengali Recitation", slug: "bengali-recitation", grouping: "SPOKEN_WORD" },
+    { name: "English Recitation", slug: "english-recitation", grouping: "SPOKEN_WORD" },
+    { name: "Rabindra Sangeet", slug: "rabindra-sangeet", grouping: "MUSIC_VOCAL" },
+    { name: "Nazrul Geeti", slug: "nazrul-geeti", grouping: "MUSIC_VOCAL" },
+    { name: "Classical Dance", slug: "classical-dance", grouping: "PERFORMING_ARTS" },
+    { name: "Drawing & Painting", slug: "drawing-painting", grouping: "VISUAL_ARTS" },
+    { name: "Creative Writing", slug: "creative-writing", grouping: "LITERARY_ARTS" },
+    { name: "Story Telling", slug: "story-telling", grouping: "LITERARY_ARTS" },
+    { name: "Folk Singing", slug: "folk-singing", grouping: "MUSIC_VOCAL" },
+    { name: "Instrumental Flute", slug: "instrumental-flute", grouping: "MUSIC_INSTRUMENTAL" },
+    { name: "Instrumental Sitar", slug: "instrumental-sitar", grouping: "MUSIC_INSTRUMENTAL" },
+    { name: "Western Vocals", slug: "western-vocals", grouping: "MUSIC_VOCAL" },
+    { name: "Clay Modeling", slug: "clay-modeling", grouping: "VISUAL_ARTS" },
+    { name: "Photography", slug: "photography", grouping: "VISUAL_ARTS" },
+    { name: "Drama & Mime", slug: "drama-mime", grouping: "PERFORMING_ARTS" },
+    { name: "Handwriting Improvement", slug: "handwriting-improvement", grouping: "LITERARY_ARTS" },
+    { name: "Hindustani Classical Vocals", slug: "hindustani-classical-vocals", grouping: "MUSIC_VOCAL" },
+    { name: "Modern Bengali Songs", slug: "modern-bengali-songs", grouping: "MUSIC_VOCAL" },
+    { name: "Digital Illustration", slug: "digital-illustration", grouping: "VISUAL_ARTS" },
+    { name: "Elocution & Speech", slug: "elocution-speech", grouping: "SPOKEN_WORD" },
+    { name: "Classical Vocal", slug: "classical-vocal", grouping: "MUSIC_VOCAL" },
+    { name: "Classical Instrumental", slug: "classical-instrumental", grouping: "MUSIC_INSTRUMENTAL" },
+    { name: "Poetry Recitation", slug: "poetry-recitation", grouping: "LITERARY_ARTS" },
   ];
 
   for (const cat of categories) {
     await prisma.category.upsert({
       where: { slug: cat.slug },
-      update: {},
+      update: { grouping: cat.grouping },
       create: cat,
     });
   }
 
-  console.log("✓ Seeded 4 categories");
+  console.log(`✓ Seeded ${categories.length} categories with groupings`);
 
   // ─── SEED ADMIN USER ─────────────────────────────────────────────────────────
 
@@ -284,14 +283,18 @@ async function main() {
   const judgePassword = await bcrypt.hash("password123", 10);
   const judges = [];
 
-  for (let i = 0; i < 3; i++) {
-    const judgeEmail = `judge${i + 1}@test.com`;
+  const judgesData = [
+    { email: "judge-classical-vocal@test.com", name: "Dr. Ravi Shankar", specs: ["classical-vocal", "hindustani-classical-vocals", "rabindra-sangeet"] },
+    { email: "judge-classical-inst@test.com", name: "Prof. Ustad Ali Khan", specs: ["classical-instrumental", "instrumental-sitar", "instrumental-flute"] },
+    { email: "judge-poetry@test.com", name: "Smt. Madhuri Dutta", specs: ["poetry-recitation", "creative-writing", "story-telling"] },
+  ];
 
+  for (const judgeData of judgesData) {
     const judgeUser = await prisma.user.upsert({
-      where: { email: judgeEmail },
+      where: { email: judgeData.email },
       update: {},
       create: {
-        email: judgeEmail,
+        email: judgeData.email,
         passwordHash: judgePassword,
         role: "JUDGE",
       },
@@ -299,20 +302,20 @@ async function main() {
 
     const judge = await prisma.judge.upsert({
       where: { userId: judgeUser.id },
-      update: {},
+      update: { specializations: judgeData.specs },
       create: {
         userId: judgeUser.id,
-        name: `Judge ${i + 1}`,
-        specializations: ["vocal", "instrumental"],
-        tier: i === 0 ? "NATIONAL" : "REGIONAL",
+        name: judgeData.name,
+        specializations: judgeData.specs,
+        tier: "NATIONAL",
         isVerified: true,
-        yearsOfExperience: 10 + i * 5,
+        yearsOfExperience: 15,
       },
     });
     judges.push(judge);
   }
 
-  console.log(`✓ Seeded ${judges.length} judges`);
+  console.log(`✓ Seeded ${judges.length} judges with missing specializations`);
 
   // ─── ASSIGN JUDGES TO COMPETITION ─────────────────────────────────────────────
 
