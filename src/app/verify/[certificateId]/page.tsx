@@ -3,6 +3,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import CertificateHeader from "@/components/CertificateDisplay";
 import { ShieldAlert, Award } from "lucide-react";
+import { Metadata } from "next";
 
 // Dynamic route data fetching
 async function getCertificateDetails(certId: string) {
@@ -73,6 +74,67 @@ interface CertDataDetails {
 
 interface VerifyPageProps {
   params: Promise<{ certificateId: string }>;
+}
+
+export async function generateMetadata({ params }: VerifyPageProps): Promise<Metadata> {
+  const { certificateId } = await params;
+  const certIdDecoded = decodeURIComponent(certificateId);
+
+  const certData = await getCertificateDetails(certIdDecoded);
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const certificateUrl = `${baseUrl}/verify/${encodeURIComponent(certIdDecoded)}`;
+
+  if (!certData) {
+    return {
+      title: "Certificate Verification | Pratibha Parishad",
+      description: "Verify the authenticity of your Pratibha Parishad certificate.",
+      openGraph: {
+        title: "Certificate Verification | Pratibha Parishad",
+        description: "Verify the authenticity of your Pratibha Parishad certificate.",
+        url: certificateUrl,
+        type: "website",
+      },
+    };
+  }
+
+  const studentName = certData.registration.student.name;
+  const competitionTitle = certData.registration.competitionCategory.competition.title;
+  const categoryName = certData.registration.competitionCategory.category.name;
+  const awardTitle = getAwardTitleForMetadata(certData.type);
+
+  return {
+    title: `${studentName}'s Certificate | Pratibha Parishad`,
+    description: `${studentName} earned a ${awardTitle} in ${categoryName} at ${competitionTitle}. Verify this achievement on Pratibha Parishad.`,
+    openGraph: {
+      title: `🎓 ${studentName} - ${awardTitle}`,
+      description: `${studentName} earned a ${awardTitle} in ${categoryName} at ${competitionTitle}. Verify this fine arts achievement!`,
+      url: certificateUrl,
+      type: "website",
+      images: [
+        {
+          url: `${baseUrl}/images/pp-certificate-og.png`,
+          width: 1200,
+          height: 630,
+          alt: `${studentName}'s Certificate from Pratibha Parishad`,
+        },
+      ],
+    },
+  };
+}
+
+function getAwardTitleForMetadata(type: string): string {
+  switch (type) {
+    case "MERIT_1":
+      return "Certificate of Merit - 1st Place";
+    case "MERIT_2":
+      return "Certificate of Merit - 2nd Place";
+    case "MERIT_3":
+      return "Certificate of Merit - 3rd Place";
+    case "SPECIAL_MENTION":
+      return "Special Mention Certificate";
+    default:
+      return "Certificate of Participation";
+  }
 }
 
 export default async function VerifyCertificatePage({ params }: VerifyPageProps) {

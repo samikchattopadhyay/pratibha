@@ -38,6 +38,17 @@ export default function CertificateHeader({ certificateId, isDemo }: Certificate
     });
   };
 
+  const handleShareFacebook = () => {
+    const url = getCertificateUrl();
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent("🎓 I earned a certificate in a fine arts competition at Pratibha Parishad! Verify my achievement.")}`,
+      "_blank",
+      "width=600,height=400"
+    );
+    setSuccessMessage("✓ Opening Facebook...");
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
+
   return (
     <>
       {/* Verification Header Status Panel */}
@@ -80,6 +91,13 @@ export default function CertificateHeader({ certificateId, isDemo }: Certificate
               title="Share on Instagram"
             >
               <Share2 className="w-4 h-4" /> Instagram
+            </button>
+            <button
+              onClick={handleShareFacebook}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
+              title="Share on Facebook"
+            >
+              <Share2 className="w-4 h-4" /> Facebook
             </button>
           </div>
         </div>
