@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 import { DeliveryErrorType, DeliveryStatus } from "@prisma/client";
 import prisma from "@/lib/db";
+import { renderEmailTemplate } from "@/lib/email/emailTemplateEngine";
+import * as emailTemplates from "@/lib/email/templates";
 
 let resendClient: Resend | null = null;
 
@@ -145,43 +147,10 @@ export async function sendEmailRegistrationCreated(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-          .accent { color: #E07B54; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Pratibha Parishad</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <p>${body}</p>
-            <p>Your child's submission video is queued for double-blind grading. Results will be notified shortly.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View in Dashboard</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildRegistrationCreatedTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
@@ -192,44 +161,10 @@ export async function sendEmailPaymentReceived(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .success-badge { background: #C8A84B; color: white; padding: 12px 20px; border-radius: 4px; display: inline-block; margin: 16px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✓ Payment Verified</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <p>${body}</p>
-            <div class="success-badge">Payment Confirmed ✓</div>
-            <p>Your registration is now complete and your submission has been queued for evaluation.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Dashboard</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildPaymentReceivedTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
@@ -240,42 +175,10 @@ export async function sendEmailRegistrationVerified(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✓ Registration Verified</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <p>${body}</p>
-            <p>Your child's submission is now under evaluation by our expert judges. Results will be announced soon.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Check Status</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildRegistrationVerifiedTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
@@ -286,42 +189,10 @@ export async function sendEmailRegistrationRejected(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Registration Update</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <p>${body}</p>
-            <p>Please check your dashboard for more details or contact our support team.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Details</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildRegistrationRejectedTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
@@ -332,43 +203,10 @@ export async function sendEmailResultsPublished(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .award { background: #C8A84B; color: white; padding: 16px; border-radius: 4px; text-align: center; font-weight: bold; margin: 20px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🎉 Results Published!</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <div class="award">${body}</div>
-            <p>Congratulations! Your submission has been evaluated by our expert panel of judges.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Results & Certificate</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildResultsPublishedTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
@@ -379,42 +217,10 @@ export async function sendEmailCertificateReady(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>📜 Certificate Ready</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <p>${body}</p>
-            <p>Your verified digital certificate is now ready to download. You can access it anytime from your dashboard.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Download Certificate</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildCertificateReadyTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
@@ -425,42 +231,10 @@ export async function sendEmailQualificationOffered(
   title: string,
   body: string
 ): Promise<void> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-          .header { background: #1C1C1E; color: white; padding: 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; }
-          .content { padding: 30px; }
-          .content p { color: #333; line-height: 1.6; margin: 16px 0; }
-          .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🌟 Qualification Offer</h1>
-          </div>
-          <div class="content">
-            <p><strong>${title}</strong></p>
-            <p>${body}</p>
-            <p>Your child has been selected to participate in the next level of competition! Please accept this qualification offer within the expiry date.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/parent/dashboard" style="background: #E07B54; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Accept Offer</a>
-            </p>
-          </div>
-          <div class="footer">
-            <p>Thank you,<br/>Pratibha Parishad Team</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  await sendEmailViaResend(to, title, html);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildQualificationOfferedTemplate(title, body, appUrl);
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
 }
 
 /**
