@@ -471,6 +471,9 @@ export default function CreateCompetitionWizard({
   };
 
   const handleResetCriteria = () => {
+    if (!confirm("Reset criteria to defaults for this scope and category? This action cannot be undone.")) {
+      return;
+    }
     const cat = dbCategories.find((c) => c.id === data.categoryId);
     const grouping = cat?.grouping || "MUSIC_VOCAL";
     const source = dynamicRubrics || SCORING_CRITERIA;
