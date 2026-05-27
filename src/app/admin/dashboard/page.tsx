@@ -418,6 +418,7 @@ function AdminDashboardContent() {
           loadAdminData(currentPage, limit, debouncedSearch, filter);
         } else if (activeTab === "judges") {
           loadAdminData(1, 100, "", "ALL");
+          loadCategories();
         } else if (activeTab === "voting") {
           loadVoting(votingPage, itemsPerPage);
         } else if (activeTab === "certificates") {
@@ -791,6 +792,8 @@ function AdminDashboardContent() {
               judges={judges}
               navigateToTab={navigateToTab}
               setSearch={setSearch}
+              onRefresh={() => loadAdminData(1, 100, "", "ALL")}
+              categories={dbCategories}
             />
           )}
 

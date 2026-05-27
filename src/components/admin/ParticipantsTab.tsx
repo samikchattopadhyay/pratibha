@@ -6,6 +6,7 @@ import Button from "@/components/Button";
 export interface Judge {
   id: string;
   name: string;
+  email?: string;
   evaluationCount?: number;
   pendingCount?: number;
   averageScore?: string;
@@ -15,6 +16,14 @@ export interface Judge {
   consistency?: string;
   specializations?: string[];
   tier?: string;
+  bio?: string;
+  credentials?: string;
+  stateOfResidence?: string;
+  states?: string[];
+  languages?: string[];
+  yearsOfExperience?: number;
+  isVerified?: boolean;
+  isAvailable?: boolean;
 }
 
 export interface Registration {

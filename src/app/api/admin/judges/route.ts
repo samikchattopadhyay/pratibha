@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/db";
-
+import bcrypt from "bcryptjs";
 import { JudgeTier } from "@prisma/client";
+import { sendEmailJudgeWelcome } from "@/lib/notifications";
+import { generateSecurePassword } from "@/lib/passwordGenerator";
+import { randomBytes } from "crypto";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
@@ -16,6 +19,16 @@ export async function GET(request: NextRequest) {
     if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
+    const emailToCheck = searchParams.get("email");
+
+    // Check if email exists
+    if (emailToCheck) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: emailToCheck },
+      });
+      return NextResponse.json({ exists: !!existingUser });
+    }
+
     const tierFilter = searchParams.get("tier"); // LOCAL | REGIONAL | NATIONAL | EXPERT
     const competitionId = searchParams.get("competitionId"); // returns eligible judges only
     const verifiedOnly = searchParams.get("verified") === "true";
@@ -48,6 +61,7 @@ export async function GET(request: NextRequest) {
         isAvailable: true,
       },
       include: {
+        user: true,
         assignments: {
           include: { score: true },
         },
@@ -80,6 +94,7 @@ export async function GET(request: NextRequest) {
       return {
         id: j.id,
         name: j.name,
+        email: j.user.email,
         specializations: j.specializations,
         profileImageUrl: j.profileImageUrl,
         // Plan 03 — new fields
@@ -87,8 +102,8 @@ export async function GET(request: NextRequest) {
         bio: j.bio,
         credentials: j.credentials,
         stateOfResidence: j.stateOfResidence,
-        states: (j as any).states || [],
-        languages: (j as any).languages || [],
+        states: j.states || [],
+        languages: j.languages || [],
         yearsOfExperience: j.yearsOfExperience,
         isVerified: j.isVerified,
         isAvailable: j.isAvailable,
@@ -110,3 +125,201 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const role = (session.user as { role?: string }).role;
+    if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const body = await request.json();
+    const {
+      name,
+      email,
+      tier = "LOCAL",
+      specializations = [],
+      bio = "",
+      credentials = "",
+      stateOfResidence = "",
+      states = [],
+      languages = [],
+      yearsOfExperience = null,
+      isVerified = false,
+      isAvailable = true,
+    } = body;
+
+    if (!name || !email) {
+      return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json({ error: "A user with this email already exists" }, { status: 400 });
+    }
+
+    const internalPassword = generateSecurePassword();
+    const passwordHash = await bcrypt.hash(internalPassword, 10);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          role: "JUDGE",
+        },
+      });
+
+      const judge = await tx.judge.create({
+        data: {
+          userId: user.id,
+          name,
+          tier: tier as JudgeTier,
+          specializations,
+          bio,
+          credentials,
+          stateOfResidence,
+          states,
+          languages,
+          yearsOfExperience: yearsOfExperience ? parseInt(yearsOfExperience.toString(), 10) : null,
+          isVerified,
+          isAvailable,
+        },
+      });
+
+      const setupToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+      await tx.passwordSetupToken.create({
+        data: {
+          userId: user.id,
+          token: setupToken,
+          expiresAt,
+        },
+      });
+
+      const setupUrl = `${appUrl}/judge-setup/${setupToken}`;
+
+      return { user, judge, setupUrl };
+    });
+
+    try {
+      await sendEmailJudgeWelcome(email, name, result.setupUrl);
+    } catch (mailError) {
+      console.error("Resilient notification: Failed to send judge welcome email:", mailError);
+    }
+
+    return NextResponse.json({ message: "Judge created successfully and invitation email sent", judge: result.judge }, { status: 201 });
+  } catch (error) {
+    console.error("Admin judge create error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const role = (session.user as { role?: string }).role;
+    if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const body = await request.json();
+    const {
+      id,
+      name,
+      email,
+      password,
+      tier,
+      specializations,
+      bio,
+      credentials,
+      stateOfResidence,
+      states,
+      languages,
+      yearsOfExperience,
+      isVerified,
+      isAvailable,
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Judge ID is required" }, { status: 400 });
+    }
+
+    const judge = await prisma.judge.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!judge) {
+      return NextResponse.json({ error: "Judge not found" }, { status: 404 });
+    }
+
+    // Check email uniqueness if modified
+    if (email && email !== judge.user.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return NextResponse.json({ error: "A user with this email already exists" }, { status: 400 });
+      }
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Update User details if email or password is provided
+      const userUpdateData: { email?: string; passwordHash?: string } = {};
+      if (email) userUpdateData.email = email;
+      if (password) {
+        userUpdateData.passwordHash = await bcrypt.hash(password, 10);
+      }
+
+      if (Object.keys(userUpdateData).length > 0) {
+        await tx.user.update({
+          where: { id: judge.userId },
+          data: userUpdateData,
+        });
+      }
+
+      // Update Judge details
+      const judgeUpdateData: {
+        name?: string;
+        tier?: JudgeTier;
+        specializations?: string[];
+        bio?: string;
+        credentials?: string;
+        stateOfResidence?: string;
+        states?: string[];
+        languages?: string[];
+        yearsOfExperience?: number | null;
+        isVerified?: boolean;
+        isAvailable?: boolean;
+      } = {};
+      if (name !== undefined) judgeUpdateData.name = name;
+      if (tier !== undefined) judgeUpdateData.tier = tier as JudgeTier;
+      if (specializations !== undefined) judgeUpdateData.specializations = specializations;
+      if (bio !== undefined) judgeUpdateData.bio = bio;
+      if (credentials !== undefined) judgeUpdateData.credentials = credentials;
+      if (stateOfResidence !== undefined) judgeUpdateData.stateOfResidence = stateOfResidence;
+      if (states !== undefined) judgeUpdateData.states = states;
+      if (languages !== undefined) judgeUpdateData.languages = languages;
+      if (yearsOfExperience !== undefined) {
+        judgeUpdateData.yearsOfExperience = yearsOfExperience ? parseInt(yearsOfExperience.toString(), 10) : null;
+      }
+      if (isVerified !== undefined) judgeUpdateData.isVerified = isVerified;
+      if (isAvailable !== undefined) judgeUpdateData.isAvailable = isAvailable;
+
+      const updatedJudge = await tx.judge.update({
+        where: { id },
+        data: judgeUpdateData,
+      });
+
+      return updatedJudge;
+    });
+
+    return NextResponse.json({ message: "Judge updated successfully", judge: updated });
+  } catch (error) {
+    console.error("Admin judge update error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+

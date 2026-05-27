@@ -35,6 +35,16 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Custom visual utilities */
 .alpana-pattern {
   background-image: radial-gradient(rgba(178, 59, 30, 0.05) 1px, transparent 1px);
@@ -108,5 +118,19 @@ input[type="date"]::-webkit-datetime-edit-month-field,
 input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-year-field {
   cursor: pointer !important;
+}
+
+/* Prevent browser autocomplete/autofill from overriding colors in dark mode inputs */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover, 
+.dark input:-webkit-autofill:focus, 
+.dark input:-webkit-autofill:active,
+input.bg-charcoal:-webkit-autofill,
+input.bg-charcoal:-webkit-autofill:hover, 
+input.bg-charcoal:-webkit-autofill:focus, 
+input.bg-charcoal:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 100px #181512 inset !important; /* bg-charcoal color */
+  -webkit-text-fill-color: #fcf9f2 !important; /* text-cream color */
+  caret-color: #fcf9f2;
 }
 

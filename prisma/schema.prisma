@@ -192,6 +192,7 @@ model User {
   judgeProfile            Judge?
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  passwordSetupTokens     PasswordSetupToken[]
 }
 
 model Parent {
@@ -674,4 +675,20 @@ model TelegramMessageDelivery {
   @@index([status, nextRetryAt])
   @@index([chatId])
   @@index([createdAt])
+}
+
+// ─── PASSWORD SETUP TOKENS ────────────────────────────────────────────────
+
+model PasswordSetupToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
 }

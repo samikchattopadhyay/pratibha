@@ -480,3 +480,16 @@ export async function sendTelegramQualificationOffered(
   const message = `<b>🌟 ${title}</b>\n\n${body}\n\n⏰ Accept this offer before it expires.`;
   await sendTelegramViaBotAPI(chatId, message);
 }
+
+/**
+ * Email for JUDGE_WELCOME notification with password setup link.
+ */
+export async function sendEmailJudgeWelcome(
+  to: string,
+  judgeName: string,
+  setupUrl: string
+): Promise<void> {
+  const template = emailTemplates.buildJudgeWelcomeTemplate(judgeName, to, setupUrl, "");
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
+}
