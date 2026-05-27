@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
+import { Plus } from "lucide-react";
 
 interface Category {
   id: string;
@@ -34,6 +35,7 @@ interface SettingsTabProps {
   handleAddCategory: (name: string, grouping: string) => Promise<void>;
   bannerTemplates: BannerTemplate[];
   handleAddBannerTemplate: (name: string, imageUrl: string, description: string, tags: string[]) => Promise<void>;
+  onRefreshCategories?: () => Promise<void>;
 }
 
 const CATEGORY_GROUPS = [
@@ -55,9 +57,10 @@ export default function SettingsTab({
   handleAddCategory,
   bannerTemplates,
   handleAddBannerTemplate,
+  onRefreshCategories,
 }: SettingsTabProps) {
   const searchParams = useSearchParams();
-  const [activeSubTab, setActiveSubTab] = useState<"general" | "categories" | "banners">("general");
+  const [activeSubTab, setActiveSubTab] = useState<"general" | "categories" | "banners" | "groupings" | "rubrics">("general");
   const [newCatName, setNewCatName] = useState("");
   const [newCatGroup, setNewCatGroup] = useState("MUSIC_VOCAL");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,16 +95,295 @@ export default function SettingsTab({
     }
   };
 
+  const [rubrics, setRubrics] = useState<any>(null);
+  const [selectedGroup, setSelectedGroup] = useState("MUSIC_VOCAL");
+  const [selectedScope, setSelectedScope] = useState<"STATE" | "NATIONAL">("STATE");
+  const [isSavingRubrics, setIsSavingRubrics] = useState(false);
+  const [rubricError, setRubricError] = useState("");
+  const [rubricSuccess, setRubricSuccess] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+
+  const [showCriterionModal, setShowCriterionModal] = useState(false);
+  const [editingCriterionIdx, setEditingCriterionIdx] = useState<number | null>(null);
+
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
+  const [editingCatGroup, setEditingCatGroup] = useState("");
+
+  const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null);
+  const [editingGroupLabel, setEditingGroupLabel] = useState("");
+
+  const handleStartEdit = (cat: Category) => {
+    setEditingCatId(cat.id);
+    setEditingCatName(cat.name);
+    setEditingCatGroup(cat.grouping || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCatId(null);
+    setEditingCatName("");
+    setEditingCatGroup("");
+  };
+
+  const handleUpdateCategory = async (id: string) => {
+    if (!editingCatName.trim()) return;
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: editingCatName.trim(), grouping: editingCatGroup }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update specialization");
+      
+      setEditingCatId(null);
+      if (onRefreshCategories) {
+        await onRefreshCategories();
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to update specialization");
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    setErrorMsg("");
+    try {
+      const res = await fetch(`/api/admin/categories?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete specialization");
+      
+      if (onRefreshCategories) {
+        await onRefreshCategories();
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to delete specialization");
+    }
+  };
+
+  const getCategoryGroupOptions = () => {
+    if (!rubrics) return CATEGORY_GROUPS;
+    const keys = Object.keys(rubrics.STATE || {});
+    const prettyMap: Record<string, string> = {
+      MUSIC_VOCAL: "Music (Vocal)",
+      MUSIC_INSTRUMENTAL: "Music (Instrumental)",
+      PERFORMING_ARTS: "Performing Arts",
+      VISUAL_ARTS: "Visual Arts",
+      LITERARY_ARTS: "Literary Arts",
+      SPOKEN_WORD: "Spoken Word",
+    };
+    return keys.map((key) => ({
+      value: key,
+      label: prettyMap[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    }));
+  };
+
+  useEffect(() => {
+    const fetchRubrics = async () => {
+      try {
+        const res = await fetch("/api/admin/rubrics");
+        if (res.ok) {
+          const data = await res.json();
+          setRubrics(data);
+          // Set default selected group from keys
+          const keys = Object.keys(data.STATE || {});
+          if (keys.length > 0) {
+            setSelectedGroup(keys[0]);
+            setNewCatGroup(keys[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load rubrics settings:", err);
+      }
+    };
+    fetchRubrics();
+  }, []);
+
+  const handleAddCategoryGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim() || !rubrics) return;
+    setRubricError("");
+    setRubricSuccess("");
+
+    const formattedKey = newGroupName.trim().toUpperCase().replace(/[\s-]+/g, "_").replace(/[^\w]/g, "");
+    if (!formattedKey) {
+      setRubricError("Invalid group name format");
+      return;
+    }
+
+    if (rubrics.STATE[formattedKey] || rubrics.NATIONAL[formattedKey]) {
+      setRubricError("Group already exists");
+      return;
+    }
+
+    const updated = { ...rubrics };
+    updated.STATE[formattedKey] = [
+      { key: "criteria1", label: "Technical Competence", max: 40, description: "Accuracy and basic technical execution." },
+      { key: "criteria2", label: "Artistic Presentation", max: 30, description: "Styling, expression, and delivery choice." },
+      { key: "criteria3", label: "Overall Impression", max: 30, description: "General aesthetic and performance balance." },
+    ];
+    updated.NATIONAL[formattedKey] = [
+      { key: "criteria1", label: "Technical Competence", max: 35, description: "Technical proficiency and execution accuracy." },
+      { key: "criteria2", label: "Artistic Presentation", max: 25, description: "Performance delivery, stylistic choices, and emotional depth." },
+      { key: "criteria3", label: "General Aesthetic Choice", max: 25, description: "Composition selection, complexity, and overall balance." },
+      { key: "criteria4", label: "Originality & Innovation", max: 15, description: "Creative uniqueness and novel presentation." },
+    ];
+
+    setIsSavingRubrics(true);
+    try {
+      const res = await fetch("/api/admin/rubrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        setRubrics(updated);
+        setNewGroupName("");
+        setRubricSuccess(`Category Group "${newGroupName}" added successfully!`);
+        setTimeout(() => setRubricSuccess(""), 3000);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to add group");
+      }
+    } catch (err) {
+      setRubricError(err instanceof Error ? err.message : "Error adding category group");
+    } finally {
+      setIsSavingRubrics(false);
+    }
+  };
+
+  const handleRemoveCategoryGroup = async (groupKey: string) => {
+    if (!rubrics) return;
+    const isAssigned = categories.some((cat) => cat.grouping === groupKey);
+    if (isAssigned) {
+      setRubricError(`Cannot delete Group "${groupKey}". There are specializations assigned to it.`);
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete Category Group "${groupKey}"?`)) return;
+
+    setRubricError("");
+    setRubricSuccess("");
+
+    const updated = { ...rubrics };
+    delete updated.STATE[groupKey];
+    delete updated.NATIONAL[groupKey];
+
+    setIsSavingRubrics(true);
+    try {
+      const res = await fetch("/api/admin/rubrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        setRubrics(updated);
+        if (selectedGroup === groupKey) {
+          const keys = Object.keys(updated.STATE);
+          setSelectedGroup(keys[0] || "");
+          setNewCatGroup(keys[0] || "");
+        }
+        setRubricSuccess(`Category Group "${groupKey}" deleted successfully!`);
+        setTimeout(() => setRubricSuccess(""), 3000);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to delete group");
+      }
+    } catch (err) {
+      setRubricError(err instanceof Error ? err.message : "Error deleting category group");
+    } finally {
+      setIsSavingRubrics(false);
+    }
+  };
+
+  const handleUpdateRubricCriterion = (idx: number, field: string, value: any) => {
+    if (!rubrics) return;
+    setRubrics((prev: any) => {
+      const updated = { ...prev };
+      const currentList = [...(updated[selectedScope]?.[selectedGroup] || [])];
+      currentList[idx] = { ...currentList[idx], [field]: value };
+      updated[selectedScope][selectedGroup] = currentList;
+      return updated;
+    });
+  };
+
+  const handleAddRubricCriterion = () => {
+    if (!rubrics) return;
+    setRubrics((prev: any) => {
+      const updated = { ...prev };
+      const currentList = [...(updated[selectedScope]?.[selectedGroup] || [])];
+      currentList.push({
+        key: `criteria_custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        label: "",
+        max: 10,
+        description: "",
+      });
+      updated[selectedScope][selectedGroup] = currentList;
+      return updated;
+    });
+  };
+
+  const handleRemoveRubricCriterion = (idx: number) => {
+    if (!rubrics) return;
+    setRubrics((prev: any) => {
+      const updated = { ...prev };
+      const currentList = [...(updated[selectedScope]?.[selectedGroup] || [])];
+      const filtered = currentList.filter((_, i) => i !== idx);
+      updated[selectedScope][selectedGroup] = filtered;
+      return updated;
+    });
+  };
+
+  const handleSaveRubrics = async () => {
+    if (!rubrics) return;
+    setRubricError("");
+    setRubricSuccess("");
+
+    // Validation: check sum for selected group and scope
+    const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
+    const totalPoints = currentList.reduce((sum: number, c: any) => sum + (parseInt(c.max) || 0), 0);
+    if (totalPoints !== 100) {
+      setRubricError(`Rubric points must sum up to exactly 100. Current total is ${totalPoints}.`);
+      return;
+    }
+
+    setIsSavingRubrics(true);
+    try {
+      const res = await fetch("/api/admin/rubrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rubrics),
+      });
+      if (res.ok) {
+        setRubricSuccess("Default rubrics saved successfully!");
+        setTimeout(() => setRubricSuccess(""), 3000);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to save");
+      }
+    } catch (err) {
+      setRubricError(err instanceof Error ? err.message : "Error saving rubrics");
+    } finally {
+      setIsSavingRubrics(false);
+    }
+  };
+
   useEffect(() => {
     Promise.resolve().then(() => {
-      const subTab = searchParams.get("subtab") as "general" | "categories" | "banners";
-      if (subTab && (subTab === "general" || subTab === "categories" || subTab === "banners")) {
+      const subTab = searchParams.get("subtab") as "general" | "categories" | "banners" | "groupings" | "rubrics";
+      if (subTab && (subTab === "general" || subTab === "categories" || subTab === "banners" || subTab === "groupings" || subTab === "rubrics")) {
         setActiveSubTab(subTab);
       }
     });
   }, [searchParams]);
 
-  const handleSubTabChange = (tab: "general" | "categories" | "banners") => {
+  const handleSubTabChange = (tab: "general" | "categories" | "banners" | "groupings" | "rubrics") => {
     setActiveSubTab(tab);
     const params = new URLSearchParams(searchParams);
     params.set("subtab", tab);
@@ -259,6 +541,26 @@ export default function SettingsTab({
         >
           🖼️ Banner Templates
         </button>
+        <button
+          onClick={() => handleSubTabChange("groupings")}
+          className={`cursor-pointer px-4 py-2.5 rounded-lg text-left text-sm font-bold transition-all whitespace-nowrap md:whitespace-normal shrink-0 ${
+            activeSubTab === "groupings"
+              ? "bg-terracotta text-cream dark:bg-gold dark:text-charcoal shadow-sm"
+              : "text-cream/60 hover:bg-cream/5 hover:text-cream"
+          }`}
+        >
+          🎨 Visual Groupings
+        </button>
+        <button
+          onClick={() => handleSubTabChange("rubrics")}
+          className={`cursor-pointer px-4 py-2.5 rounded-lg text-left text-sm font-bold transition-all whitespace-nowrap md:whitespace-normal shrink-0 ${
+            activeSubTab === "rubrics"
+              ? "bg-terracotta text-cream dark:bg-gold dark:text-charcoal shadow-sm"
+              : "text-cream/60 hover:bg-cream/5 hover:text-cream"
+          }`}
+        >
+          🎯 Judging Criteria
+        </button>
       </div>
 
       {/* Content Area (Right panel) */}
@@ -303,28 +605,100 @@ export default function SettingsTab({
               <h3 className="font-serif text-base font-bold">Category Specializations</h3>
               <p className="text-sm text-cream/50 mt-1">Configure baseline disciplines and categories registered in the database.</p>
             </div>
-
-            {/* Existing Categories List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[350px] overflow-y-auto pr-2">
+            {/* Existing Categories List - Tabular View */}
+            <div className="max-h-[350px] overflow-y-auto pr-2 border border-terracotta/15 rounded-xl bg-charcoal">
               {categories && categories.length > 0 ? (
-                categories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="bg-charcoal border border-terracotta/10 rounded-xl p-4 flex items-center justify-between shadow-sm select-none"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-serif text-sm font-bold text-cream">{cat.name}</p>
-                      <p className="text-[10px] uppercase font-bold text-gold tracking-wider">
-                        {CATEGORY_GROUPS.find(g => g.value === cat.grouping)?.label || cat.grouping || "Unassigned"}
-                      </p>
-                    </div>
-                    <span className="px-2 py-1 rounded bg-cream/5 border border-cream/10 text-xs text-cream/60 font-sans">
-                      Active
-                    </span>
-                  </div>
-                ))
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-terracotta/15 bg-charcoal-light">
+                      <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Specialization Name</th>
+                      <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Visual Grouping</th>
+                      <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Status</th>
+                      <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((cat) => {
+                      const isEditing = editingCatId === cat.id;
+                      return (
+                        <tr
+                          key={cat.id}
+                          className="border-b border-terracotta/10 last:border-b-0 hover:bg-cream/5 transition-all text-xs font-semibold"
+                        >
+                          <td className="py-2.5 px-4">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editingCatName}
+                                onChange={(e) => setEditingCatName(e.target.value)}
+                                className="bg-charcoal border border-terracotta/30 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta w-full"
+                              />
+                            ) : (
+                              <span className="text-cream/90 font-serif font-bold">{cat.name}</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            {isEditing ? (
+                              <select
+                                value={editingCatGroup}
+                                onChange={(e) => setEditingCatGroup(e.target.value)}
+                                className="bg-charcoal border border-terracotta/30 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta w-full"
+                              >
+                                {getCategoryGroupOptions().map((group) => (
+                                  <option key={group.value} value={group.value}>{group.label}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-terracotta/10 text-gold border border-terracotta/10">
+                                {getCategoryGroupOptions().find(g => g.value === cat.grouping)?.label || cat.grouping || "Unassigned"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <span className="inline-block px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[10px] text-green-400 font-sans">
+                              Active
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-right">
+                            {isEditing ? (
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => handleUpdateCategory(cat.id)}
+                                  className="cursor-pointer px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 hover:border-green-500/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="cursor-pointer px-3 py-1.5 bg-cream/5 hover:bg-cream/10 text-cream/60 hover:text-cream border border-cream/10 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => handleStartEdit(cat)}
+                                  className="cursor-pointer px-3 py-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/20 hover:border-gold/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(cat.id)}
+                                  className="cursor-pointer px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               ) : (
-                <div className="col-span-3 text-center py-8 space-y-4">
+                <div className="text-center py-8 space-y-4">
                   <p className="text-sm text-cream/40 italic">No category specializations loaded.</p>
                   <Button
                     onClick={handleSeedCategories}
@@ -365,7 +739,7 @@ export default function SettingsTab({
                     onChange={(e) => setNewCatGroup(e.target.value)}
                     className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta"
                   >
-                    {CATEGORY_GROUPS.map((group) => (
+                    {getCategoryGroupOptions().map((group) => (
                       <option key={group.value} value={group.value}>{group.label}</option>
                     ))}
                   </select>
@@ -380,6 +754,285 @@ export default function SettingsTab({
                 {isSubmitting ? "Adding Specialization..." : "+ Add Specialization"}
               </Button>
             </form>
+
+
+          </div>
+        )}
+
+        {activeSubTab === "rubrics" && (
+          <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-6 shadow-md">
+            <div>
+              <h3 className="font-serif text-base font-bold">Default Judging Criteria Configurations</h3>
+              <p className="text-sm text-cream/50 mt-1">Manage standard evaluation rubrics loaded automatically during Competition creation.</p>
+            </div>
+
+            {rubrics && (
+              <>
+                {rubricError && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold">
+                    {rubricError}
+                  </div>
+                )}
+                {rubricSuccess && (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold">
+                    {rubricSuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4 max-w-xl">
+                  <div className="space-y-1 text-sm font-semibold">
+                    <label className="block text-cream/60">Category Group</label>
+                    <select
+                      value={selectedGroup}
+                      onChange={(e) => {
+                        setSelectedGroup(e.target.value);
+                        setRubricError("");
+                      }}
+                      className="w-full bg-charcoal border border-terracotta/30 rounded p-2 text-cream text-xs focus:outline-none focus:border-terracotta"
+                    >
+                      {CATEGORY_GROUPS.map((group) => (
+                        <option key={group.value} value={group.value}>{group.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1 text-sm font-semibold">
+                    <label className="block text-cream/60">Geographic Scope</label>
+                    <select
+                      value={selectedScope}
+                      onChange={(e) => {
+                        setSelectedScope(e.target.value as any);
+                        setRubricError("");
+                      }}
+                      className="w-full bg-charcoal border border-terracotta/30 rounded p-2 text-cream text-xs focus:outline-none focus:border-terracotta"
+                    >
+                      <option value="STATE">State Level (3 Criteria Default)</option>
+                      <option value="NATIONAL">National Level (4 Criteria Default)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Criteria List */}
+                <div className="max-h-[350px] overflow-y-auto pr-2 border border-terracotta/15 rounded-xl bg-charcoal">
+                  {(rubrics[selectedScope]?.[selectedGroup] || []).length > 0 ? (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-terracotta/15 bg-charcoal-light">
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Criterion</th>
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Max Points</th>
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(rubrics[selectedScope]?.[selectedGroup] || []).map((criterion: any, idx: number) => (
+                          <tr
+                            key={criterion.key || idx}
+                            className="border-b border-terracotta/10 last:border-b-0 hover:bg-cream/5 transition-all text-xs font-semibold"
+                          >
+                            <td className="py-2.5 px-4">
+                              <span className="text-cream/90 font-serif font-bold">{criterion.label}</span>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-terracotta/10 text-gold border border-terracotta/10 font-mono">
+                                {criterion.max}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-right">
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCriterionIdx(idx);
+                                    setShowCriterionModal(true);
+                                  }}
+                                  className="cursor-pointer px-3 py-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/20 hover:border-gold/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRubricCriterion(idx)}
+                                  className="cursor-pointer px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-cream/40 italic">No criteria defined.</p>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
+                    const newIdx = currentList.length;
+                    handleAddRubricCriterion();
+                    setEditingCriterionIdx(newIdx);
+                    setShowCriterionModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 border border-dashed border-terracotta/30 text-cream/60 hover:text-cream hover:border-terracotta/50 rounded-xl transition-all text-xs font-semibold"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Default Criterion
+                </button>
+
+                {/* Score balance check card */}
+                {(() => {
+                  const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
+                  const total = currentList.reduce((sum: number, c: any) => sum + (parseInt(c.max) || 0), 0);
+                  const isValid = total === 100;
+                  return (
+                    <div className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
+                      isValid ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    }`}>
+                      <div className="text-xs font-medium">
+                        Total Sum: <strong className="font-mono">{total}</strong> / 100 points
+                        {!isValid && <span className="block opacity-75 mt-0.5">Points must equal 100 to save configuration.</span>}
+                      </div>
+                      <Button
+                        onClick={handleSaveRubrics}
+                        variant={isValid ? "secondary" : "outline"}
+                        size="md"
+                        disabled={isSavingRubrics || !isValid}
+                      >
+                        {isSavingRubrics ? "Saving Config..." : "Save Default Rubric"}
+                      </Button>
+                    </div>
+                  );
+                })()}
+
+                {/* Add New Category Group Form */}
+                <form onSubmit={handleAddCategoryGroup} className="border-t border-terracotta/10 pt-6 space-y-4">
+                  <h4 className="font-serif text-sm font-bold">Add New Category Group</h4>
+                  <div className="flex flex-col sm:flex-row gap-3 max-w-xl items-end">
+                    <div className="flex-1 space-y-1 text-xs font-semibold w-full">
+                      <label className="block text-cream/60">New Group Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Theatre & Drama"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta"
+                        required
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      size="md"
+                      disabled={isSavingRubrics || !newGroupName.trim()}
+                      className="whitespace-nowrap w-full sm:w-auto"
+                    >
+                      + Add Group
+                    </Button>
+                  </div>
+                  <p className="text-xs text-cream/40">
+                    A new group will be created with default criteria for both State and National scope.
+                    Adjust them above after adding.
+                  </p>
+                </form>
+
+                {/* Criterion Modal */}
+                {showCriterionModal && editingCriterionIdx !== null && (
+                  <div className="fixed inset-0 bg-charcoal/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-lg">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-serif text-lg font-bold text-cream">Edit Criterion</h3>
+                        <button
+                          onClick={() => {
+                            setShowCriterionModal(false);
+                            setEditingCriterionIdx(null);
+                          }}
+                          className="text-cream/60 hover:text-cream text-2xl leading-none"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {(() => {
+                        const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
+                        const criterion = currentList[editingCriterionIdx];
+                        if (!criterion) return null;
+
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="col-span-2 space-y-1">
+                                <label className="block text-xs text-cream/60 font-semibold">Label</label>
+                                <input
+                                  type="text"
+                                  value={criterion.label}
+                                  onChange={(e) => handleUpdateRubricCriterion(editingCriterionIdx, "label", e.target.value)}
+                                  placeholder="e.g. Rhythm & Composition"
+                                  className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-xs text-cream/60 font-semibold">Max Points</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={criterion.max}
+                                  onChange={(e) => handleUpdateRubricCriterion(editingCriterionIdx, "max", parseInt(e.target.value) || 0)}
+                                  className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta text-center font-mono font-bold"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block text-xs text-cream/60 font-semibold">Description / Evaluation Rubric Guidelines</label>
+                              <textarea
+                                value={criterion.description || ""}
+                                onChange={(e) => handleUpdateRubricCriterion(editingCriterionIdx, "description", e.target.value)}
+                                placeholder="What should judges look for when scoring this criterion..."
+                                rows={4}
+                                className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta resize-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-3 justify-end pt-4 border-t border-terracotta/10">
+                              <Button
+                                onClick={() => {
+                                  setShowCriterionModal(false);
+                                  setEditingCriterionIdx(null);
+                                }}
+                                variant="outline"
+                                size="md"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setShowCriterionModal(false);
+                                  setEditingCriterionIdx(null);
+                                }}
+                                variant="secondary"
+                                size="md"
+                              >
+                                Done
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!rubrics && (
+              <div className="p-4 text-center bg-charcoal border border-terracotta/10 rounded-xl">
+                <p className="text-sm text-cream/50">Loading Judging Criteria...</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -546,6 +1199,168 @@ export default function SettingsTab({
                 {isUploadingBanner ? "Creating Template..." : "+ Create Template"}
               </Button>
             </form>
+          </div>
+        )}
+
+        {activeSubTab === "groupings" && (
+          <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-6 shadow-md">
+            <div>
+              <h3 className="font-serif text-base font-bold">Visual Groupings</h3>
+              <p className="text-sm text-cream/50 mt-1">Configure and manage category visual groupings. Note: Groups with active specializations assigned cannot be deleted.</p>
+            </div>
+
+            {rubrics && (
+              <>
+                {rubricError && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold">
+                    {rubricError}
+                  </div>
+                )}
+                {rubricSuccess && (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold">
+                    {rubricSuccess}
+                  </div>
+                )}
+
+                {/* Groupings Table */}
+                <div className="max-h-[450px] overflow-y-auto pr-2 border border-terracotta/15 rounded-xl bg-charcoal">
+                  {getCategoryGroupOptions().length > 0 ? (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-terracotta/15 bg-charcoal-light">
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Grouping Name</th>
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Key</th>
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider">Specializations</th>
+                          <th className="py-3 px-4 text-[10px] uppercase font-bold text-gold tracking-wider text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getCategoryGroupOptions().map((group) => {
+                          const isAssigned = categories.some((c) => c.grouping === group.value);
+                          const assignedCount = categories.filter((c) => c.grouping === group.value).length;
+                          const isEditing = editingGroupKey === group.value;
+
+                          return (
+                            <tr
+                              key={group.value}
+                              className="border-b border-terracotta/10 last:border-b-0 hover:bg-cream/5 transition-all text-xs font-semibold"
+                            >
+                              <td className="py-2.5 px-4">
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={editingGroupLabel}
+                                    onChange={(e) => setEditingGroupLabel(e.target.value)}
+                                    className="bg-charcoal border border-terracotta/30 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta w-full"
+                                  />
+                                ) : (
+                                  <span className="text-cream/90 font-serif font-bold">{group.label}</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-terracotta/10 text-gold border border-terracotta/10 font-mono">
+                                  {group.value}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                  {assignedCount}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 text-right">
+                                {isEditing ? (
+                                  <div className="flex gap-2 justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setEditingGroupKey(null);
+                                        setEditingGroupLabel("");
+                                      }}
+                                      className="cursor-pointer px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 hover:border-green-500/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingGroupKey(null);
+                                        setEditingGroupLabel("");
+                                      }}
+                                      className="cursor-pointer px-3 py-1.5 bg-cream/5 hover:bg-cream/10 text-cream/60 hover:text-cream border border-cream/10 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2 justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setEditingGroupKey(group.value);
+                                        setEditingGroupLabel(group.label);
+                                      }}
+                                      className="cursor-pointer px-3 py-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/20 hover:border-gold/40 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveCategoryGroup(group.value)}
+                                      disabled={isAssigned}
+                                      className={`cursor-pointer px-3 py-1.5 border rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 transform active:scale-95 ${
+                                        isAssigned
+                                          ? "bg-red-500/5 text-red-300/40 border-red-500/10 cursor-not-allowed"
+                                          : "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 hover:border-red-500/40"
+                                      }`}
+                                      title={isAssigned ? `Cannot delete: ${assignedCount} specialization(s) assigned` : "Delete grouping"}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-cream/40 italic">No visual groupings loaded.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Grouping Form */}
+                <form onSubmit={handleAddCategoryGroup} className="border-t border-terracotta/10 pt-6 space-y-4">
+                  <h4 className="font-serif text-sm font-bold">Add New Visual Grouping</h4>
+                  <div className="flex flex-col sm:flex-row gap-3 max-w-xl items-end">
+                    <div className="flex-1 space-y-1 text-xs font-semibold w-full">
+                      <label className="block text-cream/60">New Grouping Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Theatre & Drama"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta"
+                        required
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      size="md"
+                      disabled={isSavingRubrics || !newGroupName.trim()}
+                      className="whitespace-nowrap w-full sm:w-auto"
+                    >
+                      + Add Grouping
+                    </Button>
+                  </div>
+                </form>
+              </>
+            )}
+
+            {!rubrics && (
+              <div className="p-4 text-center bg-charcoal border border-terracotta/10 rounded-xl">
+                <p className="text-sm text-cream/50">Loading Visual Groupings...</p>
+              </div>
+            )}
           </div>
         )}
       </div>

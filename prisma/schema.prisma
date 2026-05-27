@@ -264,7 +264,7 @@ model Category {
   name         String                @unique
   slug         String                @unique
   icon         String?               // Plan 07 — icon name (e.g., Music, Mic, Paintbrush)
-  grouping     CategoryGroup?        // Plan 07 — category visual groupings
+  grouping     String?               // Changed from CategoryGroup? to String? to support dynamic groups
   competitions CompetitionCategory[]
 }
 

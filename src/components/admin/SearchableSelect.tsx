@@ -116,7 +116,7 @@ export default function SearchableSelect({
         className={`w-full flex items-center justify-between gap-2 bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream text-sm font-semibold transition-all ${
           disabled
             ? "opacity-50 cursor-not-allowed"
-            : "hover:border-terracotta/50 focus:outline-none focus:border-terracotta"
+            : "hover:border-terracotta/50 focus:outline-none focus:border-terracotta cursor-pointer"
         } ${isOpen ? "border-terracotta" : ""}`}
       >
         <span className="truncate">

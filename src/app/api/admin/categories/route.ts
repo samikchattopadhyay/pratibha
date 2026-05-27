@@ -77,3 +77,81 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const role = (session.user as { role?: string }).role;
+    if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const body = await request.json();
+    const { id, name, grouping } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
+    }
+
+    const updateData: any = {};
+    if (name) {
+      updateData.name = name;
+      updateData.slug = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/[\s_-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+    if (grouping !== undefined) {
+      updateData.grouping = grouping;
+    }
+
+    const updated = await prisma.category.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json({ category: updated });
+  } catch (error) {
+    console.error("PATCH /api/admin/categories error:", error);
+    return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const role = (session.user as { role?: string }).role;
+    if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
+    }
+
+    // Check if category is used in any competition categories
+    const usage = await prisma.competitionCategory.count({
+      where: { categoryId: id },
+    });
+
+    if (usage > 0) {
+      return NextResponse.json({
+        error: "Cannot delete category. It is actively linked to competitions.",
+      }, { status: 400 });
+    }
+
+    await prisma.category.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true, message: "Category deleted successfully" });
+  } catch (error) {
+    console.error("DELETE /api/admin/categories error:", error);
+    return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
+  }
+}

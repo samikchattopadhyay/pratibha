@@ -133,6 +133,22 @@ export default function CreateCompetitionWizard({
   const [judgeSearch, setJudgeSearch] = useState("");
   const [judgeTierFilter, setJudgeTierFilter] = useState("ALL");
   const [judgeSpecFilter, setJudgeSpecFilter] = useState("ALL");
+  const [dynamicRubrics, setDynamicRubrics] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchRubrics = async () => {
+      try {
+        const res = await fetch("/api/admin/rubrics");
+        if (res.ok) {
+          const data = await res.json();
+          setDynamicRubrics(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch rubrics:", err);
+      }
+    };
+    fetchRubrics();
+  }, []);
 
   useEffect(() => {
     if (currentStep === 7) {
@@ -151,6 +167,12 @@ export default function CreateCompetitionWizard({
       }
     }
   }, [currentStep, data.categoryId, dbCategories, availableJudges.length]);
+
+  useEffect(() => {
+    if (currentStep === 9) {
+      initializeCriteria();
+    }
+  }, [currentStep, data.scope, data.categoryId, dynamicRubrics]);
 
   const judgeTiers = useMemo(() => {
     const tiers = new Set<string>();
@@ -322,6 +344,17 @@ export default function CreateCompetitionWizard({
           return false;
         }
         return true;
+      case 9:
+        if (data.criteriaConfig.length === 0) {
+          setError("At least one judging criterion is required");
+          return false;
+        }
+        const totalPoints = data.criteriaConfig.reduce((sum, c) => sum + (c.max || 0), 0);
+        if (totalPoints !== 100) {
+          setError(`Total max points must equal exactly 100. Current total is ${totalPoints}.`);
+          return false;
+        }
+        return true;
       default:
         return true;
     }
@@ -437,7 +470,11 @@ export default function CreateCompetitionWizard({
   };
 
   const handleResetCriteria = () => {
-    const defaults = [...SCORING_CRITERIA[data.scope]] as CriterionConfig[];
+    const cat = dbCategories.find((c) => c.id === data.categoryId);
+    const grouping = cat?.grouping || "MUSIC_VOCAL";
+    const source = dynamicRubrics || SCORING_CRITERIA;
+    const groupCriteria = source[data.scope]?.[grouping] || source[data.scope]?.["MUSIC_VOCAL"] || [];
+    const defaults = groupCriteria.map((c: any) => ({ ...c })) as CriterionConfig[];
     setData((prev) => ({
       ...prev,
       criteriaConfig: defaults,
@@ -445,13 +482,37 @@ export default function CreateCompetitionWizard({
   };
 
   const initializeCriteria = () => {
-    if (data.criteriaConfig.length === 0) {
-      const defaults = [...SCORING_CRITERIA[data.scope]] as CriterionConfig[];
-      setData((prev) => ({
-        ...prev,
-        criteriaConfig: defaults,
-      }));
-    }
+    const cat = dbCategories.find((c) => c.id === data.categoryId);
+    const grouping = cat?.grouping || "MUSIC_VOCAL";
+    const source = dynamicRubrics || SCORING_CRITERIA;
+    const groupCriteria = source[data.scope]?.[grouping] || source[data.scope]?.["MUSIC_VOCAL"] || [];
+    const defaults = groupCriteria.map((c: any) => ({ ...c })) as CriterionConfig[];
+    setData((prev) => ({
+      ...prev,
+      criteriaConfig: defaults,
+    }));
+  };
+
+  const handleAddCriterion = () => {
+    setData((prev) => ({
+      ...prev,
+      criteriaConfig: [
+        ...prev.criteriaConfig,
+        {
+          key: `criteria_custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          label: "",
+          max: 10,
+          description: "",
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveCriterion = (idx: number) => {
+    setData((prev) => ({
+      ...prev,
+      criteriaConfig: prev.criteriaConfig.filter((_, i) => i !== idx),
+    }));
   };
 
   const handleSubmit = async () => {
@@ -1020,7 +1081,10 @@ export default function CreateCompetitionWizard({
           {currentStep === 9 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-cream">Judging Criteria</h3>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-cream">Judging Criteria</h3>
+                  <p className="text-xs text-cream/60">Define evaluation metrics and their point allocation.</p>
+                </div>
                 <button
                   onClick={handleResetCriteria}
                   className="text-xs px-3 py-1 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 transition-colors"
@@ -1028,6 +1092,42 @@ export default function CreateCompetitionWizard({
                   Reset to Defaults
                 </button>
               </div>
+
+              {/* Total points summary card */}
+              {(() => {
+                const totalPoints = data.criteriaConfig.reduce((sum, c) => sum + (c.max || 0), 0);
+                const isValid = totalPoints === 100;
+                return (
+                  <div className={`p-4 rounded-xl border flex flex-col gap-3 transition-all ${
+                    isValid 
+                      ? "bg-green-500/10 border-green-500/30 text-green-400" 
+                      : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium block">Total Allocated Points</span>
+                        <span className="text-xs opacity-75">All criteria must sum up to exactly 100 points.</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold font-mono">{totalPoints}</span>
+                        <span className="text-sm font-medium"> / 100</span>
+                      </div>
+                    </div>
+
+                    {data.criteriaConfig.length > 0 && (
+                      <div className="pt-2 border-t border-current/10 space-y-1.5 text-xs">
+                        <span className="font-semibold block opacity-80 uppercase tracking-wider text-[10px]">Calculated Summary Rubric:</span>
+                        {data.criteriaConfig.map((c, i) => (
+                          <div key={c.key || i} className="flex justify-between items-center opacity-90 pl-1 border-l-2 border-current/20">
+                            <span className="truncate max-w-[350px] font-medium">{c.label || <span className="italic opacity-55">Unnamed Criterion</span>}</span>
+                            <span className="font-mono font-bold whitespace-nowrap">{c.max || 0} pts ({(c.max || 0)}%)</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {data.criteriaConfig.length === 0 && (
                 <button
@@ -1042,10 +1142,23 @@ export default function CreateCompetitionWizard({
                 {data.criteriaConfig.map((criterion, idx) => (
                   <div
                     key={criterion.key}
-                    className="p-4 bg-charcoal-light border border-terracotta/20 rounded space-y-2"
+                    className="p-4 bg-charcoal-light border border-terracotta/20 rounded space-y-3 relative group"
                   >
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gold font-mono uppercase tracking-wider">
+                        Criterion #{idx + 1}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveCriterion(idx)}
+                        className="text-cream/50 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"
+                        title="Remove criterion"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="col-span-2">
                         <label className="block text-xs text-cream/70 mb-1">
                           Label
                         </label>
@@ -1062,16 +1175,31 @@ export default function CreateCompetitionWizard({
                               return { ...prev, criteriaConfig: newConfig };
                             })
                           }
-                          className="w-full bg-charcoal border border-terracotta/20 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta"
+                          placeholder="e.g., Accuracy"
+                          className="w-full bg-charcoal border border-terracotta/20 rounded px-2.5 py-1.5 text-cream text-xs focus:outline-none focus:border-terracotta"
                         />
                       </div>
                       <div>
                         <label className="block text-xs text-cream/70 mb-1">
-                          Max Points: {criterion.max}
+                          Max Points
                         </label>
-                        <div className="text-xs text-cream/50 px-2 py-1">
-                          (Fixed)
-                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={criterion.max}
+                          onChange={(e) =>
+                            setData((prev) => {
+                              const newConfig = [...prev.criteriaConfig];
+                              newConfig[idx] = {
+                                ...newConfig[idx],
+                                max: parseInt(e.target.value) || 0,
+                              };
+                              return { ...prev, criteriaConfig: newConfig };
+                            })
+                          }
+                          className="w-full bg-charcoal border border-terracotta/20 rounded px-2.5 py-1.5 text-cream text-xs focus:outline-none focus:border-terracotta font-mono font-bold text-center"
+                        />
                       </div>
                     </div>
                     <div>
@@ -1090,7 +1218,8 @@ export default function CreateCompetitionWizard({
                             return { ...prev, criteriaConfig: newConfig };
                           })
                         }
-                        className="w-full bg-charcoal border border-terracotta/20 rounded px-2 py-1 text-cream text-xs focus:outline-none focus:border-terracotta resize-none"
+                        placeholder="Guidelines for judges evaluating this criterion..."
+                        className="w-full bg-charcoal border border-terracotta/20 rounded px-2.5 py-1.5 text-cream text-xs focus:outline-none focus:border-terracotta resize-none"
                         rows={2}
                       />
                     </div>
@@ -1098,9 +1227,13 @@ export default function CreateCompetitionWizard({
                 ))}
               </div>
 
-              <p className="text-xs text-cream/50">
-                Note: Max point values are fixed by the scoring system and cannot be changed.
-              </p>
+              <button
+                onClick={handleAddCriterion}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 transition-colors text-xs font-semibold"
+              >
+                <Plus className="w-4 h-4" />
+                Add Custom Criterion
+              </button>
             </div>
           )}
 

@@ -870,6 +870,7 @@ function AdminDashboardContent() {
               handleAddCategory={handleAddCategory}
               bannerTemplates={bannerTemplates}
               handleAddBannerTemplate={handleAddBannerTemplate}
+              onRefreshCategories={loadCategories}
             />
           )}
 

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { CategoryGroup } from "@prisma/client";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
@@ -58,7 +57,7 @@ export async function POST() {
           .replace(/[^\w\s-]/g, "")
           .replace(/\s+/g, "-")
           .substring(0, 100),
-        grouping: cat.grouping as CategoryGroup,
+        grouping: cat.grouping as string,
       })),
       skipDuplicates: true,
     });
