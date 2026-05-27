@@ -374,6 +374,11 @@ model Judge {
 
   // Plan 07 — Payments & Ledgers
   bankAccountDetails  Json?             // Structured bank info: bankName, accountNum, ifscCode
+  paymentPerEvaluation Decimal?          @db.Decimal(8, 2) // INR per evaluation/candidate
+  revenueShareLOCAL Decimal?             @db.Decimal(5, 2) // Revenue share % for LOCAL tier participants
+  revenueShareREGIONAL Decimal?          @db.Decimal(5, 2) // Revenue share % for REGIONAL tier participants
+  revenueShareNATIONAL Decimal?          @db.Decimal(5, 2) // Revenue share % for NATIONAL tier participants
+  revenueShareEXPERT Decimal?            @db.Decimal(5, 2) // Revenue share % for EXPERT tier participants
   payouts             JudgePayout[]
 
   // Phase 2 — Telegram notifications

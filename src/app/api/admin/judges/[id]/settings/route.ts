@@ -5,8 +5,13 @@ import type { JudgeSettings } from "@/types/judges-details";
 
 // ✅ Pattern: Request DTO validation
 const UpdateSettingsSchema = z.object({
-  maxEvaluationsPerDay: z.coerce.number().min(1).max(50),
-  restPeriodHours: z.coerce.number().min(0).max(24),
+  maxEvaluationsPerDay: z.number().min(1).max(50),
+  restPeriodHours: z.number().min(0).max(24),
+  paymentPerEvaluation: z.number().min(0).max(10000),
+  revenueShareLOCAL: z.number().min(0).max(100).nullable().optional(),
+  revenueShareREGIONAL: z.number().min(0).max(100).nullable().optional(),
+  revenueShareNATIONAL: z.number().min(0).max(100).nullable().optional(),
+  revenueShareEXPERT: z.number().min(0).max(100).nullable().optional(),
   preferredCategories: z.array(z.string()).min(1),
   emailNotifications: z.boolean(),
   smsNotifications: z.boolean(),
@@ -17,9 +22,6 @@ async function checkAdminAuth(request: NextRequest): Promise<boolean> {
   // TODO: Implement actual auth check
   return true;
 }
-
-// For now, we'll store settings in the judge model's specializations field
-// TODO: Create a JudgeSettings table if more granular settings management is needed
 
 export async function PATCH(
   request: NextRequest,
@@ -47,19 +49,44 @@ export async function PATCH(
       );
     }
 
-    // Update judge specializations as preferred categories
-    const updated = await prisma.judge.update({
+    // Update judge with payment and preferred categories
+    const updateData: any = {
+      specializations: validated.data.preferredCategories,
+    };
+
+    if (validated.data.paymentPerEvaluation > 0) {
+      updateData.paymentPerEvaluation = validated.data.paymentPerEvaluation;
+    }
+    if (validated.data.revenueShareLOCAL !== undefined && validated.data.revenueShareLOCAL !== null) {
+      updateData.revenueShareLOCAL = validated.data.revenueShareLOCAL;
+    }
+    if (validated.data.revenueShareREGIONAL !== undefined && validated.data.revenueShareREGIONAL !== null) {
+      updateData.revenueShareREGIONAL = validated.data.revenueShareREGIONAL;
+    }
+    if (validated.data.revenueShareNATIONAL !== undefined && validated.data.revenueShareNATIONAL !== null) {
+      updateData.revenueShareNATIONAL = validated.data.revenueShareNATIONAL;
+    }
+    if (validated.data.revenueShareEXPERT !== undefined && validated.data.revenueShareEXPERT !== null) {
+      updateData.revenueShareEXPERT = validated.data.revenueShareEXPERT;
+    }
+
+    await prisma.judge.update({
       where: { id: judgeId },
-      data: {
-        specializations: validated.data.preferredCategories,
-      },
+      data: updateData,
     });
 
     // Return settings DTO
     const settings: JudgeSettings = {
       maxEvaluationsPerDay: validated.data.maxEvaluationsPerDay,
       restPeriodHours: validated.data.restPeriodHours,
-      preferredCategories: updated.specializations as readonly string[],
+      paymentPerEvaluation: validated.data.paymentPerEvaluation,
+      revenueShareByTier: {
+        LOCAL: validated.data.revenueShareLOCAL ?? null,
+        REGIONAL: validated.data.revenueShareREGIONAL ?? null,
+        NATIONAL: validated.data.revenueShareNATIONAL ?? null,
+        EXPERT: validated.data.revenueShareEXPERT ?? null,
+      },
+      preferredCategories: validated.data.preferredCategories,
       emailNotifications: validated.data.emailNotifications,
       smsNotifications: validated.data.smsNotifications,
     };
@@ -81,14 +108,14 @@ export async function PATCH(
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: judgeId } = await params;
 
     // Check authorization
-    const isAuthorized = await checkAdminAuth(request);
+    const isAuthorized = await checkAdminAuth(_request);
     if (!isAuthorized) {
       return NextResponse.json(
         { code: "UNAUTHORIZED", message: "Admin access required" },
@@ -96,10 +123,9 @@ export async function GET(
       );
     }
 
-    const judge = await prisma.judge.findUnique({
+    const judge = (await prisma.judge.findUnique({
       where: { id: judgeId },
-      select: { specializations: true },
-    });
+    })) as any;
 
     if (!judge) {
       return NextResponse.json(
@@ -108,10 +134,17 @@ export async function GET(
       );
     }
 
-    // Return default settings with judge's specializations
+    // Return settings with judge's actual values
     const settings: JudgeSettings = {
       maxEvaluationsPerDay: 5,
       restPeriodHours: 8,
+      paymentPerEvaluation: judge.paymentPerEvaluation ? Number(judge.paymentPerEvaluation) : 0,
+      revenueShareByTier: {
+        LOCAL: judge.revenueShareLOCAL ? Number(judge.revenueShareLOCAL) : null,
+        REGIONAL: judge.revenueShareREGIONAL ? Number(judge.revenueShareREGIONAL) : null,
+        NATIONAL: judge.revenueShareNATIONAL ? Number(judge.revenueShareNATIONAL) : null,
+        EXPERT: judge.revenueShareEXPERT ? Number(judge.revenueShareEXPERT) : null,
+      },
       preferredCategories: judge.specializations as readonly string[],
       emailNotifications: true,
       smsNotifications: false,

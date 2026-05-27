@@ -278,6 +278,14 @@ export interface PaginatedResponse<T> {
   readonly limit: number;
 }
 
+// Revenue share percentages by participant tier
+export interface RevenueShareByTier {
+  readonly LOCAL: number | null;
+  readonly REGIONAL: number | null;
+  readonly NATIONAL: number | null;
+  readonly EXPERT: number | null;
+}
+
 // Revenue summary DTO
 export interface RevenueMetadata {
   readonly totalEarned: number;
@@ -301,6 +309,8 @@ export interface PaymentRecord {
 export interface JudgeSettings {
   readonly maxEvaluationsPerDay: number;
   readonly restPeriodHours: number;
+  readonly paymentPerEvaluation: number;
+  readonly revenueShareByTier: RevenueShareByTier;
   readonly preferredCategories: readonly string[];
   readonly emailNotifications: boolean;
   readonly smsNotifications: boolean;
@@ -1050,7 +1060,11 @@ export default function ParticipantsSubTab({ judgeId }: ParticipantsSubTabProps)
 
 **Instructions:**
 1. Fetch revenue summary on mount
-2. Display compensation metrics (total earned, pending, rates)
+2. Display compensation metrics:
+   - Total earned (cumulative)
+   - Total pending (unpaid)
+   - Per-evaluation rate (from judge settings)
+   - Revenue share percentage (tier-based, read-only)
 3. Fetch and display payment history table (paginated)
 4. Show payment status badges
 5. Add export invoice button (optional)
@@ -1063,7 +1077,7 @@ Response:
 {
   "totalEarned": 15000,
   "totalPending": 2500,
-  "hourlyRate": 500,
+  "hourlyRate": 0,
   "perEvaluationRate": 150,
   "lastPaymentDate": "2026-05-20T00:00:00Z"
 }
@@ -1081,11 +1095,23 @@ Response: PaginatedResponse<PaymentRecord>
 **Instructions:**
 1. Accept judge metadata as prop
 2. Render form with React Hook Form + Zod validation
-3. Fields: max evaluations/day, rest period hours, preferred categories, notification toggles
-4. Validate on submit
-5. Send PATCH request to update settings
-6. Show success/error toast
-7. Use design-system button styling
+3. Fields:
+   - Max evaluations/day (number input)
+   - Rest period hours (number input)
+   - Payment per evaluation (currency input with ₹ symbol, tier-based guidance)
+   - Revenue share by participant tier (4 separate decimal inputs: LOCAL, REGIONAL, NATIONAL, EXPERT)
+   - Preferred categories (multi-select checkboxes)
+   - Email/SMS notification toggles
+4. Revenue share is **user-configurable per judge, per participant tier**:
+   - Judge sets different percentage for each tier of participants they evaluate
+   - Example: Judge A earns 20% when evaluating LOCAL tier participants, 30% for REGIONAL, 50% for NATIONAL, 75% for EXPERT
+   - Allow values 0-100 with decimal precision (step=0.1)
+   - Each field is optional (nullable in DB)
+   - Display guidance: "Set different percentages based on the tier of participants this judge evaluates"
+5. Validate on submit
+6. Send PATCH request to update settings
+7. Show success/error feedback
+8. Use design-system button styling
 
 **Form Schema (Zod):**
 
@@ -1093,11 +1119,21 @@ Response: PaginatedResponse<PaymentRecord>
 const JudgeSettingsSchema = z.object({
   maxEvaluationsPerDay: z.number().min(1).max(50),
   restPeriodHours: z.number().min(0).max(24),
+  paymentPerEvaluation: z.number().min(0).max(10000),
+  revenueShareLOCAL: z.number().min(0).max(100).nullable().optional(),
+  revenueShareREGIONAL: z.number().min(0).max(100).nullable().optional(),
+  revenueShareNATIONAL: z.number().min(0).max(100).nullable().optional(),
+  revenueShareEXPERT: z.number().min(0).max(100).nullable().optional(),
   preferredCategories: z.array(z.string()).min(1, "Select at least 1 category"),
   emailNotifications: z.boolean(),
   smsNotifications: z.boolean(),
 });
 ```
+
+**Compensation Model:**
+- **Fixed Per Evaluation:** Configurable amount paid per candidate evaluated, with tier-based guidance (LOCAL ₹100-150, REGIONAL ₹200-300, NATIONAL ₹400-500, EXPERT ₹600+)
+- **Revenue Share (Tiered):** Automatic percentage of competition entry fees based on judge tier, displayed as read-only
+- Judges earn through **both** compensation modes simultaneously
 
 ---
 
@@ -1347,6 +1383,7 @@ export async function GET(request: NextRequest) {
 const UpdateSettingsSchema = z.object({
   maxEvaluationsPerDay: z.number().min(1).max(50),
   restPeriodHours: z.number().min(0).max(24),
+  paymentPerEvaluation: z.number().min(0).max(10000),
   preferredCategories: z.array(z.string()).min(1),
   emailNotifications: z.boolean(),
   smsNotifications: z.boolean(),
@@ -1413,6 +1450,45 @@ export async function PATCH(
 - ✅ HTTP status codes correct (400, 401, 404, 422, 500)
 - ✅ Authorization checked before business logic
 - ✅ No sensitive data in responses
+
+---
+
+## Judge Compensation Model
+
+### Per-Judge, Participant-Tier-Based Revenue Share (Implemented)
+
+Judge compensation combines two models:
+
+1. **Fixed Per-Evaluation Payment**
+   - Configurable amount per participant evaluated
+   - Tier-based guidance provided in UI showing typical rates by judge tier:
+     - LOCAL judges: ₹100-150 range
+     - REGIONAL judges: ₹200-300 range
+     - NATIONAL judges: ₹400-500 range
+     - EXPERT judges: ₹600+ range
+   - Stored in database and customizable per judge
+   - This is the fixed amount paid per candidate the judge evaluates
+
+2. **Per-Judge Revenue Share by Participant Tier**
+   - Percentage of competition entry fees, configured per judge and per participant tier
+   - **Fully customizable** — each judge sets different percentages for each tier
+   - Configuration:
+     - Judge sets % for LOCAL tier participants they evaluate
+     - Judge sets % for REGIONAL tier participants they evaluate
+     - Judge sets % for NATIONAL tier participants they evaluate
+     - Judge sets % for EXPERT tier participants they evaluate
+   - Example: Judge A earns 20% when evaluating LOCAL, 30% for REGIONAL, 50% for NATIONAL, 75% for EXPERT
+   - Example: Judge B earns 10% when evaluating LOCAL, 15% for REGIONAL, 25% for NATIONAL, 40% for EXPERT
+   - Each field allows 0-100 with decimal precision
+   - Fields are optional (can be left null/empty)
+   - Judges earn through **both** compensation modes simultaneously
+
+### Why This Model
+
+- **Fairness:** Each judge has independent configuration, not tied to their tier
+- **Flexibility:** Judges can adjust revenue share based on their expertise and availability
+- **Transparency:** Clear breakdown by participant tier helps judges understand earnings
+- **Scalability:** Works across competitions and participant tiers without pre-configured limits
 
 ---
 

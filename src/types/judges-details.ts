@@ -55,10 +55,20 @@ export interface PaymentRecord {
   readonly completedAt?: string | null;
 }
 
+// Revenue share percentages by participant tier
+export interface RevenueShareByTier {
+  readonly LOCAL: number | null;
+  readonly REGIONAL: number | null;
+  readonly NATIONAL: number | null;
+  readonly EXPERT: number | null;
+}
+
 // Settings DTO
 export interface JudgeSettings {
   readonly maxEvaluationsPerDay: number;
   readonly restPeriodHours: number;
+  readonly paymentPerEvaluation: number;
+  readonly revenueShareByTier: RevenueShareByTier;
   readonly preferredCategories: readonly string[];
   readonly emailNotifications: boolean;
   readonly smsNotifications: boolean;
