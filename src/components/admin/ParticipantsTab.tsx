@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Eye, Search, ChevronDown, ChevronUp, Download, CheckSquare, Square } from "lucide-react";
+import Link from "next/link";
+import { Eye, Search, ChevronDown, ChevronUp, Download, CheckSquare, Square, User } from "lucide-react";
 import Button from "@/components/Button";
 
 export interface Judge {
@@ -30,6 +31,7 @@ export interface Judge {
 export interface Registration {
   id: string;
   registrationId: string;
+  studentId: string;
   studentName: string;
   competitionTitle: string;
   categoryName: string;
@@ -441,6 +443,14 @@ export default function ParticipantsTab({
                     </td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2 flex-col sm:flex-row">
+                        <Link
+                          href={`/admin/students/${reg.studentId}`}
+                          className="px-2.5 py-1.5 rounded bg-blue-700 hover:bg-blue-800 text-white w-full sm:w-auto text-xs font-semibold flex items-center justify-center gap-1.5"
+                          title="View Student Profile"
+                        >
+                          <User className="w-3.5 h-3.5" /> Profile
+                        </Link>
+
                         {reg.status === "PENDING_VERIFICATION" && (
                           <Button
                             onClick={() => handleVerifyEntry(reg.id)}

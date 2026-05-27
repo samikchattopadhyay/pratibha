@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
     const formatted = registrations.map((reg) => ({
       id: reg.id,
       registrationId: reg.registrationId,
+      studentId: reg.studentId,
       studentName: reg.student.name,
       competitionTitle: reg.competitionCategory.competition.title,
       categoryName: reg.competitionCategory.category.name,

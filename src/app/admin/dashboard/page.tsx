@@ -31,6 +31,7 @@ const mockRegistrations = [
   {
     id: "reg-1",
     registrationId: "PP-2026-REC-0021",
+    studentId: "std-1",
     studentName: "Bhaskar Chattopadhyay",
     competitionTitle: "Borsha Bodhon 2026",
     categoryName: "Bengali Recitation",
@@ -44,6 +45,7 @@ const mockRegistrations = [
   {
     id: "reg-2",
     registrationId: "PP-2026-ART-0098",
+    studentId: "std-2",
     studentName: "Pooja Chattopadhyay",
     competitionTitle: "Chitra Kala 2026",
     categoryName: "Drawing",
@@ -55,6 +57,7 @@ const mockRegistrations = [
   {
     id: "reg-3",
     registrationId: "PP-2026-REC-0099",
+    studentId: "std-3",
     studentName: "Arnav Mukherjee",
     competitionTitle: "Borsha Bodhon 2026",
     categoryName: "Bengali Recitation",

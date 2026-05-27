@@ -20,6 +20,7 @@ interface Student {
 
 interface Registration {
   id: string;
+  studentId: string;
   studentName: string;
   competitionTitle: string;
   categoryName: string;
@@ -64,6 +65,7 @@ const mockStudents = [
 const mockRegistrations = [
   {
     id: "r1",
+    studentId: "s1",
     studentName: "Bhaskar Chattopadhyay",
     competitionTitle: "Borsha Bodhon 2026",
     categoryName: "Bengali Recitation",
@@ -79,6 +81,7 @@ const mockRegistrations = [
   },
   {
     id: "r2",
+    studentId: "s2",
     studentName: "Pooja Chattopadhyay",
     competitionTitle: "Chitra Kala 2026",
     categoryName: "Drawing",
@@ -95,6 +98,7 @@ function ParentDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabFromUrl = (searchParams.get("tab") || "students") as "students" | "entries";
+  const selectedStudentId = searchParams.get("student") || null;
 
   const activeTab = tabFromUrl;
   const [isValidRole, setIsValidRole] = useState(false);
@@ -110,6 +114,7 @@ function ParentDashboardContent() {
     if (sessionStatus === "authenticated" && session?.user) {
       const userRole = (session.user as { role?: string }).role;
       if (userRole === "PARENT") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsValidRole(true);
       } else {
         router.push(userRole === "SUPER_ADMIN" || userRole === "MODERATOR" ? "/admin" : "/judge/dashboard");
@@ -386,26 +391,28 @@ function ParentDashboardContent() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {students.map((student) => (
-                        <div key={student.id} className="bg-cream dark:bg-charcoal-light border border-terracotta/5 dark:border-terracotta/10 rounded-xl p-5 shadow-sm flex justify-between items-start">
-                          <div>
-                            <h4 className="font-sans text-base font-bold text-charcoal dark:text-cream">{student.name}</h4>
-                            <p className="font-sans text-sm text-charcoal/50 dark:text-cream/50 mt-0.5">
-                              {student.gender} | Age: {calculateAge(student.dateOfBirth)} years old
-                            </p>
-                            {student.disciplineInterests && student.disciplineInterests.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {student.disciplineInterests.map((interest) => (
-                                  <span key={interest} className="inline-block px-2 py-0.5 text-sm font-sans font-semibold rounded bg-terracotta/10 text-terracotta dark:bg-gold/15 dark:text-gold">
-                                    {interest}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                        <Link key={student.id} href={`/parent/dashboard?tab=entries&student=${student.id}`} className="group">
+                          <div className="bg-cream dark:bg-charcoal-light border border-terracotta/5 dark:border-terracotta/10 rounded-xl p-5 shadow-sm flex justify-between items-start hover:border-terracotta/20 dark:hover:border-terracotta/30 hover:shadow-md transition-all duration-250 cursor-pointer">
+                            <div>
+                              <h4 className="font-sans text-base font-bold text-charcoal dark:text-cream group-hover:text-terracotta dark:group-hover:text-gold transition-colors">{student.name}</h4>
+                              <p className="font-sans text-sm text-charcoal/50 dark:text-cream/50 mt-0.5">
+                                {student.gender} | Age: {calculateAge(student.dateOfBirth)} years old
+                              </p>
+                              {student.disciplineInterests && student.disciplineInterests.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {student.disciplineInterests.map((interest) => (
+                                    <span key={interest} className="inline-block px-2 py-0.5 text-sm font-sans font-semibold rounded bg-terracotta/10 text-terracotta dark:bg-gold/15 dark:text-gold">
+                                      {interest}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <span className="w-8 h-8 rounded-full bg-gold/10 dark:bg-gold/20 text-gold-dark dark:text-gold flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                              {student.name.charAt(0)}
+                            </span>
                           </div>
-                          <span className="w-8 h-8 rounded-full bg-gold/10 dark:bg-gold/20 text-gold-dark dark:text-gold flex items-center justify-center font-bold text-xs uppercase shrink-0">
-                            {student.name.charAt(0)}
-                          </span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -416,7 +423,22 @@ function ParentDashboardContent() {
               {activeTab === "entries" && (
                 <div className="space-y-6">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-serif text-xl font-bold text-charcoal dark:text-cream">Registered Entries</h3>
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-charcoal dark:text-cream">
+                        Registered Entries
+                        {selectedStudentId && students.find(s => s.id === selectedStudentId) && (
+                          <span className="text-terracotta dark:text-gold text-lg"> — {students.find(s => s.id === selectedStudentId)?.name}</span>
+                        )}
+                      </h3>
+                      {selectedStudentId && (
+                        <button
+                          onClick={() => router.push("/parent/dashboard?tab=entries")}
+                          className="mt-2 text-sm text-terracotta dark:text-gold hover:underline font-semibold"
+                        >
+                          ✕ Clear filter
+                        </button>
+                      )}
+                    </div>
                     <Link
                       href="/competitions"
                       className="inline-flex"
@@ -430,13 +452,18 @@ function ParentDashboardContent() {
                     </Link>
                   </div>
 
-                  {registrations.length === 0 ? (
-                    <div className="bg-cream dark:bg-charcoal-light border border-dashed border-terracotta/20 rounded-2xl p-12 text-center text-charcoal/50 dark:text-cream/50 font-sans text-sm">
-                      No competition entries submitted yet. Visit the competitions catalog to enter.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {registrations.map((reg) => (
+                  {(() => {
+                    const filteredEntries = selectedStudentId
+                      ? registrations.filter(reg => reg.studentId === selectedStudentId)
+                      : registrations;
+
+                    return filteredEntries.length === 0 ? (
+                      <div className="bg-cream dark:bg-charcoal-light border border-dashed border-terracotta/20 rounded-2xl p-12 text-center text-charcoal/50 dark:text-cream/50 font-sans text-sm">
+                        {selectedStudentId ? "No competition entries for this student yet." : "No competition entries submitted yet. Visit the competitions catalog to enter."}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredEntries.map((reg) => (
                         <div key={reg.id} className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-xl p-5 shadow-sm space-y-4">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                             <div>
@@ -498,8 +525,9 @@ function ParentDashboardContent() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
