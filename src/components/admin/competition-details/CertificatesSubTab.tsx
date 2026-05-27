@@ -18,7 +18,7 @@ interface RevokeConfirmation {
 export default function CertificatesSubTab({ competitionId }: SubTabProps) {
   const [data, setData] = useState<CertificateRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [revokeConfirm, setRevokeConfirm] = useState<RevokeConfirmation | null>(null);
@@ -88,23 +88,36 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
     }
   }, [successMessage]);
 
-  const handleGenerateCertificates = async () => {
-    setGenerating(true);
+  const handleFinalizeAndGenerate = async () => {
+    setFinalizing(true);
     setError("");
     try {
       const res = await fetch(
-        `/api/admin/competitions/${competitionId}/certificates/generate`,
+        `/api/admin/competitions/${competitionId}/finalize-and-generate`,
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
-      if (!res.ok) throw new Error("Failed to generate certificates");
-      const result = await res.json();
-      setSuccessMessage(`✓ Generated ${result.generatedCount} certificates successfully!`);
+      if (!res.ok) {
+        const body = await res.json() as { error?: string };
+        throw new Error(body.error ?? "Failed to finalize and generate certificates");
+      }
+      const result = await res.json() as {
+        prizesAwarded: number;
+        certificatesCreated: number;
+        certificatesUpdated: number;
+        notificationsSent: number;
+        skipped: number;
+      };
+      setSuccessMessage(
+        `✓ Certificates finalized: ${result.certificatesCreated} created, ` +
+        `${result.certificatesUpdated} repaired, ${result.prizesAwarded} prizes awarded. ` +
+        `Notifications sent: ${result.notificationsSent}.`
+      );
       await fetchCertificates();
       await fetchStats();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate certificates");
+      setError(err instanceof Error ? err.message : "Failed to finalize certificates");
     } finally {
-      setGenerating(false);
+      setFinalizing(false);
     }
   };
 
@@ -216,15 +229,15 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
             variant="secondary"
             size="md"
           >
-            {notifying ? "Sending..." : "📧 Send Emails"}
+            {notifying ? "Sending..." : "📧 Resend Notifications"}
           </Button>
           <Button
-            onClick={handleGenerateCertificates}
-            disabled={generating || loading}
+            onClick={handleFinalizeAndGenerate}
+            disabled={finalizing || loading}
             variant="primary"
             size="md"
           >
-            {generating ? "Generating..." : "🎓 Generate Certificates"}
+            {finalizing ? "Finalizing..." : "🎓 Finalize & Generate Certificates"}
           </Button>
         </div>
       </div>
