@@ -5,7 +5,7 @@ import { CertificateRecord, PaginatedResponse, CertificateStats, SubTabProps } f
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { Eye, XCircle } from "lucide-react";
+import { Eye, XCircle, HelpCircle, X } from "lucide-react";
 
 type CertStatus = "ALL" | "PENDING" | "GENERATED" | "SHARED";
 
@@ -30,6 +30,7 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
   const [status, setStatus] = useState<CertStatus>("ALL");
   const [stats, setStats] = useState<CertificateStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const fetchCertificates = useCallback(async () => {
     setLoading(true);
@@ -217,7 +218,16 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
       {/* Header */}
       <div className="flex justify-between items-start gap-4">
         <div>
-          <h3 className="font-serif text-base font-bold">Certificate Management</h3>
+          <h3 className="font-serif text-base font-bold flex items-center gap-2">
+            Certificate Management
+            <button
+              onClick={() => setShowHelp(true)}
+              className="text-cream/40 hover:text-gold transition-colors focus:outline-none p-1 rounded hover:bg-cream/5"
+              title="Show Certificate Guidelines"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+          </h3>
           <p className="text-sm text-cream/50 mt-1">
             Generate and track digital certificates for competition winners
           </p>
@@ -425,6 +435,106 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
         onConfirm={handleConfirmRevoke}
         onCancel={() => setRevokeConfirm(null)}
       />
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/80 backdrop-blur-sm p-4">
+          <div className="bg-charcoal-light border border-terracotta/30 p-6 rounded-2xl max-w-3xl w-full space-y-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setShowHelp(false)}
+              className="absolute top-4 right-4 text-cream/50 hover:text-cream transition-colors focus:outline-none p-1 rounded hover:bg-cream/5"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Title Banner */}
+            <div className="flex items-start gap-3 border-b border-terracotta/10 pb-4">
+              <div className="bg-gold/10 p-2.5 rounded-xl border border-gold/20">
+                <HelpCircle className="w-6 h-6 text-gold" />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl font-bold text-cream">Certificate Operations Guide</h3>
+                <p className="text-xs text-cream/40 mt-0.5">Workflow guidelines for PDF generation, signing, and verification</p>
+              </div>
+            </div>
+
+            {/* Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              
+              {/* Left Column: Graphic */}
+              <div className="md:col-span-2 space-y-3">
+                <div className="w-full h-48 md:h-64 relative rounded-xl overflow-hidden border border-terracotta/20 bg-charcoal flex items-center justify-center">
+                  <img
+                    src="/images/certificates_workflow_infographic.png"
+                    alt="Certificate Management Workflow"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="bg-charcoal/50 p-3 rounded-lg border border-terracotta/5 text-[11px] text-cream/50 leading-relaxed font-mono">
+                  <span className="text-gold font-bold">ℹ️ Note:</span> Generated files are securely stored on AWS S3/Cloudflare with matching public cryptographic keys.
+                </div>
+              </div>
+
+              {/* Right Column: Descriptions */}
+              <div className="md:col-span-3 space-y-4 max-h-[26rem] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-terracotta/20">
+                
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">1</span>
+                    Bulk PDF Finalization & Creation
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Click the *Finalize & Generate* button to compile verified participant score records, calculate first/second/third rankings, and automatically render print-ready PDF certificate files.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">2</span>
+                    QR Code Verification Signature
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Every generated certificate contains a unique cryptographic verification hash mapped to a QR code. Public users scanning this code are redirected to our public verification route to check validity.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">3</span>
+                    Parent Notifications
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Once generated successfully, click *Resend Notifications* to dispatch automated WhatsApp templates and emails to parent profiles containing direct download URLs.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">4</span>
+                    Revocation Operations
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    If an entry is disqualified or requires rating corrections post-publication, administrators can click the Revoke button to invalidate the verification QR link instantly.
+                  </p>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end pt-3 border-t border-terracotta/10">
+              <Button
+                onClick={() => setShowHelp(false)}
+                variant="primary"
+                size="md"
+                className="w-full md:w-36 font-bold shadow-md shadow-terracotta/10"
+              >
+                Got It
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

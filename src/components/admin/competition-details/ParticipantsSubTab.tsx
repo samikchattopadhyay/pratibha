@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ParticipantRecord, PaginatedResponse, SubTabProps } from "@/types/competition-details";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { Check, X } from "lucide-react";
+import { Check, X, HelpCircle } from "lucide-react";
 
 type FilterType = "ALL" | "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "DISQUALIFIED";
 
@@ -18,6 +18,7 @@ export default function ParticipantsSubTab({ competitionId }: SubTabProps) {
   const [filter, setFilter] = useState<FilterType>("ALL");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -92,7 +93,16 @@ export default function ParticipantsSubTab({ competitionId }: SubTabProps) {
     <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-6">
       {/* Header */}
       <div>
-        <h3 className="font-serif text-base font-bold">Competition Participants</h3>
+        <h3 className="font-serif text-base font-bold flex items-center gap-2">
+          Competition Participants
+          <button
+            onClick={() => setShowHelp(true)}
+            className="text-cream/40 hover:text-gold transition-colors focus:outline-none p-1 rounded hover:bg-cream/5"
+            title="Show Participant Guidelines"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </h3>
         <p className="text-sm text-cream/50 mt-1">
           Manage registrations, verify entries, and assign judges for this competition
         </p>
@@ -258,6 +268,106 @@ export default function ParticipantsSubTab({ competitionId }: SubTabProps) {
           {data.filter((d) => d.assignedJudges.length === 0).length}
         </div>
       </div>
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/80 backdrop-blur-sm p-4">
+          <div className="bg-charcoal-light border border-terracotta/30 p-6 rounded-2xl max-w-3xl w-full space-y-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setShowHelp(false)}
+              className="absolute top-4 right-4 text-cream/50 hover:text-cream transition-colors focus:outline-none p-1 rounded hover:bg-cream/5"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Title Banner */}
+            <div className="flex items-start gap-3 border-b border-terracotta/10 pb-4">
+              <div className="bg-gold/10 p-2.5 rounded-xl border border-gold/20">
+                <HelpCircle className="w-6 h-6 text-gold" />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl font-bold text-cream">Participant Verification Guide</h3>
+                <p className="text-xs text-cream/40 mt-0.5">Workflow guidelines for managing registrations and judge assignments</p>
+              </div>
+            </div>
+
+            {/* Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              
+              {/* Left Column: Graphic */}
+              <div className="md:col-span-2 space-y-3">
+                <div className="w-full h-48 md:h-64 relative rounded-xl overflow-hidden border border-terracotta/20 bg-charcoal flex items-center justify-center">
+                  <img
+                    src="/images/participants_workflow_infographic.png"
+                    alt="Participants Verification Workflow"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="bg-charcoal/50 p-3 rounded-lg border border-terracotta/5 text-[11px] text-cream/50 leading-relaxed font-mono">
+                  <span className="text-gold font-bold">ℹ️ Note:</span> Payment status matches Razorpay integrations, while judge lists are custom per category grouping.
+                </div>
+              </div>
+
+              {/* Right Column: Descriptions */}
+              <div className="md:col-span-3 space-y-4 max-h-[26rem] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-terracotta/20">
+                
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">1</span>
+                    Review Submissions
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Examine each registrant profile, student details, and age classification. Confirm that the selected category matches the age ranges required by division specifications.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">2</span>
+                    Reconcile Payments
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Verify the registration Payment status. Succesfully paid registrations show <strong className="text-green-400">Paid</strong> and are eligible for verification approval. Unpaid registrations remain in sandbox stage until checked.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">3</span>
+                    Verify Entry Approved
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Approving a participant switches their state to <strong className="text-green-400">VERIFIED</strong>, placing them into active queues so judges can access their submissions on their own panels.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-gold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center text-[10px] text-gold font-mono">4</span>
+                    Panel Judge Assignments
+                  </h4>
+                  <p className="text-xs text-cream/60 leading-relaxed">
+                    Assign authorized evaluators to review the entrants' submissions. Once assigned, you can monitor individual scoring marks directly from the registry grid.
+                  </p>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end pt-3 border-t border-terracotta/10">
+              <Button
+                onClick={() => setShowHelp(false)}
+                variant="primary"
+                size="md"
+                className="w-full md:w-36 font-bold shadow-md shadow-terracotta/10"
+              >
+                Got It
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
