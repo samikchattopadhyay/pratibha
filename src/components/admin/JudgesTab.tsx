@@ -64,15 +64,14 @@ export default function JudgesTab({
             </p>
           </div>
 
-          <Button
+          <button
             onClick={() => setShowHelp(true)}
-            variant="outline"
-            size="sm"
-            className="flex items-center justify-center gap-1.5 text-xs text-cream/70 hover:text-cream border-cream/15 w-full md:w-auto self-start md:self-center font-bold tracking-wide px-4"
+            className="p-2.5 rounded-xl border border-cream/15 hover:border-gold text-cream/70 hover:text-gold bg-charcoal hover:bg-cream/5 transition-all duration-200 focus:outline-none flex items-center justify-center self-start md:self-center"
+            title="Jury Audit Rules"
+            aria-label="Jury Audit Rules"
           >
-            <Shield className="w-3.5 h-3.5" />
-            Audit Rules
-          </Button>
+            <Shield className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Filter and Control Bar */}
