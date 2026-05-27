@@ -4,9 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import { CertificateRecord, PaginatedResponse, CertificateStats, SubTabProps } from "@/types/competition-details";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { Eye, Link2, XCircle } from "lucide-react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { Eye, XCircle } from "lucide-react";
 
 type CertStatus = "ALL" | "PENDING" | "GENERATED" | "SHARED";
+
+interface RevokeConfirmation {
+  certId: string;
+  studentName: string;
+  certificateType: string;
+}
 
 export default function CertificatesSubTab({ competitionId }: SubTabProps) {
   const [data, setData] = useState<CertificateRecord[]>([]);
@@ -14,6 +21,7 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
   const [generating, setGenerating] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [revokeConfirm, setRevokeConfirm] = useState<RevokeConfirmation | null>(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -124,26 +132,28 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
     window.open(`/verify/${encodeURIComponent(certificateId)}`, "_blank");
   };
 
-  const handleCopyLink = async (certificateId: string) => {
-    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/verify/${encodeURIComponent(certificateId)}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setSuccessMessage("✓ Certificate link copied to clipboard!");
-    } catch {
-      setError("Failed to copy link");
-    }
+
+  const handleRevokeClick = (cert: CertificateRecord) => {
+    setRevokeConfirm({
+      certId: cert.id,
+      studentName: cert.studentName,
+      certificateType: cert.type,
+    });
   };
 
-  const handleRevoke = async (certId: string) => {
-    setRevoking(certId);
+  const handleConfirmRevoke = async () => {
+    if (!revokeConfirm) return;
+
+    setRevoking(revokeConfirm.certId);
     setError("");
     try {
       const res = await fetch(
-        `/api/admin/competitions/${competitionId}/certificates/${certId}/revoke`,
+        `/api/admin/competitions/${competitionId}/certificates/${revokeConfirm.certId}/revoke`,
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!res.ok) throw new Error("Failed to revoke certificate");
       setSuccessMessage("✓ Certificate revoked successfully!");
+      setRevokeConfirm(null);
       await fetchCertificates();
       await fetchStats();
     } catch (err) {
@@ -278,12 +288,9 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-terracotta/10">
-              <th className="text-left px-4 py-3 text-cream/60 font-bold">Registration ID</th>
-              <th className="text-left px-4 py-3 text-cream/60 font-bold">Student Name</th>
-              <th className="text-left px-4 py-3 text-cream/60 font-bold">Type</th>
+              <th className="text-left px-4 py-3 text-cream/60 font-bold">Student</th>
+              <th className="text-left px-4 py-3 text-cream/60 font-bold">Certificate Type</th>
               <th className="text-left px-4 py-3 text-cream/60 font-bold">Status</th>
-              <th className="text-left px-4 py-3 text-cream/60 font-bold">Certificate ID</th>
-              <th className="text-left px-4 py-3 text-cream/60 font-bold">Generated Date</th>
               <th className="text-left px-4 py-3 text-cream/60 font-bold">Actions</th>
             </tr>
           </thead>
@@ -291,8 +298,10 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
             {data.length > 0 ? (
               data.map((row) => (
                 <tr key={row.id} className="border-b border-terracotta/5 hover:bg-cream/5 transition-colors">
-                  <td className="px-4 py-3 text-cream/80 font-mono text-xs">{row.registrationId}</td>
-                  <td className="px-4 py-3 text-cream">{row.studentName}</td>
+                  <td className="px-4 py-3">
+                    <div className="text-cream font-medium">{row.studentName}</div>
+                    <div className="text-cream/50 text-xs mt-0.5">ID: {row.registrationId}</div>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded text-xs font-bold inline-block ${getTypeColor(row.type)}`}>
                       {row.type.replace(/_/g, " ")}
@@ -303,31 +312,20 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
                       {row.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-cream/70 text-xs font-mono">{row.certificateId}</td>
-                  <td className="px-4 py-3 text-cream/70 text-xs">
-                    {row.generatedAt ? new Date(row.generatedAt).toLocaleDateString() : "—"}
-                  </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handlePreview(row.certificateId)}
-                        className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                        className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 cursor-pointer transition-colors"
                         title="Preview certificate"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleCopyLink(row.certificateId)}
-                        className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-                        title="Copy verification link"
-                      >
-                        <Link2 className="w-4 h-4" />
-                      </button>
                       {row.status !== "REVOKED" && (
                         <button
-                          onClick={() => handleRevoke(row.id)}
+                          onClick={() => handleRevokeClick(row)}
                           disabled={revoking === row.id}
-                          className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                          className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Revoke certificate"
                         >
                           <XCircle className="w-4 h-4" />
@@ -339,7 +337,7 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-cream/40 italic">
+                <td colSpan={4} className="text-center py-8 text-cream/40 italic">
                   No certificates found
                 </td>
               </tr>
@@ -388,6 +386,32 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
         </div>
       )}
 
+      {/* Revoke Confirmation Modal */}
+      <ConfirmDialog
+        isOpen={!!revokeConfirm}
+        title="Revoke Certificate?"
+        message={
+          revokeConfirm ? (
+            <div className="space-y-2">
+              <p>
+                You are about to revoke the certificate for <strong>{revokeConfirm.studentName}</strong>.
+              </p>
+              <p className="text-cream/70">
+                Certificate Type: <strong>{revokeConfirm.certificateType.replace(/_/g, " ")}</strong>
+              </p>
+              <p className="text-red-400/80 text-xs mt-3">
+                ⚠️ This action cannot be undone. The revoked certificate will no longer be valid for verification.
+              </p>
+            </div>
+          ) : null
+        }
+        confirmText="Revoke Certificate"
+        cancelText="Cancel"
+        isDangerous={true}
+        isLoading={!!revoking}
+        onConfirm={handleConfirmRevoke}
+        onCancel={() => setRevokeConfirm(null)}
+      />
     </div>
   );
 }

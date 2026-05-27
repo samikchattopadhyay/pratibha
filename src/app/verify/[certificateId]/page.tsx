@@ -1,8 +1,8 @@
 ﻿import prisma from "@/lib/db";
 import Link from "next/link";
 import QRCode from "qrcode";
-import Button from "@/components/Button";
-import { CheckCircle, Printer, ShieldAlert, Award } from "lucide-react";
+import CertificateHeader from "@/components/CertificateDisplay";
+import { ShieldAlert, Award } from "lucide-react";
 
 // Dynamic route data fetching
 async function getCertificateDetails(certId: string) {
@@ -128,47 +128,18 @@ export default async function VerifyCertificatePage({ params }: VerifyPageProps)
 
   return (
     <div className="min-h-screen bg-cream flex flex-col font-sans">
-      
-      {/* Verification Header Status Panel (Hidden when printing) */}
-      <div className="bg-charcoal text-cream-dark py-4 px-6 print:hidden">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 text-gold hover:underline">
-              <Award className="w-5 h-5" />
-              <span className="font-serif font-bold text-sm tracking-wide">প্রতিভা परिषद</span>
-            </Link>
-            <span className="text-cream/30">|</span>
-            {certData ? (
-              <span className="flex items-center gap-1 text-green-400 text-sm font-bold">
-                <CheckCircle className="w-4 h-4" /> Authenticity Verified Online
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-red-400 text-sm font-bold">
-                <ShieldAlert className="w-4 h-4" /> Unverified Serial Number
-              </span>
-            )}
+      {/* Share Header (Client Component) */}
+      {certData && <CertificateHeader certificateId={certData.certificateId} isDemo={isDemo} />}
+
+      {/* Invalid Certificate Notice */}
+      {!certData && (
+        <div className="bg-red-500/10 border-b border-red-500/20 py-3 px-6 print:hidden">
+          <div className="max-w-7xl mx-auto flex items-center gap-2 text-red-400 text-sm font-bold">
+            <ShieldAlert className="w-4 h-4" /> Unverified Serial Number
           </div>
- 
-          {certData && (
-            <div className="flex gap-4">
-              {isDemo && (
-                <span className="text-sm bg-yellow-500/20 text-yellow-300 font-bold px-2 py-1 rounded">
-                  DEMO RECORD
-                </span>
-              )}
-              <Button
-                onClick={() => window.print()}
-                variant="primary"
-                size="sm"
-                className="flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" /> Print / Save PDF
-              </Button>
-            </div>
-          )}
         </div>
-      </div>
- 
+      )}
+
       {/* Main Certificate Content */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-8 md:p-12">
         {!certData ? (
