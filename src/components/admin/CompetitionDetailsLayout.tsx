@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CompetitionMetadata, SubTab } from "@/types/competition-details";
 import Loading from "@/components/Loading";
+import DetailsSubTab from "@/components/admin/competition-details/DetailsSubTab";
 import ParticipantsSubTab from "@/components/admin/competition-details/ParticipantsSubTab";
 import VotingSubTab from "@/components/admin/competition-details/VotingSubTab";
 import CertificatesSubTab from "@/components/admin/competition-details/CertificatesSubTab";
@@ -19,16 +20,16 @@ function CompetitionDetailsContent({
   competitionId,
 }: CompetitionDetailsLayoutProps) {
   const searchParams = useSearchParams();
-  const [activeSubTab, setActiveSubTab] = useState<SubTab>("participants");
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>("details");
   const [mounted, setMounted] = useState(false);
 
   // Sync URL → State on mount and when URL changes (back/forward support)
   useEffect(() => {
     const subtab = searchParams.get("subtab") as SubTab;
     const initial =
-      (subtab && ["participants", "voting", "certificates", "shipping"].includes(subtab)
+      (subtab && ["details", "participants", "voting", "certificates", "shipping"].includes(subtab)
         ? subtab
-        : "participants") || "participants";
+        : "details") || "details";
     Promise.resolve().then(() => {
       setActiveSubTab(initial);
       setMounted(true);
@@ -84,6 +85,16 @@ function CompetitionDetailsContent({
         {/* LEFT SIDEBAR */}
         <div className="w-full md:w-48 shrink-0 flex flex-row md:flex-col gap-1 border-b md:border-b-0 md:border-r border-terracotta/15 pb-4 md:pb-0 md:pr-4 overflow-x-auto md:overflow-x-visible">
           <button
+            onClick={() => handleTabChange("details")}
+            className={`cursor-pointer px-4 py-2.5 rounded-lg text-left text-sm font-bold transition-all whitespace-nowrap md:whitespace-normal shrink-0 ${
+              activeSubTab === "details"
+                ? "bg-terracotta text-cream dark:bg-gold dark:text-charcoal shadow-sm"
+                : "text-cream/60 hover:bg-cream/5 hover:text-cream"
+            }`}
+          >
+            ℹ️ Details
+          </button>
+          <button
             onClick={() => handleTabChange("participants")}
             className={`cursor-pointer px-4 py-2.5 rounded-lg text-left text-sm font-bold transition-all whitespace-nowrap md:whitespace-normal shrink-0 ${
               activeSubTab === "participants"
@@ -127,6 +138,9 @@ function CompetitionDetailsContent({
 
         {/* RIGHT CONTENT AREA */}
         <div className="flex-1 min-w-0">
+          {activeSubTab === "details" && (
+            <DetailsSubTab competition={competition} competitionId={competitionId} />
+          )}
           {activeSubTab === "participants" && (
             <Suspense fallback={<Loading variant="overlay" text="Loading participants..." />}>
               <ParticipantsSubTab competitionId={competitionId} />

@@ -1,7 +1,7 @@
 // Competition Details Page Type Definitions
 // Used across competition detail routes and sub-tab components
 
-export type SubTab = "participants" | "voting" | "certificates" | "shipping";
+export type SubTab = "details" | "participants" | "voting" | "certificates" | "shipping";
 
 // ─── Metadata (Competition Header) ────────────────────────────────────────
 
