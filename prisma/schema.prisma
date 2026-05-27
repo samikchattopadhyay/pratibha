@@ -37,6 +37,13 @@ enum CertificateType {
   SPECIAL_MENTION
 }
 
+enum CertificateStatus {
+  PENDING
+  GENERATED
+  SHARED
+  REVOKED
+}
+
 // ─── ENUMS (PLAN 01 — Geographic Scope) ──────────────────────────────────────
 
 enum CompetitionScope {
@@ -464,16 +471,19 @@ model SocialMetric {
 // ─── CERTIFICATE MODEL ────────────────────────────────────────────────────────
 
 model Certificate {
-  id             String          @id @default(uuid())
-  registrationId String          @unique
-  registration   Registration    @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  certificateId  String          @unique
+  id             String              @id @default(uuid())
+  registrationId String              @unique
+  registration   Registration        @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  certificateId  String              @unique
   certificateUrl String
   qrCodeUrl      String
-  type           CertificateType @default(PARTICIPATION)
-  prizeAwardId   String?         @unique  // Plan 02 — link certificate to award
-  prizeAward     PrizeAward?     @relation(fields: [prizeAwardId], references: [id])
-  issuedAt       DateTime        @default(now())
+  type           CertificateType     @default(PARTICIPATION)
+  status         CertificateStatus   @default(PENDING)
+  prizeAwardId   String?             @unique  // Plan 02 — link certificate to award
+  prizeAward     PrizeAward?         @relation(fields: [prizeAwardId], references: [id])
+  issuedAt       DateTime            @default(now())
+  revokedAt      DateTime?
+  revokedBy      String?
 }
 
 // ─── PRIZE MODELS (PLAN 02) ───────────────────────────────────────────────────

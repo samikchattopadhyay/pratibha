@@ -167,7 +167,7 @@ async function main() {
 
   console.log(`✓ Seeded parent and ${students.length} students`);
 
-  // ─── SEED COMPETITION ─────────────────────────────────────────────────────────
+  // ─── SEED COMPETITIONS ────────────────────────────────────────────────────────
 
   const now = new Date();
   const competition = await prisma.competition.upsert({
@@ -189,7 +189,27 @@ async function main() {
     },
   });
 
-  console.log("✓ Seeded competition");
+  // Secondary competition for testing
+  const competition2 = await prisma.competition.upsert({
+    where: { id: "6819db14-442d-43db-b8ad-02ef6a09449e" },
+    update: {},
+    create: {
+      id: "6819db14-442d-43db-b8ad-02ef6a09449e",
+      title: "Regional Arts Excellence 2026",
+      description: "Regional competition for artistic talent across disciplines",
+      entryFeeINR: 300,
+      startDate: new Date(now.getFullYear(), now.getMonth(), 5),
+      endDate: new Date(now.getFullYear(), now.getMonth() + 1, 5),
+      registrationDeadline: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000),
+      resultDate: new Date(now.getTime() + 50 * 24 * 60 * 60 * 1000),
+      scope: "STATE",
+      hostState: "West Bengal",
+      difficultyLevel: 1,
+      minJudgesRequired: 2,
+    },
+  });
+
+  console.log("✓ Seeded 2 competitions");
 
   // ─── SEED COMPETITION CATEGORIES ───────────────────────────────────────────────
 
@@ -201,8 +221,14 @@ async function main() {
     where: { slug: "drawing-painting" },
   });
 
-  const compCategories = [];
+  const classicalDanceCategory = await prisma.category.findUnique({
+    where: { slug: "classical-dance" },
+  });
 
+  const compCategories = [];
+  const comp2Categories = [];
+
+  // Categories for competition 1
   if (vocalCategory) {
     const cc1 = await prisma.competitionCategory.upsert({
       where: {
@@ -247,11 +273,80 @@ async function main() {
     compCategories.push(cc2);
   }
 
-  console.log(`✓ Seeded ${compCategories.length} competition categories`);
+  // Categories for competition 2
+  if (vocalCategory) {
+    const cc3 = await prisma.competitionCategory.upsert({
+      where: {
+        competitionId_categoryId_minAge_maxAge: {
+          competitionId: competition2.id,
+          categoryId: vocalCategory.id,
+          minAge: 10,
+          maxAge: 15,
+        },
+      },
+      update: {},
+      create: {
+        competitionId: competition2.id,
+        categoryId: vocalCategory.id,
+        minAge: 10,
+        maxAge: 15,
+        language: "Any",
+      },
+    });
+    comp2Categories.push(cc3);
+  }
+
+  if (classicalDanceCategory) {
+    const cc4 = await prisma.competitionCategory.upsert({
+      where: {
+        competitionId_categoryId_minAge_maxAge: {
+          competitionId: competition2.id,
+          categoryId: classicalDanceCategory.id,
+          minAge: 10,
+          maxAge: 15,
+        },
+      },
+      update: {},
+      create: {
+        competitionId: competition2.id,
+        categoryId: classicalDanceCategory.id,
+        minAge: 10,
+        maxAge: 15,
+        language: null,
+      },
+    });
+    comp2Categories.push(cc4);
+  }
+
+  if (drawingCategory) {
+    const cc5 = await prisma.competitionCategory.upsert({
+      where: {
+        competitionId_categoryId_minAge_maxAge: {
+          competitionId: competition2.id,
+          categoryId: drawingCategory.id,
+          minAge: 10,
+          maxAge: 15,
+        },
+      },
+      update: {},
+      create: {
+        competitionId: competition2.id,
+        categoryId: drawingCategory.id,
+        minAge: 10,
+        maxAge: 15,
+        language: null,
+      },
+    });
+    comp2Categories.push(cc5);
+  }
+
+  console.log(`✓ Seeded ${compCategories.length + comp2Categories.length} competition categories`);
 
   // ─── SEED REGISTRATIONS ────────────────────────────────────────────────────────
 
   const registrations = [];
+
+  // Registrations for competition 1
   for (let i = 0; i < students.length; i++) {
     const compCategory = compCategories[i % compCategories.length];
     if (!compCategory) continue;
@@ -276,7 +371,32 @@ async function main() {
     registrations.push(registration);
   }
 
-  console.log(`✓ Seeded ${registrations.length} registrations (participants)`);
+  // Registrations for competition 2
+  for (let i = 0; i < students.length; i++) {
+    const compCategory = comp2Categories[i % comp2Categories.length];
+    if (!compCategory) continue;
+
+    const registrationId = `REG-${competition2.id.substring(0, 8).toUpperCase()}-${String(i + 1).padStart(3, "0")}`;
+    const fbPostUrl = `https://facebook.com/post-${students[i].id}-comp2-${i}`;
+
+    const registration = await prisma.registration.upsert({
+      where: { registrationId },
+      update: {},
+      create: {
+        studentId: students[i].id,
+        competitionCategoryId: compCategory.id,
+        fbPostUrl,
+        registrationId,
+        paymentStatus: Math.random() > 0.3 ? "SUCCESS" : "PENDING",
+        status: Math.random() > 0.15 ? "VERIFIED" : "PENDING_VERIFICATION",
+        finalRank: Math.random() > 0.5 ? Math.floor(Math.random() * 3) + 1 : null,
+        finalScore: Math.random() > 0.5 ? 80 + Math.random() * 20 : null,
+      },
+    });
+    registrations.push(registration);
+  }
+
+  console.log(`✓ Seeded ${registrations.length} registrations (participants) across 2 competitions`);
 
   // ─── SEED JUDGES ──────────────────────────────────────────────────────────────
 
@@ -287,6 +407,8 @@ async function main() {
     { email: "judge-classical-vocal@test.com", name: "Dr. Ravi Shankar", specs: ["classical-vocal", "hindustani-classical-vocals", "rabindra-sangeet"] },
     { email: "judge-classical-inst@test.com", name: "Prof. Ustad Ali Khan", specs: ["classical-instrumental", "instrumental-sitar", "instrumental-flute"] },
     { email: "judge-poetry@test.com", name: "Smt. Madhuri Dutta", specs: ["poetry-recitation", "creative-writing", "story-telling"] },
+    { email: "judge-classical-dance@test.com", name: "Smt. Anita Verma", specs: ["classical-dance", "performing-arts"] },
+    { email: "judge-visual-arts@test.com", name: "Mr. Rajesh Patel", specs: ["drawing-painting", "visual-arts", "digital-illustration"] },
   ];
 
   for (const judgeData of judgesData) {
@@ -315,27 +437,147 @@ async function main() {
     judges.push(judge);
   }
 
-  console.log(`✓ Seeded ${judges.length} judges with missing specializations`);
+  console.log(`✓ Seeded ${judges.length} judges with matching specializations`);
 
-  // ─── ASSIGN JUDGES TO COMPETITION ─────────────────────────────────────────────
+  // ─── ASSIGN JUDGES TO COMPETITIONS (MATCHING SPECIALIZATIONS) ─────────────────
 
-  for (const judge of judges) {
+  // Competition 1 categories: Classical Vocals, Drawing & Painting
+  // Assign: Dr. Ravi Shankar (vocal), Mr. Rajesh Patel (visual arts)
+  const vocalJudge = judges.find(j => j.specializations.includes("classical-vocal"));
+  const visualArtsJudge = judges.find(j => j.specializations.includes("drawing-painting"));
+
+  if (vocalJudge) {
     await prisma.competitionJudge.upsert({
+      where: { competitionId_judgeId: { competitionId: competition.id, judgeId: vocalJudge.id } },
+      update: {},
+      create: { competitionId: competition.id, judgeId: vocalJudge.id },
+    });
+  }
+
+  if (visualArtsJudge) {
+    await prisma.competitionJudge.upsert({
+      where: { competitionId_judgeId: { competitionId: competition.id, judgeId: visualArtsJudge.id } },
+      update: {},
+      create: { competitionId: competition.id, judgeId: visualArtsJudge.id },
+    });
+  }
+
+  // Competition 2 categories: Classical Vocals, Classical Dance, Drawing & Painting
+  // Assign: Dr. Ravi Shankar (vocal), Smt. Anita Verma (dance), Mr. Rajesh Patel (visual arts)
+  const danceJudge = judges.find(j => j.specializations.includes("classical-dance"));
+
+  if (vocalJudge) {
+    await prisma.competitionJudge.upsert({
+      where: { competitionId_judgeId: { competitionId: competition2.id, judgeId: vocalJudge.id } },
+      update: {},
+      create: { competitionId: competition2.id, judgeId: vocalJudge.id },
+    });
+  }
+
+  if (danceJudge) {
+    await prisma.competitionJudge.upsert({
+      where: { competitionId_judgeId: { competitionId: competition2.id, judgeId: danceJudge.id } },
+      update: {},
+      create: { competitionId: competition2.id, judgeId: danceJudge.id },
+    });
+  }
+
+  if (visualArtsJudge) {
+    await prisma.competitionJudge.upsert({
+      where: { competitionId_judgeId: { competitionId: competition2.id, judgeId: visualArtsJudge.id } },
+      update: {},
+      create: { competitionId: competition2.id, judgeId: visualArtsJudge.id },
+    });
+  }
+
+  console.log("✓ Assigned judges to competitions (matched by category specializations)");
+
+  // ─── SEED JUDGE ASSIGNMENTS & SCORES (VOTING DATA) ─────────────────────────────
+
+  // Get all registrations for competition2
+  const comp2Registrations = await prisma.registration.findMany({
+    where: {
+      competitionCategory: {
+        competitionId: competition2.id,
+      },
+    },
+    include: {
+      competitionCategory: {
+        include: { category: true },
+      },
+    },
+  });
+
+  let assignmentCount = 0;
+  let scoreCount = 0;
+
+  // Assign judges to registrations based on category match
+  for (const registration of comp2Registrations) {
+    const categorySlug = registration.competitionCategory.category.slug;
+
+    // Find matching judge for this category
+    let assignedJudge = null;
+    if (categorySlug === "classical-vocal") {
+      assignedJudge = vocalJudge;
+    } else if (categorySlug === "classical-dance") {
+      assignedJudge = danceJudge;
+    } else if (categorySlug === "drawing-painting") {
+      assignedJudge = visualArtsJudge;
+    }
+
+    if (!assignedJudge) continue;
+
+    // Create judge assignment
+    const assignment = await prisma.judgeAssignment.upsert({
       where: {
-        competitionId_judgeId: {
-          competitionId: competition.id,
-          judgeId: judge.id,
+        registrationId_judgeId: {
+          registrationId: registration.id,
+          judgeId: assignedJudge.id,
         },
       },
       update: {},
       create: {
-        competitionId: competition.id,
-        judgeId: judge.id,
+        registrationId: registration.id,
+        judgeId: assignedJudge.id,
+        isSubmitted: false,
       },
     });
+
+    assignmentCount++;
+
+    // Create scores for ~60% of assignments (simulate some judges have submitted)
+    if (Math.random() > 0.4 && registration.status === "VERIFIED") {
+      const c1 = Math.floor(Math.random() * 40); // 0-39 (max 40)
+      const c2 = Math.floor(Math.random() * 30); // 0-29 (max 30)
+      const c3 = Math.floor(Math.random() * 30); // 0-29 (max 30)
+      const c4 = 0; // criteria4 only for national competitions, set to 0 for state competitions
+      const total = c1 + c2 + c3 + c4; // Max 100
+
+      await prisma.score.upsert({
+        where: { judgeAssignmentId: assignment.id },
+        update: {},
+        create: {
+          judgeAssignmentId: assignment.id,
+          criteria1: c1,
+          criteria2: c2,
+          criteria3: c3,
+          criteria4: c4,
+          totalScore: total,
+          remarks: "Good performance",
+        },
+      });
+
+      // Update assignment to mark as submitted
+      await prisma.judgeAssignment.update({
+        where: { id: assignment.id },
+        data: { isSubmitted: true, submittedAt: new Date() },
+      });
+
+      scoreCount++;
+    }
   }
 
-  console.log("✓ Assigned judges to competition");
+  console.log(`✓ Seeded ${assignmentCount} judge assignments with ${scoreCount} scores for voting`);
 }
 
 main()

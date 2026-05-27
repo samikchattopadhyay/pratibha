@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createAndDispatchNotification } from "@/lib/notificationService";
 import prisma from "@/lib/db";
 
 export async function POST(
@@ -29,16 +30,19 @@ export async function POST(
         competitionCategory: { competitionId },
         status: "VERIFIED",
       },
-      select: {
-        id: true,
-        registrationId: true,
-        student: { select: { name: true } },
+      include: {
+        student: {
+          include: {
+            parent: true,
+          },
+        },
         certificate: true,
       },
     });
 
     let generatedCount = 0;
     let failedCount = 0;
+    const certificateIds: string[] = [];
 
     // Generate certificates for eligible entries
     for (const registration of eligibleRegistrations) {
@@ -49,12 +53,26 @@ export async function POST(
           const qrCodeUrl = `https://pratibha.local/verify/${certificateId}`;
           const certificateUrl = `https://cdn.example.com/certificates/${certificateId}.pdf`;
 
+          // Determine certificate type based on final rank
+          let certType = "PARTICIPATION";
+          if (registration.finalRank === 1) {
+            certType = "MERIT_1";
+          } else if (registration.finalRank === 2) {
+            certType = "MERIT_2";
+          } else if (registration.finalRank === 3) {
+            certType = "MERIT_3";
+          } else if (registration.finalRank && registration.finalRank > 3) {
+            certType = "SPECIAL_MENTION";
+          }
+
           if (registration.certificate) {
             await prisma.certificate.update({
               where: { id: registration.certificate.id },
               data: {
                 certificateUrl,
                 qrCodeUrl,
+                type: certType as any,
+                status: "GENERATED",
               },
             });
           } else {
@@ -64,16 +82,32 @@ export async function POST(
                 certificateId,
                 certificateUrl,
                 qrCodeUrl,
-                type: "PARTICIPATION",
+                type: certType as any,
+                status: "GENERATED",
               },
             });
           }
 
+          certificateIds.push(registration.id);
           generatedCount++;
         }
       } catch (err) {
         console.error(`Failed to generate cert for registration ${registration.id}:`, err);
         failedCount++;
+      }
+    }
+
+    // Fire notifications for generated certificates (fire-and-forget)
+    for (const registrationId of certificateIds) {
+      const reg = eligibleRegistrations.find((r) => r.id === registrationId);
+      if (reg?.student?.parent?.userId) {
+        createAndDispatchNotification({
+          userId: reg.student.parent.userId,
+          type: "CERTIFICATE_READY",
+          registrationId,
+          title: "Certificate Ready",
+          body: `Your certificate for ${reg.student.name} is ready!`,
+        }).catch((err) => console.error(`Failed to send notification for registration ${registrationId}:`, err));
       }
     }
 

@@ -56,10 +56,15 @@ export interface CertificateRecord {
   registrationId: string;
   studentName: string;
   type: "PARTICIPATION" | "MERIT_1" | "MERIT_2" | "MERIT_3" | "SPECIAL_MENTION";
-  status: "PENDING" | "GENERATED" | "SHARED";
+  status: "PENDING" | "GENERATED" | "SHARED" | "REVOKED";
   certificateId: string;
   qrCodeUrl: string;
   generatedAt: string;
+}
+
+export interface CertificateStats {
+  byStatus: Record<"PENDING" | "GENERATED" | "SHARED" | "REVOKED", number>;
+  byType: Record<"PARTICIPATION" | "MERIT_1" | "MERIT_2" | "MERIT_3" | "SPECIAL_MENTION", number>;
 }
 
 // ─── Shipping SubTab Types ──────────────────────────────────────────────

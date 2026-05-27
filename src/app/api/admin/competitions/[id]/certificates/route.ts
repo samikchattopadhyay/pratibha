@@ -30,52 +30,42 @@ export async function GET(
 
     const skip = (page - 1) * limit;
 
-    // Build filter conditions
+    // Build filter conditions with DB-level status filtering
     const where: Prisma.CertificateWhereInput = {
       registration: {
         competitionCategory: { competitionId },
       },
+      ...(statusFilter !== "ALL" ? { status: statusFilter as any } : {}),
     };
 
-    // Fetch total count (all certificates, status filtering done in-memory)
-    const allCertificates = await prisma.certificate.findMany({
-      where,
-      select: {
-        id: true,
-        registration: {
-          select: {
-            registrationId: true,
-            student: { select: { name: true } },
+    // Fetch total count and paginated results at database level
+    const [totalCount, paginatedCerts] = await prisma.$transaction([
+      prisma.certificate.count({ where }),
+      prisma.certificate.findMany({
+        where,
+        include: {
+          registration: {
+            select: {
+              registrationId: true,
+              student: { select: { name: true } },
+            },
           },
         },
-        type: true,
-        certificateId: true,
-        certificateUrl: true,
-        qrCodeUrl: true,
-        issuedAt: true,
-      },
-      orderBy: { issuedAt: "desc" },
-    });
+        orderBy: { issuedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+    ]);
 
-    // Filter by status in-memory
-    const filteredCerts = statusFilter === "ALL"
-      ? allCertificates
-      : allCertificates.filter(cert => {
-          const status = cert.certificateUrl ? "GENERATED" : "PENDING";
-          return status === statusFilter;
-        });
-
-    const totalCount = filteredCerts.length;
     const totalPages = Math.ceil(totalCount / limit);
-    const paginatedCerts = filteredCerts.slice(skip, skip + limit);
 
     return NextResponse.json({
-      data: paginatedCerts.map((cert) => ({
+      data: paginatedCerts.map((cert: any) => ({
         id: cert.id,
         registrationId: cert.registration.registrationId,
         studentName: cert.registration.student.name,
         type: cert.type,
-        status: cert.certificateUrl ? "GENERATED" : "PENDING",
+        status: cert.status || "PENDING",
         certificateId: cert.certificateId,
         qrCodeUrl: cert.qrCodeUrl,
         generatedAt: cert.issuedAt.toISOString(),

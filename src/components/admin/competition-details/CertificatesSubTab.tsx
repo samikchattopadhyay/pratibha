@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CertificateRecord, PaginatedResponse, SubTabProps } from "@/types/competition-details";
+import { CertificateRecord, PaginatedResponse, CertificateStats, SubTabProps } from "@/types/competition-details";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
+import { Eye, Link2, XCircle } from "lucide-react";
 
 type CertStatus = "ALL" | "PENDING" | "GENERATED" | "SHARED";
 
@@ -11,11 +12,16 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
   const [data, setData] = useState<CertificateRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [notifying, setNotifying] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [status, setStatus] = useState<CertStatus>("ALL");
+  const [stats, setStats] = useState<CertificateStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const fetchCertificates = useCallback(async () => {
     setLoading(true);
@@ -41,15 +47,38 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
     }
   }, [competitionId, currentPage, status]);
 
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/competitions/${competitionId}/certificates/stats`);
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      const statsData = await res.json() as CertificateStats;
+      setStats(statsData);
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [competitionId]);
+
   useEffect(() => {
-    // eslint-disable-next-line
     setCurrentPage(1);
   }, [status]);
 
   useEffect(() => {
-    // eslint-disable-next-line
     fetchCertificates();
   }, [fetchCertificates]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(""), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   const handleGenerateCertificates = async () => {
     setGenerating(true);
@@ -61,12 +90,66 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
       );
       if (!res.ok) throw new Error("Failed to generate certificates");
       const result = await res.json();
-      alert(`✓ Generated ${result.generatedCount} certificates successfully!`);
+      setSuccessMessage(`✓ Generated ${result.generatedCount} certificates successfully!`);
       await fetchCertificates();
+      await fetchStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate certificates");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleSendEmails = async () => {
+    setNotifying(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/admin/competitions/${competitionId}/certificates/notify`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+      if (!res.ok) throw new Error("Failed to send emails");
+      const result = await res.json();
+      setSuccessMessage(`✓ Sent notifications to ${result.notifiedCount} parents!`);
+      await fetchCertificates();
+      await fetchStats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send emails");
+    } finally {
+      setNotifying(false);
+    }
+  };
+
+  const handlePreview = (certificateId: string) => {
+    window.open(`/verify/${encodeURIComponent(certificateId)}`, "_blank");
+  };
+
+  const handleCopyLink = async (certificateId: string) => {
+    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/verify/${encodeURIComponent(certificateId)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setSuccessMessage("✓ Certificate link copied to clipboard!");
+    } catch {
+      setError("Failed to copy link");
+    }
+  };
+
+  const handleRevoke = async (certId: string) => {
+    setRevoking(certId);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/admin/competitions/${competitionId}/certificates/${certId}/revoke`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+      if (!res.ok) throw new Error("Failed to revoke certificate");
+      setSuccessMessage("✓ Certificate revoked successfully!");
+      await fetchCertificates();
+      await fetchStats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to revoke certificate");
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -116,20 +199,57 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
             Generate and track digital certificates for competition winners
           </p>
         </div>
-        <Button
-          onClick={handleGenerateCertificates}
-          disabled={generating || loading}
-          variant="primary"
-          size="md"
-        >
-          {generating ? "Generating..." : "🎓 Generate Certificates"}
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={handleSendEmails}
+            disabled={notifying || loading}
+            variant="secondary"
+            size="md"
+          >
+            {notifying ? "Sending..." : "📧 Send Emails"}
+          </Button>
+          <Button
+            onClick={handleGenerateCertificates}
+            disabled={generating || loading}
+            variant="primary"
+            size="md"
+          >
+            {generating ? "Generating..." : "🎓 Generate Certificates"}
+          </Button>
+        </div>
       </div>
+
+      {/* Success Banner */}
+      {successMessage && (
+        <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold">
+          {successMessage}
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
         <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold">
           {error}
+        </div>
+      )}
+
+      {/* Stats Panel */}
+      {stats && !statsLoading && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Pending", count: stats.byStatus.PENDING, color: "text-yellow-400" },
+            { label: "Generated", count: stats.byStatus.GENERATED, color: "text-blue-400" },
+            { label: "Shared", count: stats.byStatus.SHARED, color: "text-green-400" },
+            { label: "Revoked", count: stats.byStatus.REVOKED, color: "text-red-400" },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-cream/5 border border-terracotta/10 rounded-lg p-3 text-center"
+            >
+              <div className={`text-lg font-bold ${stat.color}`}>{stat.count}</div>
+              <div className="text-xs text-cream/60 mt-1">{stat.label}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -164,6 +284,7 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
               <th className="text-left px-4 py-3 text-cream/60 font-bold">Status</th>
               <th className="text-left px-4 py-3 text-cream/60 font-bold">Certificate ID</th>
               <th className="text-left px-4 py-3 text-cream/60 font-bold">Generated Date</th>
+              <th className="text-left px-4 py-3 text-cream/60 font-bold">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -185,6 +306,34 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
                   <td className="px-4 py-3 text-cream/70 text-xs font-mono">{row.certificateId}</td>
                   <td className="px-4 py-3 text-cream/70 text-xs">
                     {row.generatedAt ? new Date(row.generatedAt).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handlePreview(row.certificateId)}
+                        className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                        title="Preview certificate"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleCopyLink(row.certificateId)}
+                        className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
+                        title="Copy verification link"
+                      >
+                        <Link2 className="w-4 h-4" />
+                      </button>
+                      {row.status !== "REVOKED" && (
+                        <button
+                          onClick={() => handleRevoke(row.id)}
+                          disabled={revoking === row.id}
+                          className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                          title="Revoke certificate"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -239,24 +388,6 @@ export default function CertificatesSubTab({ competitionId }: SubTabProps) {
         </div>
       )}
 
-      {/* Summary Metrics */}
-      <div className="flex flex-wrap gap-4 text-xs text-cream/60 border-t border-terracotta/10 pt-4">
-        <div>
-          <span className="font-bold text-cream">Total Certificates:</span> {totalCount}
-        </div>
-        <div>
-          <span className="font-bold text-cream">Pending:</span>{" "}
-          {data.filter((d) => d.status === "PENDING").length}
-        </div>
-        <div>
-          <span className="font-bold text-cream">Generated:</span>{" "}
-          {data.filter((d) => d.status === "GENERATED").length}
-        </div>
-        <div>
-          <span className="font-bold text-cream">Shared:</span>{" "}
-          {data.filter((d) => d.status === "SHARED").length}
-        </div>
-      </div>
     </div>
   );
 }

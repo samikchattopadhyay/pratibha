@@ -4,10 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { VotingRecord, PaginatedResponse, SubTabProps } from "@/types/competition-details";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, TrendingUp } from "lucide-react";
+
+interface LeaderboardItem {
+  registrationId: string;
+  participantName: string;
+  categoryName: string;
+  scoresReceived: number;
+  averageScore: number;
+  totalScore: number;
+}
 
 export default function VotingSubTab({ competitionId }: SubTabProps) {
   const [data, setData] = useState<VotingRecord[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,18 +28,28 @@ export default function VotingSubTab({ competitionId }: SubTabProps) {
     setLoading(true);
     setError("");
     try {
+      // Fetch judge progress
       const query = new URLSearchParams({
         page: currentPage.toString(),
         limit: "10",
       });
-      const res = await fetch(
+      const progressRes = await fetch(
         `/api/admin/competitions/${competitionId}/voting?${query.toString()}`
       );
-      if (!res.ok) throw new Error("Failed to fetch voting data");
-      const { data, pagination } = await res.json() as PaginatedResponse<VotingRecord>;
+      if (!progressRes.ok) throw new Error("Failed to fetch voting data");
+      const { data, pagination } = await progressRes.json() as PaginatedResponse<VotingRecord>;
       setData(data);
       setTotalPages(pagination.totalPages);
       setTotalCount(pagination.totalCount);
+
+      // Fetch leaderboard
+      const leaderboardRes = await fetch(
+        `/api/admin/competitions/${competitionId}/voting/leaderboard`
+      );
+      if (leaderboardRes.ok) {
+        const { data: leaderboardData } = await leaderboardRes.json();
+        setLeaderboard(leaderboardData);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
@@ -58,21 +78,11 @@ export default function VotingSubTab({ competitionId }: SubTabProps) {
     return pages;
   };
 
-  const getTierColor = (tier: string) => {
-    const colors: Record<string, string> = {
-      LOCAL: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
-      REGIONAL: "bg-purple-500/10 text-purple-400 border border-purple-500/20",
-      NATIONAL: "bg-gold/20 text-gold border border-gold/30",
-      EXPERT: "bg-red-500/10 text-red-400 border border-red-500/20",
-    };
-    return colors[tier] || "bg-gray-500/10 text-gray-400";
-  };
-
   return (
     <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-6">
       {/* Header */}
       <div>
-        <h3 className="font-serif text-base font-bold">Live Voting & Judge Progress</h3>
+        <h3 className="font-serif text-base font-bold">Judge Progress & Live Voting</h3>
         <p className="text-sm text-cream/50 mt-1">
           Monitor judge assignments and scoring progress for this competition
         </p>
@@ -98,12 +108,7 @@ export default function VotingSubTab({ competitionId }: SubTabProps) {
             >
               {/* Judge Header */}
               <div className="flex justify-between items-start gap-2">
-                <div className="min-w-0">
-                  <h4 className="font-serif font-bold text-cream truncate">{judge.judgeName}</h4>
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-bold uppercase mt-1 ${getTierColor(judge.tier)}`}>
-                    {judge.tier}
-                  </span>
-                </div>
+                <h4 className="font-serif font-bold text-cream truncate">{judge.judgeName}</h4>
                 {judge.completionPercentage === 100 ? (
                   <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
                 ) : judge.isOutlier ? (
@@ -140,22 +145,6 @@ export default function VotingSubTab({ competitionId }: SubTabProps) {
                 <p className="text-xs text-cream/50 text-right">{judge.completionPercentage}% complete</p>
               </div>
 
-              {/* Status Badge */}
-              <div className="flex gap-2">
-                {judge.completionPercentage === 100 ? (
-                  <span className="flex-1 px-2 py-1.5 rounded text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30 text-center">
-                    ✓ Complete
-                  </span>
-                ) : judge.completionPercentage >= 75 ? (
-                  <span className="flex-1 px-2 py-1.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 text-center">
-                    In Progress
-                  </span>
-                ) : (
-                  <span className="flex-1 px-2 py-1.5 rounded text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-center">
-                    Pending
-                  </span>
-                )}
-              </div>
             </div>
           ))}
         </div>
@@ -201,6 +190,73 @@ export default function VotingSubTab({ competitionId }: SubTabProps) {
             >
               Next
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Live Leaderboard */}
+      {leaderboard.length > 0 && (
+        <div className="bg-charcoal border border-terracotta/10 rounded-xl p-4">
+          <h4 className="font-serif font-bold text-cream mb-4 text-sm flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-gold" /> Live Leaderboard
+          </h4>
+
+          {/* Top 3 Podium */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            {leaderboard.slice(0, 3).map((entry, idx) => {
+              const medals = ["🥇", "🥈", "🥉"];
+              const bgColors = [
+                "bg-gold/20 border-gold/50",
+                "bg-gray-400/20 border-gray-400/50",
+                "bg-orange-700/20 border-orange-700/50"
+              ];
+              return (
+                <div
+                  key={entry.registrationId}
+                  className={`border rounded-lg p-3 text-center space-y-2 ${bgColors[idx]}`}
+                >
+                  <div className="text-2xl">{medals[idx]}</div>
+                  <div>
+                    <p className="font-serif font-bold text-cream text-sm truncate">
+                      {entry.participantName}
+                    </p>
+                    <p className="text-cream/60 text-xs">{entry.categoryName}</p>
+                  </div>
+                  <div className="border-t border-current/20 pt-2">
+                    <p className="font-bold text-lg" style={{color: idx === 0 ? "#F4A460" : idx === 1 ? "#C0C0C0" : "#CD7F32"}}>
+                      {entry.averageScore}
+                    </p>
+                    <p className="text-cream/50 text-xs">{entry.scoresReceived} scores</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Remaining Rankings */}
+          <div className="space-y-2">
+            {leaderboard.slice(3).map((entry, idx) => (
+              <div
+                key={entry.registrationId}
+                className="flex justify-between items-center bg-charcoal-light border border-terracotta/10 rounded p-2.5 text-xs"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-terracotta w-6 text-center">#{idx + 4}</span>
+                    <div>
+                      <p className="font-semibold text-cream truncate">
+                        {entry.participantName}
+                      </p>
+                      <p className="text-cream/50 text-xs">{entry.categoryName}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-gold text-sm">{entry.averageScore}</p>
+                  <p className="text-cream/50">{entry.scoresReceived} score{entry.scoresReceived !== 1 ? "s" : ""}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
