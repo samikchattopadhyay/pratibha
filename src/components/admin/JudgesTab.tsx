@@ -258,9 +258,11 @@ export default function JudgesTab({
                             className="w-full bg-charcoal-light border border-terracotta/20 rounded px-2 py-1 text-xs text-cream/70 focus:outline-none cursor-pointer"
                           >
                             <option value="" disabled>+ Alloc Judge</option>
-                            {judges.map(j => (
-                              <option key={j.id} value={j.id}>{j.name}</option>
-                            ))}
+                            {judges
+                              .filter(j => !card.assignments?.some(a => a.judgeId === j.id))
+                              .map(j => (
+                                <option key={j.id} value={j.id}>{j.name}</option>
+                              ))}
                           </select>
                         </div>
                       )}
@@ -334,9 +336,11 @@ export default function JudgesTab({
                             className="w-full bg-charcoal-light border border-terracotta/20 rounded px-2 py-1 text-xs text-cream/70 focus:outline-none cursor-pointer"
                           >
                             <option value="" disabled>+ Alloc Judge</option>
-                            {judges.map(j => (
-                              <option key={j.id} value={j.id}>{j.name}</option>
-                            ))}
+                            {judges
+                              .filter(j => !card.assignments?.some(a => a.judgeId === j.id))
+                              .map(j => (
+                                <option key={j.id} value={j.id}>{j.name}</option>
+                              ))}
                           </select>
                         </div>
                       )}
@@ -480,9 +484,11 @@ export default function JudgesTab({
                               className="w-full bg-charcoal-light border border-red-500/20 rounded px-2 py-1 text-xs text-cream/70 focus:outline-none cursor-pointer"
                             >
                               <option value="" disabled>+ Assign Tie-breaker</option>
-                              {judges.map(j => (
-                                <option key={j.id} value={j.id}>{j.name}</option>
-                              ))}
+                              {judges
+                                .filter(j => !card.assignments?.some(a => a.judgeId === j.id))
+                                .map(j => (
+                                  <option key={j.id} value={j.id}>{j.name}</option>
+                                ))}
                             </select>
                           </div>
                         )}
