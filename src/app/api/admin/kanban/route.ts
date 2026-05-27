@@ -89,6 +89,13 @@ export async function GET() {
         judge: judgeNames,
         score: avgScore,
         rawScores: scores,
+        assignments: reg.judgeAssignments.map((a) => ({
+          id: a.id,
+          judgeId: a.judge.id,
+          judgeName: a.judge.name,
+          isSubmitted: a.isSubmitted,
+          score: a.score ? a.score.totalScore : null,
+        })),
       };
     });
 

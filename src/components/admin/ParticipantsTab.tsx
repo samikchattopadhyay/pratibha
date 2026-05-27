@@ -13,6 +13,8 @@ export interface Judge {
   deviationPercentage?: string;
   speed?: string;
   consistency?: string;
+  specializations?: string[];
+  tier?: string;
 }
 
 export interface Registration {

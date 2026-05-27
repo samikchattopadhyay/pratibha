@@ -418,6 +418,7 @@ function AdminDashboardContent() {
           loadAdminData(currentPage, limit, debouncedSearch, filter);
         } else if (activeTab === "judges") {
           loadKanbanCards();
+          loadAdminData(1, 100, "", "ALL");
         } else if (activeTab === "voting") {
           loadVoting(votingPage, itemsPerPage);
         } else if (activeTab === "certificates") {
@@ -803,6 +804,7 @@ function AdminDashboardContent() {
               navigateToTab={navigateToTab}
               setSearch={setSearch}
               moveKanbanCard={moveKanbanCard}
+              handleAssignJudge={handleAssignJudge}
             />
           )}
 
