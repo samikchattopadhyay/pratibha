@@ -12,7 +12,7 @@ import {
 import OverviewTab, { OverviewDashboardData } from "@/components/admin/OverviewTab";
 import CompetitionsTab, { Competition } from "@/components/admin/CompetitionsTab";
 import ParticipantsTab, { Judge, Registration } from "@/components/admin/ParticipantsTab";
-import JudgesTab, { KanbanCard } from "@/components/admin/JudgesTab";
+import JudgesTab from "@/components/admin/JudgesTab";
 import VotingTab, { VotingCard } from "@/components/admin/VotingTab";
 import CertificatesTab, { CertificateMetrics } from "@/components/admin/CertificatesTab";
 import CourierTab from "@/components/admin/CourierTab";
@@ -119,7 +119,7 @@ function AdminDashboardContent() {
   const [fbInterval, setFbInterval] = useState("30");
 
   // Kanban Judges State
-  const [kanbanCards, setKanbanCards] = useState<KanbanCard[]>([]);
+  const [kanbanCards, setKanbanCards] = useState<any[]>([]);
 
   // Competition wizard states
   const [showCreateWizard, setShowCreateWizard] = useState(false);
@@ -417,7 +417,6 @@ function AdminDashboardContent() {
         } else if (activeTab === "participants") {
           loadAdminData(currentPage, limit, debouncedSearch, filter);
         } else if (activeTab === "judges") {
-          loadKanbanCards();
           loadAdminData(1, 100, "", "ALL");
         } else if (activeTab === "voting") {
           loadVoting(votingPage, itemsPerPage);
@@ -786,24 +785,12 @@ function AdminDashboardContent() {
             />
           )}
 
-          {/* TAB CONTENT 4: JUDGE OPERATIONS & KANBAN */}
+          {/* TAB CONTENT 4: JUDGE OPERATIONS */}
           {activeTab === "judges" && (
             <JudgesTab
               judges={judges}
-              kanbanCards={kanbanCards}
-              itemsPerPage={itemsPerPage}
-              kanbanPendingPage={kanbanPendingPage}
-              setKanbanPendingPage={setKanbanPendingPage}
-              kanbanInReviewPage={kanbanInReviewPage}
-              setKanbanInReviewPage={setKanbanInReviewPage}
-              kanbanCompletedPage={kanbanCompletedPage}
-              setKanbanCompletedPage={setKanbanCompletedPage}
-              kanbanConflictPage={kanbanConflictPage}
-              setKanbanConflictPage={setKanbanConflictPage}
               navigateToTab={navigateToTab}
               setSearch={setSearch}
-              moveKanbanCard={moveKanbanCard}
-              handleAssignJudge={handleAssignJudge}
             />
           )}
 
