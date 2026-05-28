@@ -10,6 +10,7 @@ import ExternalAchievementModal from "./ExternalAchievementModal";
 interface StudentProfile {
   id: string;
   name: string;
+  slug?: string;
   dateOfBirth: string;
   gender: string;
   schoolClass: string | null;
@@ -135,7 +136,8 @@ export default function StudentManageLayout({
   }, [student.id, isPublic]);
 
   const handleCopyLink = () => {
-    const link = `${window.location.origin}/student/${student.id}`;
+    const profilePath = student.slug || student.id;
+    const link = `${window.location.origin}/student/${profilePath}`;
     navigator.clipboard.writeText(link);
     setSuccessMessage("Profile link copied to clipboard!");
     setTimeout(() => setSuccessMessage(""), 3000);
@@ -167,6 +169,36 @@ export default function StudentManageLayout({
           <Edit2 className="w-4 h-4" /> Edit Profile
         </Button>
       </div>
+
+      {/* Section A-B: Public Profile URL */}
+      {isPublic && (
+        <div className="bg-white dark:bg-charcoal-light border border-terracotta/20 dark:border-terracotta/30 rounded-2xl p-6 shadow-md space-y-4">
+          <h3 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2">
+            🔗 Public Profile URL
+          </h3>
+          <div className="bg-terracotta/5 dark:bg-gold/5 border border-terracotta/10 dark:border-gold/10 rounded-lg p-4">
+            <p className="text-xs font-semibold text-charcoal/60 dark:text-white/60 uppercase tracking-wider mb-2">
+              Share Profile
+            </p>
+            <p className="font-mono text-sm text-terracotta dark:text-gold break-all mb-3">
+              {window?.location?.origin}/student/{student.slug || student.id}
+            </p>
+            <Button
+              onClick={handleCopyLink}
+              variant="secondary"
+              size="sm"
+              className="font-bold"
+            >
+              <Copy className="w-4 h-4" /> Copy Link
+            </Button>
+          </div>
+          {student.slug && (
+            <p className="text-xs text-charcoal/60 dark:text-white/60">
+              ✓ Personalized URL set. Share this link with others to showcase {student.name}'s profile!
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Section B: External Achievements Manager */}
       <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">

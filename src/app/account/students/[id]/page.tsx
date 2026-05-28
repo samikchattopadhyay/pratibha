@@ -13,6 +13,7 @@ import { ChevronLeft } from "lucide-react";
 interface StudentProfile {
   id: string;
   name: string;
+  slug?: string;
   dateOfBirth: string;
   gender: string;
   schoolClass: string | null;
@@ -58,6 +59,7 @@ async function fetchStudentAndCategories(studentId: string, parentId: string) {
   const studentData: StudentProfile = {
     id: student.id,
     name: student.name,
+    slug: student.slug || undefined,
     dateOfBirth: student.dateOfBirth.toISOString(),
     gender: student.gender,
     schoolClass: student.schoolClass || null,
@@ -181,7 +183,7 @@ async function ManageStudentPageContent({ studentId }: { studentId: string }) {
               {/* Page Header */}
               <div className="space-y-2">
                 <h1 className="font-serif text-3xl font-bold text-charcoal dark:text-cream">
-                  Manage {student.name}'s Profile
+                  Manage {student.name}&apos;s Profile
                 </h1>
                 <p className="font-sans text-charcoal/60 dark:text-cream/60">
                   Edit profile details, manage external achievements, and control public visibility.

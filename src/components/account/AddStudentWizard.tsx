@@ -7,6 +7,7 @@ import Loading from "@/components/Loading";
 import SearchableSelect from "@/components/admin/SearchableSelect";
 import ChipMultiSelect from "@/components/admin/ChipMultiSelect";
 import RichTextEditor from "@/components/RichTextEditor";
+import SlugInput from "./SlugInput";
 
 interface AddStudentWizardProps {
   readonly isOpen: boolean;
@@ -21,6 +22,7 @@ export interface StudentFormData {
   name: string;
   dateOfBirth: string;
   gender: string;
+  slug?: string;
   schoolClass: string;
   schoolName: string;
   city: string;
@@ -104,6 +106,7 @@ export default function AddStudentWizard({
       name: "",
       dateOfBirth: "",
       gender: "",
+      slug: "",
       schoolClass: "",
       schoolName: "",
       city: "",
@@ -117,6 +120,9 @@ export default function AddStudentWizard({
       specialSkills: [],
     };
   });
+
+  // Slug state
+  const [slugAvailable, setSlugAvailable] = useState(false);
 
   // Tag inputs state
   const [newInstitute, setNewInstitute] = useState("");
@@ -411,6 +417,14 @@ export default function AddStudentWizard({
                     </select>
                   </div>
                 </div>
+
+                <SlugInput
+                  value={formData.slug || ""}
+                  onChange={(slug) => setFormData({ ...formData, slug })}
+                  onAvailabilityChange={setSlugAvailable}
+                  studentId={studentId}
+                  label="Public Profile URL Slug (Optional)"
+                />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
