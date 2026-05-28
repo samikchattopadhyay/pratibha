@@ -1,13 +1,13 @@
 ﻿import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Award, ShieldCheck, Zap, MessageSquare, Video, ArrowRight, BookOpen } from "lucide-react";
+import { Award, ShieldCheck, Zap, MessageSquare, ArrowRight, Clock } from "lucide-react";
 
 export default function Home() {
   return (
     <>
       <Header />
-      
+
       {/* Hero Section */}
       <section className="relative bg-cream-dark/40 pt-8 lg:pt-16 pb-20 lg:pb-28 overflow-hidden alpana-pattern">
         {/* Alpana background ornament left top */}
@@ -32,19 +32,26 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/competitions"
+                href="/register"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-terracotta hover:bg-terracotta-light text-cream font-sans text-base font-bold shadow-lg hover:-translate-y-[1px] transition-all duration-300 dark:bg-gold dark:hover:bg-gold-light dark:text-charcoal"
+                aria-label="Create a parent account and register your child for competitions"
               >
-                Explore Competitions
+                Create Parent Account
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
-                href="/login"
+                href="/competitions"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full border-2 border-terracotta/20 hover:border-terracotta text-terracotta font-sans text-base font-bold transition-all duration-300 dark:border-gold/30 dark:hover:border-gold dark:text-gold"
               >
-                Access Student Portal
+                Explore Competitions
               </Link>
             </div>
+            <p className="font-sans text-base text-charcoal/70">
+              Already have an account?{" "}
+              <Link href="/login" className="text-terracotta hover:text-terracotta-light font-bold dark:text-gold dark:hover:text-gold-light transition-colors">
+                Log In
+              </Link>
+            </p>
           </div>
         </div>
       </section>
@@ -104,6 +111,30 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Trust Signals Section */}
+      <section className="py-16 bg-cream">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="flex flex-col items-center text-center space-y-2 p-4">
+              <p className="font-sans text-2xl sm:text-3xl font-bold text-terracotta dark:text-gold">5,000+</p>
+              <p className="font-sans text-sm text-charcoal/70">Parents Enrolled</p>
+            </div>
+            <div className="flex flex-col items-center text-center space-y-2 p-4">
+              <p className="font-sans text-2xl sm:text-3xl font-bold text-terracotta dark:text-gold">₹500K+</p>
+              <p className="font-sans text-sm text-charcoal/70">Prizes Awarded</p>
+            </div>
+            <div className="flex flex-col items-center text-center space-y-2 p-4">
+              <p className="font-sans text-2xl sm:text-3xl font-bold text-terracotta dark:text-gold">100%</p>
+              <p className="font-sans text-sm text-charcoal/70">Secure Payments</p>
+            </div>
+            <div className="flex flex-col items-center text-center space-y-2 p-4">
+              <p className="font-sans text-2xl sm:text-3xl font-bold text-terracotta dark:text-gold">Instant</p>
+              <p className="font-sans text-sm text-charcoal/70">QR Certificates</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Visual Workflow Section */}
       <section className="py-20 bg-cream-dark/20 border-t border-b border-terracotta/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -112,41 +143,70 @@ export default function Home() {
               How Participation Works
             </h2>
             <p className="font-sans text-sm text-charcoal/60 mt-2">
-              Three simple steps to submit entries and receive your council credentials
+              Four simple steps from registration to receiving your verified certificate
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 relative">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
             {/* Step 1 */}
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-cream border-2 border-terracotta text-terracotta flex items-center justify-center font-serif text-xl font-bold shadow-md">
-                <Video className="w-7 h-7" />
+              <div className="w-16 h-16 rounded-full bg-terracotta text-cream flex items-center justify-center font-serif text-xl font-bold shadow-md">
+                1
               </div>
-              <h3 className="font-serif text-lg font-bold text-charcoal">1. Upload to Facebook</h3>
-              <p className="font-sans text-sm text-charcoal/70 max-w-xs">
-                Upload your child&apos;s performance video inside our official Facebook Group and copy the post URL.
+              <h3 className="font-serif text-lg font-bold text-charcoal">Create Parent Account</h3>
+              <p className="font-sans text-xs text-charcoal/70 max-w-xs">
+                Sign up with email, add your address for medal shipping
               </p>
+              <p className="font-sans text-xs font-semibold text-terracotta dark:text-gold flex items-center justify-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> 2 minutes
+              </p>
+              <Link
+                href="/register"
+                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-bold text-terracotta hover:text-terracotta-light dark:text-gold dark:hover:text-gold-light transition-colors"
+              >
+                Start Registration <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
 
             {/* Step 2 */}
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-cream border-2 border-terracotta text-terracotta flex items-center justify-center font-serif text-xl font-bold shadow-md">
-                <BookOpen className="w-7 h-7" />
+              <div className="w-16 h-16 rounded-full bg-terracotta text-cream flex items-center justify-center font-serif text-xl font-bold shadow-md">
+                2
               </div>
-              <h3 className="font-serif text-lg font-bold text-charcoal">2. Register & Pay</h3>
-              <p className="font-sans text-sm text-charcoal/70 max-w-xs">
-                Log into our portal, enter student details, select category, paste the Facebook URL, and complete the ₹50 entry fee.
+              <h3 className="font-serif text-lg font-bold text-charcoal">Add Your Child & Category</h3>
+              <p className="font-sans text-xs text-charcoal/70 max-w-xs">
+                Enter your child&apos;s name, age, and select the competition category
+              </p>
+              <p className="font-sans text-xs font-semibold text-terracotta dark:text-gold flex items-center justify-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> 5 minutes
               </p>
             </div>
 
             {/* Step 3 */}
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-cream border-2 border-terracotta text-terracotta flex items-center justify-center font-serif text-xl font-bold shadow-md">
-                <Award className="w-7 h-7" />
+              <div className="w-16 h-16 rounded-full bg-terracotta text-cream flex items-center justify-center font-serif text-xl font-bold shadow-md">
+                3
               </div>
-              <h3 className="font-serif text-lg font-bold text-charcoal">3. Review & Certify</h3>
-              <p className="font-sans text-sm text-charcoal/70 max-w-xs">
-                Judges score entries blindly. After result publication, your verified digital certificate is automatically sent to your WhatsApp.
+              <h3 className="font-serif text-lg font-bold text-charcoal">Submit Video & Pay</h3>
+              <p className="font-sans text-xs text-charcoal/70 max-w-xs">
+                Upload your child&apos;s performance video and complete the ₹50 entry fee
+              </p>
+              <p className="font-sans text-xs font-semibold text-terracotta dark:text-gold flex items-center justify-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> 3 minutes
+              </p>
+            </div>
+
+            {/* Step 4 */}
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-terracotta text-cream flex items-center justify-center font-serif text-xl font-bold shadow-md">
+                4
+              </div>
+              <h3 className="font-serif text-lg font-bold text-charcoal">Get QR Certificate</h3>
+              <p className="font-sans text-xs text-charcoal/70 max-w-xs">
+                Receive verified digital certificate with unique QR code on WhatsApp
+              </p>
+              <p className="font-sans text-xs font-semibold text-terracotta dark:text-gold flex items-center justify-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> Instant
               </p>
             </div>
           </div>
