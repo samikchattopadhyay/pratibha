@@ -825,6 +825,330 @@ async function main() {
   console.log(`- Double-Blind Assignments: ${assignmentsToCreate.length}`);
   console.log(`- Examiner Scores: ${scoresToCreate.length}`);
   console.log(`- Generated Certificates: ${certificatesToCreate.length}`);
+
+  // 10. ─── SPECIAL SEED: SHUBHAM DAS (MULTI-WINNER STUDENT) ───────────────────
+  console.log("\n🌟 Seeding Shubham Das with multiple winning entries...");
+
+  // Create parent for Shubham Das
+  const shubhamParentUser = await prisma.user.create({
+    data: {
+      email: "shubham.parent@example.com",
+      passwordHash: await bcrypt.hash("password123", 10),
+      role: "PARENT"
+    }
+  });
+
+  const shubhamParent = await prisma.parent.create({
+    data: {
+      userId: shubhamParentUser.id,
+      name: "Ashok Kumar Das",
+      phone: "9876543210",
+      address: "123 Suren Road, Chowringhee",
+      city: "Kolkata",
+      state: "West Bengal",
+      postalCode: "700020",
+      country: "India"
+    }
+  });
+
+  // Create Shubham Das student (age 12)
+  const shubhamStudent = await prisma.student.create({
+    data: {
+      parentId: shubhamParent.id,
+      name: "Shubham Das",
+      dateOfBirth: new Date("2013-05-15"),
+      gender: "MALE",
+      disciplineInterests: ["rabindra-sangeet", "drawing-painting", "classical-dance", "instrumental-sitar"],
+      slug: "shubham-das",
+      profileImageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+      bio: "Young talented performer excelling in classical music and fine arts",
+      city: "Kolkata",
+      state: "West Bengal",
+      schoolName: "St. Xavier's School",
+      schoolClass: "Class 7",
+      trainingInstitutes: ["Dover Lane Music Academy", "Rabindra Sarovar Open Air Theatre"],
+      languages: ["Bengali", "Hindi", "English"],
+      specialSkills: ["Rabindra Sangeet", "Classical Drawing", "Bharatanatyam"],
+      isPublic: true
+    }
+  });
+
+  console.log(`✓ Created Shubham Das (ID: ${shubhamStudent.id})`);
+
+  // Define winning competitions and categories for Shubham
+  const shubhamWinningEntries = [
+    {
+      compTitle: "Saraswati Puja Fine Arts 2026",
+      categories: [
+        { slug: "rabindra-sangeet", rank: 1, score: 96.5 }, // 1st Place
+        { slug: "drawing-painting", rank: 2, score: 92.0 }, // 2nd Place
+      ]
+    },
+    {
+      compTitle: "Bengali New Year Celebration 2026",
+      categories: [
+        { slug: "rabindra-sangeet", rank: 1, score: 97.5 }, // 1st Place
+        { slug: "folk-singing", rank: 3, score: 89.0 }, // 3rd Place
+      ]
+    },
+    {
+      compTitle: "Borsha Bodhon 2026",
+      categories: [
+        { slug: "bengali-recitation", rank: 2, score: 91.5 }, // 2nd Place
+        { slug: "story-telling", rank: 1, score: 95.0 }, // 1st Place
+      ]
+    },
+    {
+      compTitle: "Spring Art Carnival 2026",
+      categories: [
+        { slug: "drawing-painting", rank: 1, score: 94.0 }, // 1st Place
+      ]
+    },
+    {
+      compTitle: "Dol Jatra Utsav 2026",
+      categories: [
+        { slug: "classical-dance", rank: 1, score: 93.5 }, // 1st Place
+        { slug: "folk-singing", rank: 2, score: 90.5 }, // 2nd Place
+      ]
+    },
+    {
+      compTitle: "Independence Day Cultural Contest 2026",
+      categories: [
+        { slug: "english-recitation", rank: 1, score: 95.5 }, // 1st Place
+      ]
+    },
+    {
+      compTitle: "Nabanno Art Festival 2025",
+      categories: [
+        { slug: "drawing-painting", rank: 1, score: 96.0 }, // 1st Place
+        { slug: "photography", rank: 2, score: 91.0 }, // 2nd Place
+      ]
+    },
+    {
+      compTitle: "Bishwo Kobi Shradhyanjali 2025",
+      categories: [
+        { slug: "rabindra-sangeet", rank: 1, score: 98.0 }, // 1st Place - Highest Score!
+        { slug: "instrumental-sitar", rank: 3, score: 88.5 }, // 3rd Place
+      ]
+    }
+  ];
+
+  let shubhamRegCount = 1;
+  let shubhamCertCount = 1;
+  const prizePoolsToCreate = [];
+  const prizeItemsToCreate = [];
+  const prizeAwardsToCreate = [];
+
+  for (const entry of shubhamWinningEntries) {
+    const compId = competitionMap[entry.compTitle];
+    if (!compId) continue;
+
+    const comp = competitionsList.find(c => c.title === entry.compTitle);
+    if (!comp) continue;
+
+    const compFee = competitionFeeMap[entry.compTitle] || 50.00;
+
+    // Create Prize Pool if it doesn't exist
+    let prizePool = await prisma.prizePool.findUnique({
+      where: { competitionId: compId }
+    });
+
+    if (!prizePool) {
+      prizePool = await prisma.prizePool.create({
+        data: {
+          competitionId: compId,
+          title: `${entry.compTitle} - Prize Pool`,
+          description: "Prizes for top performers",
+          isPublished: true
+        }
+      });
+    }
+
+    // Create Prize Items for this pool if needed
+    const prizeItemsMap = {};
+    for (const rank of ["FIRST_PLACE", "SECOND_PLACE", "THIRD_PLACE"]) {
+      let item = await prisma.prizeItem.findFirst({
+        where: {
+          prizePoolId: prizePool.id,
+          rank: rank
+        }
+      });
+
+      if (!item) {
+        item = await prisma.prizeItem.create({
+          data: {
+            prizePoolId: prizePool.id,
+            rank: rank,
+            type: "DIGITAL_CERTIFICATE",
+            title: `${rank.replace("_", " ")} Prize`,
+            description: `Digital Certificate for ${rank.replace("_", " ")}`,
+            estimatedValue: rank === "FIRST_PLACE" ? 5000 : rank === "SECOND_PLACE" ? 3000 : 1500,
+            isPhysical: false
+          }
+        });
+      }
+      prizeItemsMap[rank] = item.id;
+    }
+
+    // Create registrations and awards for each category
+    for (const cat of entry.categories) {
+      const ccIds = compCatMap[`${entry.compTitle}|${cat.slug}`];
+      if (!ccIds || ccIds.length === 0) continue;
+
+      const ccId = ccIds[1]; // Use Senior Division (10-16)
+      const regId = crypto.randomUUID();
+      const code = `PP2026${entry.compTitle.substring(0, 3).toUpperCase()}SHU${String(shubhamRegCount).padStart(3, "0")}`;
+
+      const createdDate = new Date(comp.startDate);
+      createdDate.setDate(createdDate.getDate() + getRandomInt(1, 10));
+
+      // Determine final rank for ranking system
+      let finalRank = null;
+      if (cat.rank === 1) finalRank = 1;
+      else if (cat.rank === 2) finalRank = 2;
+      else if (cat.rank === 3) finalRank = 3;
+
+      // Create registration
+      const registration = await prisma.registration.create({
+        data: {
+          id: regId,
+          studentId: shubhamStudent.id,
+          competitionCategoryId: ccId,
+          registrationId: code,
+          fbPostUrl: `https://facebook.com/groups/pratibhaparishad/posts/${entry.compTitle.replace(/\s+/g, "_")}_shubham_${shubhamRegCount}`,
+          paymentStatus: "SUCCESS",
+          status: "VERIFIED",
+          finalRank: finalRank,
+          finalScore: cat.score,
+          createdAt: createdDate,
+          updatedAt: createdDate
+        }
+      });
+
+      // Create transaction
+      await prisma.transaction.create({
+        data: {
+          id: crypto.randomUUID(),
+          registrationId: regId,
+          razorpayOrderId: `order_${code}`,
+          razorpayPaymentId: `pay_${code}`,
+          amount: compFee,
+          status: "SUCCESS",
+          createdAt: createdDate
+        }
+      });
+
+      // Create social metric (high engagement for winner)
+      await prisma.socialMetric.create({
+        data: {
+          id: crypto.randomUUID(),
+          registrationId: regId,
+          likesCount: getRandomInt(800, 1500),
+          commentsCount: getRandomInt(200, 400),
+          sharesCount: getRandomInt(100, 250),
+          calculatedEngagement: cat.score * 0.95 // High engagement for winners
+        }
+      });
+
+      // Create judge assignments with high scores
+      const j1Index = shubhamRegCount % judgeIds.length;
+      const j2Index = (shubhamRegCount + 1) % judgeIds.length;
+      const j1Id = judgeIds[j1Index];
+      const j2Id = judgeIds[j2Index];
+
+      const assign1Id = crypto.randomUUID();
+      const assign2Id = crypto.randomUUID();
+
+      await prisma.judgeAssignment.create({
+        data: {
+          id: assign1Id,
+          registrationId: regId,
+          judgeId: j1Id,
+          isSubmitted: true,
+          assignedAt: createdDate,
+          submittedAt: createdDate
+        }
+      });
+
+      await prisma.judgeAssignment.create({
+        data: {
+          id: assign2Id,
+          registrationId: regId,
+          judgeId: j2Id,
+          isSubmitted: true,
+          assignedAt: createdDate,
+          submittedAt: createdDate
+        }
+      });
+
+      // Create high scores
+      const scoreValue1 = Math.floor(cat.score * 0.95);
+      const scoreValue2 = Math.floor(cat.score * 0.90);
+
+      await prisma.score.create({
+        data: {
+          id: crypto.randomUUID(),
+          judgeAssignmentId: assign1Id,
+          criteria1: Math.floor(scoreValue1 * 0.4),
+          criteria2: Math.floor(scoreValue1 * 0.3),
+          criteria3: Math.floor(scoreValue1 * 0.3),
+          totalScore: scoreValue1,
+          remarks: "Exceptional talent with outstanding execution!"
+        }
+      });
+
+      await prisma.score.create({
+        data: {
+          id: crypto.randomUUID(),
+          judgeAssignmentId: assign2Id,
+          criteria1: Math.floor(scoreValue2 * 0.4),
+          criteria2: Math.floor(scoreValue2 * 0.3),
+          criteria3: Math.floor(scoreValue2 * 0.3),
+          totalScore: scoreValue2,
+          remarks: "Brilliant performance, shows great promise!"
+        }
+      });
+
+      // Create prize award
+      const rankMap = { 1: "FIRST_PLACE", 2: "SECOND_PLACE", 3: "THIRD_PLACE" };
+      const prizeRank = rankMap[cat.rank];
+      const prizeItemId = prizeItemsMap[prizeRank];
+
+      const prizeAwardId = crypto.randomUUID();
+      await prisma.prizeAward.create({
+        data: {
+          id: prizeAwardId,
+          prizeItemId: prizeItemId,
+          registrationId: regId,
+          rank: prizeRank,
+          awardedAt: createdDate,
+          isDispatched: false
+        }
+      });
+
+      // Create certificate
+      const certCode = `CERT-PP-SHUBHAM-${String(shubhamCertCount).padStart(4, "0")}`;
+      await prisma.certificate.create({
+        data: {
+          id: crypto.randomUUID(),
+          registrationId: regId,
+          certificateId: certCode,
+          certificateUrl: `https://cdn.pratibhaparishad.org/certificates/${certCode}.pdf`,
+          qrCodeUrl: `https://cdn.pratibhaparishad.org/qrcodes/${certCode}.png`,
+          type: prizeRank === "FIRST_PLACE" ? "MERIT_1" : prizeRank === "SECOND_PLACE" ? "MERIT_2" : "MERIT_3",
+          prizeAwardId: prizeAwardId,
+          issuedAt: createdDate
+        }
+      });
+
+      shubhamRegCount++;
+      shubhamCertCount++;
+
+      console.log(`  ✓ ${entry.compTitle} - ${cat.slug} (#${cat.rank} Place, Score: ${cat.score})`);
+    }
+  }
+
+  console.log(`✓ Seeded Shubham Das with ${shubhamRegCount - 1} winning registrations and ${shubhamCertCount - 1} certificates!\n`);
 }
 
 main()
