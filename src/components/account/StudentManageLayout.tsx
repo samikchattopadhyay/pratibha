@@ -167,7 +167,7 @@ export default function StudentManageLayout({
               setIsAchievementModalOpen(true);
             }}
             variant="secondary"
-            size="sm"
+            size="md"
             className="font-bold"
           >
             <Plus className="w-4 h-4" /> Add Achievement
