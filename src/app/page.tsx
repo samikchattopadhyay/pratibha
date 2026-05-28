@@ -1,7 +1,7 @@
 ﻿import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Award, ShieldCheck, Zap, MessageSquare, Video, ArrowRight, Play, BookOpen } from "lucide-react";
+import { Award, ShieldCheck, Zap, MessageSquare, Video, ArrowRight, BookOpen } from "lucide-react";
 
 export default function Home() {
   return (
@@ -19,84 +19,31 @@ export default function Home() {
           </svg>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-terracotta/10 text-terracotta font-sans text-sm font-bold uppercase tracking-wider">
-                <Award className="w-3.5 h-3.5" /> Traditional Arts, Modern Credentials
-              </span>
-              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-charcoal leading-tight">
-                Where Indian Heritage Meets <span className="text-terracotta">Digital Recognition</span>
-              </h1>
-              <p className="font-sans text-lg text-charcoal/80 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Pratibha Parishad is the premier digital certification board for Indian fine arts. Show off your talent in singing, dance, recitation, and visual arts to win global verification.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link
-                  href="/competitions"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-terracotta hover:bg-terracotta-light text-cream font-sans text-base font-bold shadow-lg hover:-translate-y-[1px] transition-all duration-300 dark:bg-gold dark:hover:bg-gold-light dark:text-charcoal"
-                >
-                  Explore Competitions
-                  <ArrowRight className="w-5 h-5" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full border-2 border-terracotta/20 hover:border-terracotta text-terracotta font-sans text-base font-bold transition-all duration-300 dark:border-gold/30 dark:hover:border-gold dark:text-gold"
-                >
-                  Access Student Portal
-                </Link>
-              </div>
-            </div>
-
-            {/* Visual highlight box */}
-            <div className="lg:col-span-5 relative flex justify-center">
-              <div className="w-full max-w-md p-8 bg-cream border-2 border-gold/30 rounded-3xl shadow-xl dark:bg-charcoal dark:border-gold/30 relative">
-                {/* Visual design seal */}
-                <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-gold text-charcoal flex items-center justify-center font-serif font-bold text-lg shadow-md animate-bounce">
-                  PP
-                </div>
-                
-                <h3 className="font-serif text-xl font-bold text-terracotta dark:text-gold border-b border-terracotta/10 dark:border-gold/10 pb-4 mb-4">
-                  Phase 1 MVP Launching Now
-                </h3>
-                
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-green-500/10 text-green-600 flex items-center justify-center mt-1">
-                      ✓
-                    </div>
-                    <div>
-                      <h4 className="font-sans text-sm font-bold text-charcoal dark:text-cream">Facebook Submission Check</h4>
-                      <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">Submit direct links of your performance videos.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-green-500/10 text-green-600 flex items-center justify-center mt-1">
-                      ✓
-                    </div>
-                    <div>
-                      <h4 className="font-sans text-sm font-bold text-charcoal dark:text-cream">Double Blind Evaluation</h4>
-                      <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">Judges grade performace blindly with strict conflict checks.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-green-500/10 text-green-600 flex items-center justify-center mt-1">
-                      ✓
-                    </div>
-                    <div>
-                      <h4 className="font-sans text-sm font-bold text-charcoal dark:text-cream">QR Verified Certificates</h4>
-                      <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">Instantly shareable PDF certificates with static authenticity IDs.</p>
-                    </div>
-                  </li>
-                </ul>
-
-                <div className="mt-8 pt-4 border-t border-terracotta/10 dark:border-gold/10 flex justify-between items-center text-sm font-sans text-charcoal/60 dark:text-cream/60">
-                  <span>Entry Fee: ₹50 / entry</span>
-                  <span className="font-semibold text-terracotta dark:text-gold flex items-center gap-1">
-                    <Play className="w-3.5 h-3.5 fill-current" /> Live in India & Abroad
-                  </span>
-                </div>
-              </div>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="space-y-6 text-center">
+            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-terracotta/10 text-terracotta font-sans text-sm font-bold uppercase tracking-wider">
+              <Award className="w-3.5 h-3.5" /> Traditional Arts, Modern Credentials
+            </span>
+            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-charcoal leading-tight">
+              Where Indian Heritage Meets <span className="text-terracotta">Digital Recognition</span>
+            </h1>
+            <p className="font-sans text-lg text-charcoal/80 max-w-2xl mx-auto leading-relaxed">
+              Pratibha Parishad is the premier digital certification board for Indian fine arts. Show off your talent in singing, dance, recitation, and visual arts to win global verification.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/competitions"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-terracotta hover:bg-terracotta-light text-cream font-sans text-base font-bold shadow-lg hover:-translate-y-[1px] transition-all duration-300 dark:bg-gold dark:hover:bg-gold-light dark:text-charcoal"
+              >
+                Explore Competitions
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full border-2 border-terracotta/20 hover:border-terracotta text-terracotta font-sans text-base font-bold transition-all duration-300 dark:border-gold/30 dark:hover:border-gold dark:text-gold"
+              >
+                Access Student Portal
+              </Link>
             </div>
           </div>
         </div>
