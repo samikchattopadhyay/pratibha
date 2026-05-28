@@ -10,12 +10,14 @@ interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  light?: boolean;
 }
 
 export default function RichTextEditor({
   value,
   onChange,
   placeholder = "Enter text...",
+  light = false,
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -34,15 +36,27 @@ export default function RichTextEditor({
   if (!editor) return null;
 
   return (
-    <div className="border border-terracotta/20 rounded-lg overflow-hidden bg-charcoal">
+    <div className={`border rounded-lg overflow-hidden ${
+      light
+        ? "bg-cream dark:bg-charcoal border-terracotta/20 dark:border-terracotta/20"
+        : "bg-charcoal border-terracotta/20"
+    }`}>
       {/* Toolbar */}
-      <div className="flex items-center gap-0 px-2 py-1 bg-charcoal-light border-b border-terracotta/20">
+      <div className={`flex items-center gap-0 px-2 py-1 border-b border-terracotta/20 ${
+        light
+          ? "bg-cream-dark/50 dark:bg-charcoal-light"
+          : "bg-charcoal-light"
+      }`}>
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
           disabled={!editor.can().chain().focus().toggleBold().run()}
           className={`p-1.5 rounded transition-colors ${
             editor.isActive("bold")
-              ? "bg-gold/20 text-gold"
+              ? light
+                ? "bg-terracotta/20 text-terracotta dark:bg-gold/20 dark:text-gold"
+                : "bg-gold/20 text-gold"
+              : light
+              ? "hover:bg-terracotta/20 text-charcoal/70 hover:text-charcoal dark:hover:bg-terracotta/20 dark:text-cream/70 dark:hover:text-cream"
               : "hover:bg-terracotta/20 text-cream/70 hover:text-cream"
           }`}
           title="Bold"
@@ -54,7 +68,11 @@ export default function RichTextEditor({
           disabled={!editor.can().chain().focus().toggleItalic().run()}
           className={`p-1.5 rounded transition-colors ${
             editor.isActive("italic")
-              ? "bg-gold/20 text-gold"
+              ? light
+                ? "bg-terracotta/20 text-terracotta dark:bg-gold/20 dark:text-gold"
+                : "bg-gold/20 text-gold"
+              : light
+              ? "hover:bg-terracotta/20 text-charcoal/70 hover:text-charcoal dark:hover:bg-terracotta/20 dark:text-cream/70 dark:hover:text-cream"
               : "hover:bg-terracotta/20 text-cream/70 hover:text-cream"
           }`}
           title="Italic"
@@ -66,7 +84,11 @@ export default function RichTextEditor({
           disabled={!editor.can().chain().focus().toggleUnderline().run()}
           className={`p-1.5 rounded transition-colors ${
             editor.isActive("underline")
-              ? "bg-gold/20 text-gold"
+              ? light
+                ? "bg-terracotta/20 text-terracotta dark:bg-gold/20 dark:text-gold"
+                : "bg-gold/20 text-gold"
+              : light
+              ? "hover:bg-terracotta/20 text-charcoal/70 hover:text-charcoal dark:hover:bg-terracotta/20 dark:text-cream/70 dark:hover:text-cream"
               : "hover:bg-terracotta/20 text-cream/70 hover:text-cream"
           }`}
           title="Underline"
@@ -81,7 +103,11 @@ export default function RichTextEditor({
           disabled={!editor.can().chain().focus().toggleBulletList().run()}
           className={`p-1.5 rounded transition-colors ${
             editor.isActive("bulletList")
-              ? "bg-gold/20 text-gold"
+              ? light
+                ? "bg-terracotta/20 text-terracotta dark:bg-gold/20 dark:text-gold"
+                : "bg-gold/20 text-gold"
+              : light
+              ? "hover:bg-terracotta/20 text-charcoal/70 hover:text-charcoal dark:hover:bg-terracotta/20 dark:text-cream/70 dark:hover:text-cream"
               : "hover:bg-terracotta/20 text-cream/70 hover:text-cream"
           }`}
           title="Bullet List"
@@ -93,7 +119,11 @@ export default function RichTextEditor({
           disabled={!editor.can().chain().focus().toggleOrderedList().run()}
           className={`p-1.5 rounded transition-colors ${
             editor.isActive("orderedList")
-              ? "bg-gold/20 text-gold"
+              ? light
+                ? "bg-terracotta/20 text-terracotta dark:bg-gold/20 dark:text-gold"
+                : "bg-gold/20 text-gold"
+              : light
+              ? "hover:bg-terracotta/20 text-charcoal/70 hover:text-charcoal dark:hover:bg-terracotta/20 dark:text-cream/70 dark:hover:text-cream"
               : "hover:bg-terracotta/20 text-cream/70 hover:text-cream"
           }`}
           title="Ordered List"
@@ -106,7 +136,11 @@ export default function RichTextEditor({
         <button
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().chain().focus().undo().run()}
-          className="p-1.5 rounded hover:bg-terracotta/20 text-cream/70 hover:text-cream transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`p-1.5 rounded hover:bg-terracotta/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            light
+              ? "text-charcoal/70 hover:text-charcoal dark:text-cream/70 dark:hover:text-cream"
+              : "text-cream/70 hover:text-cream"
+          }`}
           title="Undo"
         >
           <Undo2 className="w-3.5 h-3.5" />
@@ -114,7 +148,11 @@ export default function RichTextEditor({
         <button
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().chain().focus().redo().run()}
-          className="p-1.5 rounded hover:bg-terracotta/20 text-cream/70 hover:text-cream transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`p-1.5 rounded hover:bg-terracotta/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            light
+              ? "text-charcoal/70 hover:text-charcoal dark:text-cream/70 dark:hover:text-cream"
+              : "text-cream/70 hover:text-cream"
+          }`}
           title="Redo"
         >
           <Redo2 className="w-3.5 h-3.5" />
@@ -124,7 +162,7 @@ export default function RichTextEditor({
       {/* Editor */}
       <EditorContent
         editor={editor}
-        className="prose prose-invert max-w-none"
+        className={light ? "prose max-w-none" : "prose prose-invert max-w-none"}
         style={{
           minHeight: "120px",
           padding: "12px",
@@ -133,7 +171,50 @@ export default function RichTextEditor({
       />
 
       {/* Custom styles for the editor */}
-      <style>{`
+      <style>{light ? `
+        .ProseMirror {
+          outline: none;
+          color: #2a2a2a;
+        }
+        @media (prefers-color-scheme: dark) {
+          .ProseMirror {
+            color: #fcf9f2;
+          }
+        }
+        .ProseMirror p.is-editor-empty:first-child::before {
+          color: #8b7355;
+          content: attr(data-placeholder);
+          float: left;
+          height: 0;
+          pointer-events: none;
+        }
+        .ProseMirror p {
+          margin: 0.5rem 0;
+        }
+        .ProseMirror ul,
+        .ProseMirror ol {
+          padding-left: 1.5rem;
+          margin: 0.5rem 0;
+        }
+        .ProseMirror li {
+          margin: 0.25rem 0;
+        }
+        .ProseMirror strong {
+          font-weight: bold;
+          color: #cc6533;
+        }
+        @media (prefers-color-scheme: dark) {
+          .ProseMirror strong {
+            color: #e8c454;
+          }
+        }
+        .ProseMirror em {
+          font-style: italic;
+        }
+        .ProseMirror u {
+          text-decoration: underline;
+        }
+      ` : `
         .ProseMirror {
           outline: none;
           color: #fcf9f2;

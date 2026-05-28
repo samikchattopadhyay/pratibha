@@ -521,6 +521,7 @@ export default function AddStudentWizard({
                     value={formData.bio}
                     onChange={(val) => setFormData({ ...formData, bio: val })}
                     placeholder="Write a brief bio about yourself..."
+                    light={true}
                   />
                 </div>
               </div>
