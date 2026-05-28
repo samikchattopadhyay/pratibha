@@ -103,7 +103,7 @@ export default function CompetitionResultCard({
       </div>
 
       {/* Expandable Details */}
-      {(hasRubric || competition.certificateUrl) && (
+      {(hasRubric || competition.certificateUrl || competition.judgeInfo.length > 0 || competition.prizeItem) && (
         <>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
@@ -117,6 +117,47 @@ export default function CompetitionResultCard({
 
           {isExpanded && (
             <div className="px-4 sm:px-5 py-4 space-y-4 border-t border-terracotta/10 dark:border-terracotta/20 bg-cream-dark/2 dark:bg-charcoal/30">
+              {/* Judge Attribution */}
+              {competition.judgeInfo.length > 0 && (
+                <div>
+                  <p className="font-sans text-xs font-bold text-charcoal/60 dark:text-cream/60 uppercase tracking-wider mb-2">
+                    Judged By
+                  </p>
+                  <div className="space-y-1">
+                    {competition.judgeInfo.map((judge, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs">
+                        <span className="text-charcoal dark:text-cream">{judge.name}</span>
+                        <span className="px-2 py-0.5 bg-gold/20 dark:bg-gold/30 text-gold dark:text-gold/90 rounded text-xs font-semibold">
+                          {judge.tier}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Prize Item */}
+              {competition.prizeItem && (
+                <div className="p-3 bg-gradient-to-r from-terracotta/10 to-gold/10 dark:from-terracotta/20 dark:to-gold/20 rounded-lg border border-terracotta/20 dark:border-terracotta/30">
+                  <p className="font-sans text-xs font-bold text-charcoal/60 dark:text-cream/60 uppercase tracking-wider mb-2">
+                    Prize Award
+                  </p>
+                  <p className="font-semibold text-charcoal dark:text-cream mb-1">
+                    {competition.prizeItem.title}
+                  </p>
+                  {competition.prizeItem.description && (
+                    <p className="text-xs text-charcoal/70 dark:text-cream/70 mb-2">
+                      {competition.prizeItem.description}
+                    </p>
+                  )}
+                  {competition.prizeItem.type && (
+                    <span className="inline-block px-2 py-0.5 bg-charcoal/20 dark:bg-gold/20 text-charcoal dark:text-gold text-xs rounded">
+                      {competition.prizeItem.type}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Rubric Breakdown */}
               {hasRubric && (
                 <div>

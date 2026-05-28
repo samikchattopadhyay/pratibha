@@ -375,6 +375,10 @@ model Registration {
   qualificationSlotEarned    QualificationSlot?   @relation("EarnedSlot")  // Plan 04
   qualificationSlotUsed      QualificationSlot?   @relation("UsedSlot")    // Plan 04
 
+  // Phase 3 — Student curation
+  isFeatured             Boolean              @default(false)
+  isHidden               Boolean              @default(false)
+
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 }

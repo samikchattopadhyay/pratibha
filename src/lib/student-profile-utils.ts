@@ -12,7 +12,7 @@ export interface CompetitionResult {
   ageGroup: string;
   finalRank: number | null;
   finalScore: Decimal | null;
-  prizeRank: PrizeRank | null;
+  prizeRank: string | null;
   certificateType: string;
   certificateUrl: string | null;
   certificateIssuedAt: string;
@@ -25,6 +25,15 @@ export interface CompetitionResult {
     rhythm: number | null;
     originality: number | null;
   };
+  judgeInfo: { name: string; tier: string }[];
+  prizeItem: {
+    title: string;
+    description: string | null;
+    type: string;
+    imageUrl: string | null;
+  } | null;
+  isFeatured: boolean;
+  isHidden: boolean;
 }
 
 export interface CategorySummary {
@@ -158,6 +167,7 @@ export function groupByCategory(
 export function calculatePrizeBreakdown(competitions: CompetitionResult[]) {
   return competitions.reduce(
     (acc, comp) => {
+      if (!comp.prizeRank) return acc;
       if (comp.prizeRank === "FIRST_PLACE") acc.gold++;
       else if (comp.prizeRank === "SECOND_PLACE") acc.silver++;
       else if (comp.prizeRank === "THIRD_PLACE") acc.bronze++;
@@ -171,25 +181,31 @@ export function getTopAchievements(
   competitions: CompetitionResult[],
   limit: number = 3
 ): CompetitionResult[] {
-  return competitions
-    .filter((c) => c.prizeRank) // Only show prize winners
-    .sort((a, b) => {
-      // Sort by rank first (gold > silver > bronze)
-      const rankOrder = {
-        FIRST_PLACE: 3,
-        SECOND_PLACE: 2,
-        THIRD_PLACE: 1,
-      };
-      const aRank = rankOrder[a.prizeRank!] || 0;
-      const bRank = rankOrder[b.prizeRank!] || 0;
-      if (bRank !== aRank) return bRank - aRank;
+  const rankOrder: Record<string, number> = {
+    FIRST_PLACE: 3,
+    SECOND_PLACE: 2,
+    THIRD_PLACE: 1,
+  };
 
-      // Then by score
-      const aScore = a.finalScore ? Number(a.finalScore) : 0;
-      const bScore = b.finalScore ? Number(b.finalScore) : 0;
-      return bScore - aScore;
-    })
-    .slice(0, limit);
+  // Separate featured and non-featured
+  const featured = competitions.filter((c) => c.isFeatured && c.prizeRank);
+  const nonFeatured = competitions.filter((c) => !c.isFeatured && c.prizeRank);
+
+  const sorter = (a: CompetitionResult, b: CompetitionResult) => {
+    const aRank = (a.prizeRank && rankOrder[a.prizeRank]) || 0;
+    const bRank = (b.prizeRank && rankOrder[b.prizeRank]) || 0;
+    if (bRank !== aRank) return bRank - aRank;
+
+    const aScore = a.finalScore ? Number(a.finalScore) : 0;
+    const bScore = b.finalScore ? Number(b.finalScore) : 0;
+    return bScore - aScore;
+  };
+
+  // Sort both groups and combine
+  featured.sort(sorter);
+  nonFeatured.sort(sorter);
+
+  return [...featured, ...nonFeatured].slice(0, limit);
 }
 
 export function calculateProfileStats(

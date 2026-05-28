@@ -1,4 +1,5 @@
 "use client";
+import { useRef } from "react";
 import Link from "next/link";
 import { Copy, Share2 } from "lucide-react";
 import Button from "@/components/Button";
@@ -6,6 +7,9 @@ import AwardsHighlight from "./AwardsHighlight";
 import CompetitionResultCard from "./CompetitionResultCard";
 import CategoryPerformanceSummary from "./CategoryPerformanceSummary";
 import TierBadge from "./TierBadge";
+import AchievementTimeline from "../achievement/AchievementTimeline";
+import PerformanceMetrics from "./PerformanceMetrics";
+import PdfExportButton from "./PdfExportButton";
 import {
   CompetitionResult,
   calculateTier,
@@ -48,6 +52,7 @@ export default function StudentPublicProfile({
   student,
   isOwner,
 }: PublicStudentProfileProps) {
+  const profileRef = useRef<HTMLDivElement>(null);
   const profileUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/student/${student.id}`;
 
   const handleCopyLink = () => {
@@ -90,7 +95,7 @@ export default function StudentPublicProfile({
   );
 
   return (
-    <div className="space-y-8">
+    <div ref={profileRef} className="space-y-8">
       {/* Hero Section */}
       <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 sm:p-8 shadow-md">
         <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
@@ -251,6 +256,20 @@ export default function StudentPublicProfile({
         </div>
       )}
 
+      {/* Performance Metrics */}
+      {competitionResults.length > 1 && (
+        <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md">
+          <PerformanceMetrics competitions={competitionResults} />
+        </div>
+      )}
+
+      {/* Achievement Timeline */}
+      {competitionResults.length > 0 && (
+        <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md">
+          <AchievementTimeline competitions={competitionResults} />
+        </div>
+      )}
+
       {/* External Achievements */}
       {student.externalAchievements.length > 0 && (
         <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
@@ -383,12 +402,15 @@ export default function StudentPublicProfile({
         <p className="font-sans text-sm text-charcoal/70 dark:text-cream/70">
           Explore our upcoming competitions and showcase your talent on a national platform.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
           <Link href="/competitions">
             <Button variant="primary" size="md" className="font-bold">
               Explore Competitions
             </Button>
           </Link>
+          {competitionResults.length > 0 && (
+            <PdfExportButton studentName={student.name} profileRef={profileRef} />
+          )}
           <Button
             onClick={handleCopyLink}
             variant="secondary"

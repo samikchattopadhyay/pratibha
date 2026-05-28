@@ -7,6 +7,7 @@ import Button from "@/components/Button";
 import SlugInput from "./SlugInput";
 import AddStudentWizard, { StudentFormData } from "./AddStudentWizard";
 import ExternalAchievementModal from "./ExternalAchievementModal";
+import CurationPanel from "./CurationPanel";
 
 interface StudentProfile {
   id: string;
@@ -387,6 +388,16 @@ export default function StudentManageLayout({
           </div>
         )}
       </div>
+
+      {/* Section D: Achievement Curation */}
+      {isPublic && (
+        <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md">
+          <h3 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2 mb-4">
+            ⭐ Achievement Curation
+          </h3>
+          <CurationPanel studentId={student.id} />
+        </div>
+      )}
 
       {/* Modals */}
       <AddStudentWizard
