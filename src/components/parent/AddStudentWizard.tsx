@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
 import SearchableSelect from "@/components/admin/SearchableSelect";
+import ChipMultiSelect from "@/components/admin/ChipMultiSelect";
 import RichTextEditor from "@/components/RichTextEditor";
 
 interface AddStudentWizardProps {
@@ -544,12 +545,11 @@ export default function AddStudentWizard({
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium block">Languages Spoken</label>
-                  <SearchableSelect
+                  <ChipMultiSelect
                     options={LANGUAGES_OPTIONS}
-                    value={formData.languages[0] || ""}
-                    onChange={(val) => setFormData((prev) => ({ ...prev, languages: val ? [val] : [] }))}
+                    selectedValues={formData.languages}
+                    onChange={(vals) => setFormData((prev) => ({ ...prev, languages: vals }))}
                     placeholder="Select languages..."
-                    searchPlaceholder="Search languages..."
                     light={true}
                   />
                 </div>
