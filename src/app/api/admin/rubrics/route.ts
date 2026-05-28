@@ -1,10 +1,10 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import fs from "fs";
-import path from "path";
+import prisma from "@/lib/db";
+import defaultRubrics from "@/lib/rubric-defaults.json";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
-const FILE_PATH = path.join(process.cwd(), "src", "lib", "rubric-defaults.json");
+const SETTING_KEY = "rubric-defaults";
 
 export async function GET() {
   try {
@@ -14,13 +14,15 @@ export async function GET() {
     const role = (session.user as { role?: string }).role;
     if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    if (!fs.existsSync(FILE_PATH)) {
-      return NextResponse.json({ error: "Defaults file not found" }, { status: 404 });
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: SETTING_KEY },
+    });
+
+    if (setting) {
+      return NextResponse.json(setting.value);
     }
 
-    const fileContent = fs.readFileSync(FILE_PATH, "utf-8");
-    const data = JSON.parse(fileContent);
-    return NextResponse.json(data);
+    return NextResponse.json(defaultRubrics);
   } catch (error) {
     console.error("Fetch rubrics error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -40,8 +42,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload format" }, { status: 400 });
     }
 
-    // Save to file
-    fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+    await prisma.systemSetting.upsert({
+      where: { key: SETTING_KEY },
+      update: { value: data },
+      create: { key: SETTING_KEY, value: data },
+    });
+
     return NextResponse.json({ success: true, message: "Rubrics saved successfully" });
   } catch (error) {
     console.error("Save rubrics error:", error);
