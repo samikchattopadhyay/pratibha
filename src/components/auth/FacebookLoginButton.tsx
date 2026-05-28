@@ -21,7 +21,7 @@ export function FacebookLoginButton({
 
       const result = await signIn("facebook", {
         redirect: false,
-        callbackUrl: "/auth/setup",
+        callbackUrl: "/onboarding",
       });
 
       if (result?.error) {

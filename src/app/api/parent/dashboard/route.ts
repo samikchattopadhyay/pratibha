@@ -36,7 +36,10 @@ export async function GET() {
     });
 
     if (!parent) {
-      return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Profile not found", code: "SETUP_REQUIRED" },
+        { status: 404 }
+      );
     }
 
     // Flatten registrations for easy rendering

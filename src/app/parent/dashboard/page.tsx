@@ -12,6 +12,7 @@ import { User, Users, FileText, Plus, LogOut, Award, Clock } from "lucide-react"
 import AddStudentWizard from "@/components/parent/AddStudentWizard";
 import ProfileCompletionCard from "@/components/parent/ProfileCompletionCard";
 import ProfileCompletionModal from "@/components/parent/ProfileCompletionModal";
+import { calculateProfileCompletion } from "@/lib/utils/profile";
 
 interface Student {
   id: string;
@@ -89,6 +90,8 @@ function ParentDashboardContent() {
     setIsProfileCompletionModalOpen(false);
   };
   const [parent, setParent] = useState<ParentType | null>(null);
+  const profileCompletion = parent ? calculateProfileCompletion(parent) : 0;
+  const isProfileIncomplete = profileCompletion < 100;
   const [students, setStudents] = useState<Student[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; grouping: string }[]>([]);
@@ -114,6 +117,19 @@ function ParentDashboardContent() {
       const data = await res.json();
 
       if (!res.ok) {
+        // If setup is required, generate token and redirect to onboarding
+        if (data.code === "SETUP_REQUIRED") {
+          const tokenRes = await fetch("/api/parent/generate-setup-token", {
+            method: "POST",
+          });
+          const tokenData = await tokenRes.json();
+          if (tokenData.token) {
+            router.push(`/onboarding?token=${tokenData.token}`);
+          } else {
+            throw new Error("Failed to generate setup link");
+          }
+          return;
+        }
         throw new Error(data.error || "Failed to load dashboard details");
       }
 
@@ -128,7 +144,7 @@ function ParentDashboardContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (isValidRole && sessionStatus === "authenticated") {
@@ -227,31 +243,33 @@ function ParentDashboardContent() {
             />
           )}
 
-          {/* Profile Overview Header */}
-          <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 sm:p-8 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-terracotta dark:bg-gold text-cream dark:text-charcoal flex items-center justify-center shadow">
-                <User className="w-7 h-7" />
-              </div>
-              <div>
-                <h1 className="font-serif text-2xl font-bold text-charcoal dark:text-cream">{parent?.name}</h1>
-                <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">Registered Parent | Phone: {parent?.phone}</p>
-              </div>
-            </div>
+          {/* Profile Overview Header & Dashboard Content - Hidden during profile completion */}
+          {!isProfileIncomplete && (
+            <>
+              <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 sm:p-8 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-terracotta dark:bg-gold text-cream dark:text-charcoal flex items-center justify-center shadow">
+                    <User className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h1 className="font-serif text-2xl font-bold text-charcoal dark:text-cream">{parent?.name}</h1>
+                    <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">Registered Parent | Phone: {parent?.phone}</p>
+                  </div>
+                </div>
 
-            <div className="flex gap-3 w-full sm:w-auto">
-              <Button
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                variant="outline"
-                size="md"
-              >
-                <LogOut className="w-4 h-4" />
-                Log Out
-              </Button>
-            </div>
-          </div>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <Button
+                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    variant="outline"
+                    size="md"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Log Out
+                  </Button>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column: Address / details */}
             <div className="lg:col-span-4 bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
               <h3 className="font-serif text-lg font-bold text-charcoal dark:text-cream border-b border-terracotta/5 dark:border-terracotta/10 pb-2">
@@ -500,6 +518,8 @@ function ParentDashboardContent() {
 
             </div>
           </div>
+            </>
+          )}
         </div>
       </main>
 

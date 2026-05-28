@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SetupOnboarding from "@/components/auth/SetupOnboarding";
 import Loading from "@/components/Loading";
 
-export default function SetupPage() {
+export default function OnboardingPage() {
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,13 +24,6 @@ export default function SetupPage() {
 
   if (status === "unauthenticated") {
     return null;
-  }
-
-  // If no token, generate one
-  if (!token) {
-    return (
-      <SetupOnboarding />
-    );
   }
 
   return <SetupOnboarding />;
