@@ -33,61 +33,56 @@ export default function AchievementTimeline({
   };
 
   return (
-    <section className="py-12">
-      <h2 className="text-2xl font-bold text-charcoal dark:text-gold mb-8">
-        Achievement Timeline
+    <section className="py-6">
+      <h2 className="text-xl font-bold text-charcoal dark:text-gold mb-6">
+        📅 Achievement Timeline
       </h2>
 
-      <div className="relative">
-        {/* Vertical timeline line */}
-        <div className="absolute left-2 top-0 bottom-0 w-1 bg-gradient-to-b from-gold via-terracotta to-transparent" />
-
-        <div className="space-y-12 pl-12">
-          {years.map((year) => (
-            <div key={year}>
-              {/* Year header */}
-              <div className="mb-6">
-                <div className="inline-block bg-gold text-charcoal px-4 py-2 rounded-full font-bold text-lg">
-                  {year}
-                </div>
-              </div>
-
-              {/* Entries for this year */}
-              <div className="space-y-3">
-                {groupedByYear[year]
-                  .sort(
-                    (a, b) =>
-                      new Date(b.competitionStartDate).getTime() -
-                      new Date(a.competitionStartDate).getTime()
-                  )
-                  .map((comp) => (
-                    <div
-                      key={comp.registrationId}
-                      className="flex items-center gap-3 text-sm"
-                    >
-                      {/* Medal or dot */}
-                      <div className="text-lg">
-                        {getMedalEmoji(comp.prizeRank) || (
-                          <span className="text-charcoal dark:text-gold">●</span>
-                        )}
-                      </div>
-
-                      {/* Competition info */}
-                      <div className="flex-1">
-                        <p className="font-medium text-charcoal dark:text-white">
-                          {comp.competitionTitle}
-                        </p>
-                        <p className="text-charcoal/70 dark:text-cream/70 text-xs">
-                          {comp.categoryName} • Score:{" "}
-                          {comp.finalScore ? Number(comp.finalScore).toFixed(1) : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+      <div className="space-y-5">
+        {years.map((year) => (
+          <div key={year}>
+            {/* Year header */}
+            <div className="inline-block bg-gold/15 dark:bg-gold/20 text-gold font-bold px-3 py-1 rounded-full text-xs mb-2.5 border border-gold/30">
+              {year}
             </div>
-          ))}
-        </div>
+
+            {/* Grid of entries for this year */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {groupedByYear[year]
+                .sort(
+                  (a, b) =>
+                    new Date(b.competitionStartDate).getTime() -
+                    new Date(a.competitionStartDate).getTime()
+                )
+                .map((comp) => (
+                  <div
+                    key={comp.registrationId}
+                    className="flex items-start gap-2 p-2 rounded-lg hover:bg-cream-dark/5 dark:hover:bg-charcoal/50 transition-colors text-xs"
+                  >
+                    {/* Medal or dot */}
+                    <div className="text-base flex-shrink-0 mt-0.5">
+                      {getMedalEmoji(comp.prizeRank) || (
+                        <span className="text-charcoal/40 dark:text-gold/40">●</span>
+                      )}
+                    </div>
+
+                    {/* Competition info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-charcoal dark:text-white leading-tight">
+                        {comp.competitionTitle}
+                      </p>
+                      <p className="text-charcoal/70 dark:text-cream/70 text-xs mt-0.5">
+                        {comp.categoryName}
+                      </p>
+                      <p className="text-charcoal/60 dark:text-cream/60 text-xs mt-0.5">
+                        Score: <span className="font-semibold text-gold">{comp.finalScore ? Number(comp.finalScore).toFixed(1) : "N/A"}</span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
