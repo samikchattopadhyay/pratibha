@@ -1,5 +1,6 @@
 import { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import FacebookProvider from "next-auth/providers/facebook";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
 
@@ -28,6 +29,14 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
+          // CRITICAL: Check if password hash exists (not OAuth-only user)
+          if (!user.passwordHash) {
+            console.warn(
+              `Login attempt with password on OAuth-only user: ${credentials.email}`
+            );
+            return null;
+          }
+
           // CRITICAL: Check if email is verified
           if (!user.emailVerified) {
             console.warn(
@@ -51,8 +60,8 @@ export const authOptions: AuthOptions = {
             name: user.email.split("@")[0],
             role: user.role,
           };
-        } catch (error: any) {
-          if (error.message === "UNVERIFIED_EMAIL") {
+        } catch (error) {
+          if (error instanceof Error && error.message === "UNVERIFIED_EMAIL") {
             throw error;
           }
           console.error("Auth error:", error);
@@ -60,9 +69,17 @@ export const authOptions: AuthOptions = {
         }
       },
     }),
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_APP_ID || "",
+      clientSecret: process.env.FACEBOOK_APP_SECRET || "",
+      allowDangerousEmailAccountLinking: true,
+    }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      if (account?.type === "oauth") {
+        token.needsProfileSetup = true;
+      }
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
@@ -71,11 +88,23 @@ export const authOptions: AuthOptions = {
     },
     async session({ session, token }) {
       if (token && session.user) {
-        const customUser = session.user as { id?: string; role?: string };
+        const customUser = session.user as {
+          id?: string;
+          role?: string;
+          needsProfileSetup?: boolean;
+        };
         customUser.id = token.id as string;
         customUser.role = token.role as string;
+        customUser.needsProfileSetup = token.needsProfileSetup as boolean;
       }
       return session;
+    },
+    async signIn({ account }) {
+      if (account?.provider === "facebook") {
+        // Facebook login is allowed; setup flow happens on client
+        return true;
+      }
+      return true;
     },
   },
   pages: {

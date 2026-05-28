@@ -183,7 +183,8 @@ enum DeliveryErrorType {
 model User {
   id                      String                    @id @default(uuid())
   email                   String                    @unique
-  passwordHash            String
+  passwordHash            String?                   // NULL for OAuth-only users
+  facebookId              String?                   @unique // Facebook user ID
   role                    Role                      @default(PARENT)
   profileImageUrl         String?
   emailVerified           DateTime?                 // NULL = unverified, DateTime = verified at this time
@@ -196,6 +197,7 @@ model User {
   passwordSetupTokens     PasswordSetupToken[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  profileSetupTokens      ProfileSetupToken[]
 }
 
 model Parent {
@@ -764,4 +766,19 @@ model EmailVerificationToken {
   @@index([token])
   @@index([userId])
   @@index([expiresAt])
+}
+
+model ProfileSetupToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  stage     String    // "password" | "phone" | "email_verify"
+  data      Json?     // Temporary data: { tempPhone: "...", otpCode: "...", ... }
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
 }

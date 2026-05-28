@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import PasswordInput from "@/components/PasswordInput";
+import { FacebookLoginButton } from "@/components/auth/FacebookLoginButton";
 import { UserPlus, AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
@@ -76,6 +77,23 @@ export default function RegisterPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Facebook OAuth Option */}
+          <div className="mb-6">
+            <FacebookLoginButton />
+          </div>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-terracotta/20"></div>
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-3 bg-cream text-charcoal/60 font-bold uppercase tracking-wider">
+                Or register with email
+              </span>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             
