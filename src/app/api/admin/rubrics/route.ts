@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { NextResponse, NextRequest } from "next/server";
+import { getEdgeSession } from "@/lib/auth-helper";
 import fs from "fs";
 import path from "path";
 
@@ -9,7 +8,7 @@ const FILE_PATH = path.join(process.cwd(), "src", "lib", "rubric-defaults.json")
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;
@@ -30,7 +29,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(req);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;

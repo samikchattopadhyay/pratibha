@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
-import { authOptions } from "@/lib/auth";
 import { sendTelegramWithTracking } from "@/lib/notifications";
 import { DeliveryStatus } from "@prisma/client";
 
@@ -13,7 +12,7 @@ import { DeliveryStatus } from "@prisma/client";
  *   - limit: number of failed deliveries to retry (default: 10)
  */
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getEdgeSession(request);
 
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

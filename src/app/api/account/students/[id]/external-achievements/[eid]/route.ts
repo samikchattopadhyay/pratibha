@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { NextResponse, NextRequest } from "next/server";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 import { z } from "zod";
 
@@ -25,7 +24,7 @@ export async function PATCH(
 ) {
   try {
     // 1. Parse & Auth check
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(req);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
@@ -101,7 +100,7 @@ export async function DELETE(
 ) {
   try {
     // 1. Auth check
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(req);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }

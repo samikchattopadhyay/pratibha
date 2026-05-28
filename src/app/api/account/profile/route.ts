@@ -1,11 +1,10 @@
 import { NextResponse, NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession();
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
@@ -44,7 +43,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }

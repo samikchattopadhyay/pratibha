@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import { uploadBannerImage } from "@/lib/r2";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
@@ -13,7 +12,7 @@ function requireAdmin(role: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;

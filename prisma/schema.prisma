@@ -4,7 +4,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 // ─── ENUMS (EXISTING) ─────────────────────────────────────────────────────────
@@ -786,4 +787,11 @@ model ProfileSetupToken {
 
   @@index([token])
   @@index([userId])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

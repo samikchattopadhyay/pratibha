@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { JudgeTier } from "@prisma/client";
@@ -12,7 +11,7 @@ const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;
@@ -128,7 +127,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;
@@ -220,7 +219,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;

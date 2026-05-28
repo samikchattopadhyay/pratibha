@@ -1,6 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 
 export interface NotificationItem {
@@ -15,7 +14,7 @@ export interface NotificationItem {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
@@ -69,7 +68,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
@@ -121,7 +120,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }

@@ -1,7 +1,21 @@
-import crypto from "crypto";
 import prisma from "@/lib/db";
 
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Helper to calculate SHA-256 hash using Web Crypto API
+async function sha256(data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataBytes = encoder.encode(data);
+  const hash = await globalThis.crypto.subtle.digest("SHA-256", dataBytes);
+  return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Helper to generate secure random token using Web Crypto API
+function generateRandomHex(length: number = 32): string {
+  const array = new Uint8Array(length);
+  globalThis.crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 /**
  * Generate a verification token for a user.
@@ -10,13 +24,10 @@ const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
  */
 export async function generateVerificationToken(userId: string): Promise<string> {
   // 1. Generate random token (64 hex = 32 bytes)
-  const randomToken = crypto.randomBytes(32).toString("hex");
+  const randomToken = generateRandomHex(32);
 
   // 2. Hash token for secure storage
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(randomToken)
-    .digest("hex");
+  const hashedToken = await sha256(randomToken);
 
   // 3. Store in database
   await prisma.emailVerificationToken.create({
@@ -40,10 +51,7 @@ export async function verifyEmailToken(
   userId: string
 ): Promise<boolean> {
   // 1. Hash the provided token for comparison
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  const hashedToken = await sha256(token);
 
   // 2. Find the token record
   const record = await prisma.emailVerificationToken.findFirst({
@@ -86,10 +94,7 @@ export async function verifyEmailToken(
  * Check if a token has expired
  */
 export async function isTokenExpired(token: string): Promise<boolean> {
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  const hashedToken = await sha256(token);
 
   const record = await prisma.emailVerificationToken.findUnique({
     where: { token: hashedToken },

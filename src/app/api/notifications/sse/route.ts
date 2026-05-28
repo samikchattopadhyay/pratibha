@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 
 // Use serverless runtime for better compatibility with long-lived connections
@@ -8,7 +7,7 @@ import prisma from "@/lib/db";
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getEdgeSession(req);
   if (!session || !session.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

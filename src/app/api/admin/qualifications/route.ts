@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
@@ -8,7 +7,7 @@ const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 // GET /api/admin/qualifications — all rules + slot stats
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!ADMIN_ROLES.includes((session.user as { role?: string }).role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -57,7 +56,7 @@ export async function GET() {
 // POST /api/admin/qualifications — create a qualification rule
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!ADMIN_ROLES.includes((session.user as { role?: string }).role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

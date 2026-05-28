@@ -1,8 +1,7 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 import { fetchPublicStudent } from "@/lib/fetch-public-student";
 import Header from "@/components/Header";
@@ -53,7 +52,7 @@ async function StudentPublicPageContent({ studentId }: { studentId: string }) {
   }
 
   // Check if viewer is the owner
-  const session = await getServerSession(authOptions);
+  const session = await getEdgeSession();
   const isOwner =
     session?.user &&
     (await prisma.student.findUnique({

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import type { JudgeSettings } from "@/types/judges-details";
@@ -21,7 +20,7 @@ const UpdateSettingsSchema = z.object({
 
 // ✅ Pattern: Type guard for auth
 async function checkAdminAuth(): Promise<boolean> {
-  const session = await getServerSession(authOptions);
+  const session = await getEdgeSession();
   if (!session?.user) return false;
 
   const role = (session.user as { role?: string }).role;

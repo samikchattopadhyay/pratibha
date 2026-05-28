@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
-import { authOptions } from "@/lib/auth";
 import { DeliveryStatus } from "@prisma/client";
 
 /**
@@ -16,7 +15,7 @@ import { DeliveryStatus } from "@prisma/client";
  *   - sortOrder: asc or desc (default: desc)
  */
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getEdgeSession(request);
 
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

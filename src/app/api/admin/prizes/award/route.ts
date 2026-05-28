@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 import { PrizeRank } from "@prisma/client";
 
@@ -21,7 +20,7 @@ function rankToPrizeRank(rank: number): PrizeRank {
 // POST /api/admin/prizes/award — assign awards after results are finalized
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(request);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!ADMIN_ROLES.includes((session.user as any).role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

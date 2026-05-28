@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -96,7 +95,7 @@ async function fetchStudentAndCategories(studentId: string, parentId: string) {
 }
 
 async function ManageStudentPageContent({ studentId }: { studentId: string }) {
-  const session = await getServerSession(authOptions);
+  const session = await getEdgeSession();
 
   if (!session?.user) {
     redirect("/login");

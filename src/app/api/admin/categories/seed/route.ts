@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { NextResponse, NextRequest } from "next/server";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
@@ -33,7 +32,7 @@ const DEFAULT_CATEGORIES = [
 
 export async function POST() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;

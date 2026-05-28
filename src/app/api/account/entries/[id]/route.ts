@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { NextResponse, NextRequest } from "next/server";
+import { getEdgeSession } from "@/lib/auth-helper";
 import prisma from "@/lib/db";
 import { z } from "zod";
 import type { ParentEntryDetails, ParentJudgeScore } from "@/types/account-entry-details";
@@ -13,7 +12,7 @@ export async function GET(
 ) {
   try {
     // ─── 1. AUTHENTICATION ──────────────────────────────────────────────────────
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(_req);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

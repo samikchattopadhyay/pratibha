@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import prisma from "@/lib/db";
 
 const SETUP_TOKEN_EXPIRY = parseInt(process.env.SETUP_TOKEN_EXPIRY || "3600"); // 1 hour default
@@ -8,7 +7,9 @@ export async function generateProfileSetupToken(
   stage: "password" | "phone" | "email_verify",
   data?: Record<string, string | number | boolean | Date>
 ) {
-  const token = crypto.randomBytes(32).toString("hex");
+  const array = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(array);
+  const token = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
   const profileSetupToken = await prisma.profileSetupToken.create({
     data: {

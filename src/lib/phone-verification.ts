@@ -1,16 +1,16 @@
-import crypto from "crypto";
-
 const OTP_CODE_LENGTH = parseInt(process.env.OTP_CODE_LENGTH || "6");
 
 export function generateOTP(): string {
-  return crypto
-    .randomInt(0, Math.pow(10, OTP_CODE_LENGTH))
-    .toString()
-    .padStart(OTP_CODE_LENGTH, "0");
+  const array = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(array);
+  const randomVal = array[0] % Math.pow(10, OTP_CODE_LENGTH);
+  return randomVal.toString().padStart(OTP_CODE_LENGTH, "0");
 }
 
 export function generateOTPToken(): string {
-  return crypto.randomBytes(32).toString("hex");
+  const array = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export function validatePhoneFormat(phone: string): boolean {

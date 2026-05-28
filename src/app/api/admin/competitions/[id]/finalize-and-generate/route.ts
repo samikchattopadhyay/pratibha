@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getEdgeSession } from "@/lib/auth-helper";
 import { createAndDispatchNotification } from "@/lib/notificationService";
 import prisma from "@/lib/db";
 import { CertificateType, CertificateStatus, PrizeRank } from "@prisma/client";
@@ -43,7 +42,7 @@ export async function POST(
 ) {
   try {
     // 1. Auth
-    const session = await getServerSession(authOptions);
+    const session = await getEdgeSession(_req);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
