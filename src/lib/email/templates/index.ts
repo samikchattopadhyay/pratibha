@@ -14,3 +14,5 @@ export { buildResultsPublishedTemplate } from "./resultsPublishedTemplate";
 export { buildCertificateReadyTemplate } from "./certificateReadyTemplate";
 export { buildQualificationOfferedTemplate } from "./qualificationOfferedTemplate";
 export { buildJudgeWelcomeTemplate } from "./judgeWelcomeTemplate";
+export { buildPasswordResetTemplate } from "./passwordResetTemplate";
+export { buildParentWelcomeTemplate } from "./parentWelcomeTemplate";

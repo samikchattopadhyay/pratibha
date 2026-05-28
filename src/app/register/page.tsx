@@ -6,8 +6,8 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
+import PasswordInput from "@/components/PasswordInput";
 import { UserPlus, AlertCircle } from "lucide-react";
-import { INDIA_STATES } from "@/lib/constants";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,12 +16,6 @@ export default function RegisterPage() {
     email: "",
     phone: "",
     password: "",
-    address: "",
-    city: "",
-    state: "",
-    preferredState: "",
-    postalCode: "",
-    country: "India",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -100,7 +94,7 @@ export default function RegisterPage() {
                     value={formData.name}
                     onChange={handleChange}
                     className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="Avik Chattopadhyay"
+                    placeholder="John Doe"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -112,7 +106,7 @@ export default function RegisterPage() {
                     value={formData.phone}
                     onChange={handleChange}
                     className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="9830098300"
+                    placeholder="+91 98306 12345"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -124,103 +118,21 @@ export default function RegisterPage() {
                     value={formData.email}
                     onChange={handleChange}
                     className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="parent@example.com"
+                    placeholder="your.email@example.com"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Create Password</label>
-                  <input
-                    type="password"
-                    name="password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="••••••••"
-                  />
-                </div>
+                <PasswordInput
+                  label="Create Password"
+                  name="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  showRequirements={true}
+                />
               </div>
             </div>
 
-            {/* Grid 2: Shipping Address */}
-            <div className="space-y-4">
-              <h3 className="font-serif text-base font-bold text-terracotta border-b border-terracotta/5 pb-1">
-                Postal Address (For Physical Medal Shipping)
-              </h3>
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Street Address</label>
-                  <input
-                    type="text"
-                    name="address"
-                    required
-                    value={formData.address}
-                    onChange={handleChange}
-                    className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="House No, Apartment Name, Street, Locality"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">City</label>
-                    <input
-                      type="text"
-                      name="city"
-                      required
-                      value={formData.city}
-                      onChange={handleChange}
-                      className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                      placeholder="Kolkata"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">PIN / Postal Code</label>
-                    <input
-                      type="text"
-                      name="postalCode"
-                      required
-                      value={formData.postalCode}
-                      onChange={handleChange}
-                      className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                      placeholder="700019"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">State of Residence</label>
-                    <select
-                      name="state"
-                      required
-                      value={formData.state}
-                      onChange={handleChange}
-                      className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    >
-                      <option value="">Select State</option>
-                      {INDIA_STATES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Preferred State for Competitions</label>
-                    <select
-                      name="preferredState"
-                      required
-                      value={formData.preferredState}
-                      onChange={handleChange}
-                      className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    >
-                      <option value="">Select State (Default: Same as Residence)</option>
-                      {INDIA_STATES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <Button
               type="submit"

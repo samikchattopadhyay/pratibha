@@ -48,8 +48,8 @@ export async function GET(
         name: student.parent.name,
         email: student.parent.user.email,
         phone: student.parent.phone,
-        city: student.parent.city,
-        state: student.parent.state,
+        city: student.parent.city ?? "Not specified",
+        state: student.parent.state ?? "Not specified",
       },
     };
 

@@ -193,6 +193,7 @@ model User {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   passwordSetupTokens     PasswordSetupToken[]
+  passwordResetTokens     PasswordResetToken[]
 }
 
 model Parent {
@@ -201,10 +202,10 @@ model Parent {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name             String
   phone            String    @unique
-  address          String
-  city             String
-  state            String
-  postalCode       String
+  address          String?
+  city             String?
+  state            String?
+  postalCode       String?
   country          String    @default("India")
   profileImageUrl  String?
   preferredState   String?   // Plan 07 — preferred state for filtering state-wise competitions
@@ -722,6 +723,20 @@ model TelegramMessageDelivery {
 // ─── PASSWORD SETUP TOKENS ────────────────────────────────────────────────
 
 model PasswordSetupToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
   id        String    @id @default(uuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)

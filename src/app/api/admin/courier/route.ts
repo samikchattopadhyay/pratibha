@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         registration: {
           include: {
             student: {
-              include: { parent: { select: { name: true, phone: true, address: true, city: true, state: true, postalCode: true, country: true } } },
+              include: { parent: { select: { id: true, name: true, phone: true, address: true, city: true, state: true, postalCode: true, country: true } } },
             },
           },
         },
@@ -127,10 +127,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "No pending physical prize orders to generate for this competition" });
     }
 
-    const ordersData = awards.map((award) => {
+    // Filter awards where parent has complete address information
+    const ordersData = [];
+    const incompleteAddresses = [];
+
+    for (const award of awards) {
       const parent = award.registration.student.parent;
+
+      // Check if all address fields are complete
+      if (!parent.address || !parent.city || !parent.state || !parent.postalCode) {
+        incompleteAddresses.push({
+          studentName: award.registration.student.name,
+          parentName: parent.name,
+          parentId: parent.id,
+        });
+        continue;
+      }
+
       const spec = PACKAGE_SPECS[award.rank] ?? PACKAGE_SPECS.PARTICIPATION;
-      return {
+      ordersData.push({
         prizeAwardId: award.id,
         recipientName: parent.name,
         recipientPhone: parent.phone,
@@ -145,14 +160,18 @@ export async function POST(request: NextRequest) {
         widthCm: spec.widthCm,
         heightCm: spec.heightCm,
         status: "PENDING" as const,
-      };
-    });
+      });
+    }
 
-    await prisma.physicalPrizeOrder.createMany({ data: ordersData });
+    if (ordersData.length > 0) {
+      await prisma.physicalPrizeOrder.createMany({ data: ordersData });
+    }
 
     return NextResponse.json({
       message: `${ordersData.length} physical prize orders created`,
       ordersCreated: ordersData.length,
+      incompleteAddresses: incompleteAddresses.length > 0 ? incompleteAddresses : undefined,
+      warning: incompleteAddresses.length > 0 ? `${incompleteAddresses.length} parents have incomplete addresses and cannot receive physical prizes yet` : undefined,
     });
   } catch (error) {
     console.error("Courier POST error:", error);

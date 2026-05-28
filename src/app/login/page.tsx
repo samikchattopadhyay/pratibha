@@ -109,14 +109,14 @@ function LoginForm() {
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                placeholder="parent@example.com"
+                placeholder="your.email@example.com"
               />
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between">
                 <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Password</label>
-                <a href="#" className="font-sans text-sm text-terracotta font-semibold hover:underline py-2 px-1 -my-2">Forgot?</a>
+                <Link href="/forgot-password" className="font-sans text-sm text-terracotta font-semibold hover:underline py-2 px-1 -my-2">Forgot?</Link>
               </div>
               <input
                 type="password"
