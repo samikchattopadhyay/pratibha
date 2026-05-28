@@ -359,6 +359,7 @@ export default function AddStudentWizard({
                       onChange={(val) => setFormData({ ...formData, state: val })}
                       placeholder="Select state..."
                       searchPlaceholder="Search Indian states..."
+                      light={true}
                     />
                   </div>
                 </div>

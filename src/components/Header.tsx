@@ -202,10 +202,11 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
 
   const isCurrentlyAdmin = isAdmin !== undefined ? isAdmin : pathname.startsWith("/admin");
   const isCurrentlyJudge = pathname.startsWith("/judge");
+  const isCurrentlyParent = pathname.startsWith("/parent");
 
   const navigation = isCurrentlyAdmin
     ? [{ name: "Council Admin Dashboard", href: "/admin/dashboard" }]
-    : isCurrentlyJudge
+    : isCurrentlyJudge || isCurrentlyParent
     ? []
     : [
         { name: "Home", href: "/" },
@@ -253,7 +254,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
                 <span className="font-serif text-lg sm:text-xl font-bold tracking-wide text-terracotta dark:text-gold transition-colors duration-300">
                   PRATIBHA PARISHAD
                 </span>
-                <span className="font-sans text-sm font-semibold tracking-wider text-charcoal/60 dark:text-cream/60 uppercase">
+                <span className="font-sans text-xs font-semibold tracking-wider text-charcoal/60 dark:text-cream/60 uppercase">
                   Nurturing Talent, Celebrating Art.
                 </span>
               </div>
@@ -261,7 +262,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
           </div>
 
           {/* Desktop Nav Items */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden nav:flex items-center space-x-8">
             {isCurrentlyAdmin ? (
               <div className="flex items-center space-x-4">
                 <div ref={bellRef} className="relative">
@@ -338,13 +339,15 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
 
                 {status === "authenticated" ? (
                   <div className="flex items-center space-x-3">
-                    <Link
-                      href={getRoleDashboardUrl()}
-                      className="p-2.5 rounded-full border border-terracotta/20 dark:border-terracotta/40 hover:border-terracotta dark:hover:border-gold text-terracotta dark:text-gold hover:bg-terracotta/5 dark:hover:bg-gold/5 transition-all duration-300 cursor-pointer flex items-center justify-center"
-                      title="Go to Dashboard"
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                    </Link>
+                    {!pathname.includes("/dashboard") && (
+                      <Link
+                        href={getRoleDashboardUrl()}
+                        className="p-2.5 rounded-full border border-terracotta/20 dark:border-terracotta/40 hover:border-terracotta dark:hover:border-gold text-terracotta dark:text-gold hover:bg-terracotta/5 dark:hover:bg-gold/5 transition-all duration-300 cursor-pointer flex items-center justify-center"
+                        title="Go to Dashboard"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                      </Link>
+                    )}
                     <div ref={bellRef} className="relative">
                       <Button
                         onClick={() => setNotificationOpen(!notificationOpen)}
@@ -405,7 +408,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
           </div>
 
           {/* Mobile hamburger menu */}
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center nav:hidden">
             <Button
               onClick={() => setIsOpen(!isOpen)}
               variant="ghost"
@@ -423,7 +426,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
       {/* Mobile Menu Panel */}
       <div
         ref={menuRef}
-        className={`md:hidden fixed top-20 left-0 w-full bg-cream border-b border-terracotta/10 shadow-xl dark:bg-charcoal dark:border-terracotta/10 z-50 py-4 px-6 transition-all duration-300 ${
+        className={`nav:hidden fixed top-20 left-0 w-full bg-cream border-b border-terracotta/10 shadow-xl dark:bg-charcoal dark:border-terracotta/10 z-50 py-4 px-6 transition-all duration-300 ${
           isOpen ? "opacity-100 scale-y-100 visible" : "opacity-0 scale-y-95 invisible origin-top pointer-events-none"
         }`}
       >

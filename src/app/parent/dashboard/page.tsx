@@ -3,12 +3,12 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { User, Users, FileText, Plus, LogOut, Award, Clock } from "lucide-react";
+import { User, FileText, Plus, Award, Clock } from "lucide-react";
 import AddStudentWizard from "@/components/parent/AddStudentWizard";
 
 interface Student {
@@ -225,98 +225,50 @@ function ParentDashboardContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
           <>
-            {/* Profile Overview Header & Dashboard Content */}
-              <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 sm:p-8 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-terracotta dark:bg-gold text-cream dark:text-charcoal flex items-center justify-center shadow">
-                    <User className="w-7 h-7" />
-                  </div>
-                  <div>
-                    <h1 className="font-serif text-2xl font-bold text-charcoal dark:text-cream">{parent?.name}</h1>
-                    <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">Registered Parent | Phone: {parent?.phone}</p>
-                  </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Profile & Address Details */}
+            <div className="lg:col-span-4 bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-6">
+              {/* Profile Section */}
+              <div className="flex flex-col items-center gap-3 pb-6 border-b border-terracotta/5 dark:border-terracotta/10">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-terracotta to-gold text-cream flex items-center justify-center shadow-lg">
+                  <User className="w-10 h-10" />
                 </div>
-
-                <div className="flex gap-3 w-full sm:w-auto">
-                  <Button
-                    onClick={() => signOut({ callbackUrl: "/login" })}
-                    variant="outline"
-                    size="md"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Log Out
-                  </Button>
-                </div>
+                <h2 className="font-serif text-xl font-bold text-charcoal dark:text-cream text-center">{parent?.name}</h2>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Address / details */}
-            <div className="lg:col-span-4 bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
-              <h3 className="font-serif text-lg font-bold text-charcoal dark:text-cream border-b border-terracotta/5 dark:border-terracotta/10 pb-2">
-                Address Details
-              </h3>
-              
-              <div className="font-sans text-sm text-charcoal/80 dark:text-cream-dark space-y-3">
-                <div>
-                  <span className="text-sm text-charcoal/40 dark:text-cream/40 uppercase block font-bold">Street</span>
-                  <span className="font-medium">{parent?.address}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-charcoal/40 dark:text-cream/40 uppercase block font-bold">City</span>
-                    <span className="font-medium">{parent?.city}</span>
+              {/* Navigation Menu */}
+              <nav className="space-y-2">
+                <button
+                  onClick={() => handleTabChange("students")}
+                  className={`w-full text-left font-sans text-base font-semibold py-3 px-4 rounded-lg transition-colors ${
+                    activeTab === "students"
+                      ? "bg-terracotta/10 dark:bg-gold/10 text-terracotta dark:text-gold border border-terracotta/20 dark:border-gold/20"
+                      : "text-charcoal/80 dark:text-cream/80 hover:bg-terracotta/5 dark:hover:bg-gold/5"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>My Students</span>
+                    <span className="text-sm font-bold text-charcoal/40 dark:text-cream/40">({students.length})</span>
                   </div>
-                  <div>
-                    <span className="text-sm text-charcoal/40 dark:text-cream/40 uppercase block font-bold">State</span>
-                    <span className="font-medium">{parent?.state}</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange("entries")}
+                  className={`w-full text-left font-sans text-base font-semibold py-3 px-4 rounded-lg transition-colors ${
+                    activeTab === "entries"
+                      ? "bg-terracotta/10 dark:bg-gold/10 text-terracotta dark:text-gold border border-terracotta/20 dark:border-gold/20"
+                      : "text-charcoal/80 dark:text-cream/80 hover:bg-terracotta/5 dark:hover:bg-gold/5"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Competition Entries</span>
+                    <span className="text-sm font-bold text-charcoal/40 dark:text-cream/40">({registrations.length})</span>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-charcoal/40 dark:text-cream/40 uppercase block font-bold">PIN Code</span>
-                    <span className="font-medium">{parent?.postalCode}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-charcoal/40 dark:text-cream/40 uppercase block font-bold">Preferred State</span>
-                    <span className="font-medium text-terracotta dark:text-gold font-bold">{parent?.preferredState || parent?.state}</span>
-                  </div>
-                </div>
-              </div>
+                </button>
+              </nav>
             </div>
 
-            {/* Right Column: Students / Registrations Tabs */}
+            {/* Right Column: Students / Registrations Content */}
             <div className="lg:col-span-8 space-y-6">
-              
-              {/* Tab toggler */}
-              <div className="flex border-b border-terracotta/10 dark:border-terracotta/20">
-                <Button
-                  onClick={() => handleTabChange("students")}
-                  variant="ghost"
-                  size="md"
-                  className={`flex items-center gap-2 px-6 py-3.5 min-h-[44px] border-b-2 transition-colors duration-250 ${
-                    activeTab === "students"
-                      ? "border-terracotta dark:border-gold text-terracotta dark:text-gold"
-                      : "border-transparent text-charcoal/60 dark:text-cream/60"
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  My Students ({students.length})
-                </Button>
-                <Button
-                  onClick={() => handleTabChange("entries")}
-                  variant="ghost"
-                  size="md"
-                  className={`flex items-center gap-2 px-6 py-3.5 min-h-[44px] border-b-2 transition-colors duration-250 ${
-                    activeTab === "entries"
-                      ? "border-terracotta dark:border-gold text-terracotta dark:text-gold"
-                      : "border-transparent text-charcoal/60 dark:text-cream/60"
-                  }`}
-                >
-                  <FileText className="w-4 h-4" />
-                  Competition Entries ({registrations.length})
-                </Button>
-              </div>
-
               {/* TAB CONTENT: STUDENTS */}
               {activeTab === "students" && (
                 <div className="space-y-6">
