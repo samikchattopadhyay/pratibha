@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Edit2, Trash2, Copy, ExternalLink } from "lucide-react";
 import Button from "@/components/Button";
@@ -43,15 +43,28 @@ interface StudentManageLayoutProps {
 }
 
 export default function StudentManageLayout({
-  student,
+  student: initialStudent,
   categories,
   onRefresh,
 }: StudentManageLayoutProps) {
+  const [student, setStudent] = useState(initialStudent);
   const [isEditWizardOpen, setIsEditWizardOpen] = useState(false);
   const [isAchievementModalOpen, setIsAchievementModalOpen] = useState(false);
   const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [isPublic, setIsPublic] = useState(student.isPublic);
+
+  const refetchStudent = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/account/students/${student.id}`);
+      if (res.ok) {
+        const updatedStudent = await res.json();
+        setStudent(updatedStudent);
+      }
+    } catch (err) {
+      console.error("Failed to refetch student:", err);
+    }
+  }, [student.id]);
 
   // Convert student to form data for edit
   const studentFormData: StudentFormData = {
@@ -314,7 +327,7 @@ export default function StudentManageLayout({
         onSuccess={() => {
           setIsAchievementModalOpen(false);
           setEditingAchievementId(null);
-          onRefresh?.();
+          refetchStudent();
         }}
         studentId={student.id}
         achievementId={editingAchievementId || undefined}
