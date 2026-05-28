@@ -55,7 +55,6 @@ async function fetchStudentAndCategories(studentId: string, parentId: string) {
     return { student: null, categories: [] };
   }
 
-  // Convert student to match StudentProfile type
   const studentData: StudentProfile = {
     id: student.id,
     name: student.name,
@@ -79,11 +78,12 @@ async function fetchStudentAndCategories(studentId: string, parentId: string) {
     externalAchievements: student.externalAchievements || [],
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawCategories = await prisma.category.findMany({
     select: { id: true, name: true, slug: true, grouping: true },
   });
 
-  const categories = rawCategories.map((cat) => ({
+  const categories = rawCategories.map((cat: any) => ({
     id: cat.id,
     name: cat.name,
     slug: cat.slug || null,
@@ -120,34 +120,78 @@ async function ManageStudentPageContent({ studentId }: { studentId: string }) {
       <Header />
 
       <main className="flex-1 bg-cream-dark/10 dark:bg-charcoal py-12">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          {/* Back Link */}
-          <Link
-            href="/parent/dashboard?tab=students"
-            className="inline-flex items-center gap-1 text-terracotta dark:text-gold hover:underline font-bold text-sm"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Sidebar */}
+            <div className="lg:col-span-4 bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md sticky top-20 space-y-4">
+              {/* Student Profile Card */}
+              <div className="flex flex-col items-center gap-3 pb-4 border-b border-terracotta/5 dark:border-terracotta/10">
+                {student.profileImageUrl ? (
+                  <img
+                    src={student.profileImageUrl}
+                    alt={student.name}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-terracotta/20 dark:border-gold/20"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-terracotta to-gold text-cream flex items-center justify-center font-bold text-lg">
+                    {student.name
+                      .split(" ")
+                      .map((w) => w[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </div>
+                )}
+                <div className="text-center">
+                  <h2 className="font-serif text-xl font-bold text-charcoal dark:text-cream">
+                    {student.name}
+                  </h2>
+                  <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">
+                    {student.gender} • {student.schoolClass && `Class ${student.schoolClass}`}
+                  </p>
+                </div>
+              </div>
 
-          {/* Page Title */}
-          <div className="space-y-2">
-            <h1 className="font-serif text-3xl font-bold text-charcoal dark:text-cream">
-              Manage {student.name}'s Profile
-            </h1>
-            <p className="font-sans text-charcoal/60 dark:text-cream/60">
-              Edit profile details, manage external achievements, and control public visibility.
-            </p>
+              {/* Navigation Links */}
+              <nav className="space-y-2">
+                <Link
+                  href="/parent/dashboard?tab=students"
+                  className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-charcoal/80 dark:text-cream/80 hover:bg-terracotta/5 dark:hover:bg-gold/5 transition-colors font-sans text-base font-semibold"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back to Dashboard
+                </Link>
+              </nav>
+
+              {/* Quick Info */}
+              {student.city || student.state ? (
+                <div className="bg-terracotta/5 dark:bg-gold/5 rounded-lg p-3 border border-terracotta/10 dark:border-gold/10">
+                  <p className="font-sans text-xs font-semibold text-charcoal dark:text-cream uppercase tracking-wider mb-1">
+                    Location
+                  </p>
+                  <p className="font-sans text-sm text-charcoal dark:text-cream">
+                    {[student.city, student.state].filter(Boolean).join(", ")}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Right Content Area */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Page Header */}
+              <div className="space-y-2">
+                <h1 className="font-serif text-3xl font-bold text-charcoal dark:text-cream">
+                  Manage {student.name}'s Profile
+                </h1>
+                <p className="font-sans text-charcoal/60 dark:text-cream/60">
+                  Edit profile details, manage external achievements, and control public visibility.
+                </p>
+              </div>
+
+              {/* Layout Component */}
+              <StudentManageLayout student={student} categories={categories} />
+            </div>
           </div>
-
-          {/* Layout Component */}
-          <StudentManageLayout
-            student={student}
-            categories={categories}
-            onRefresh={() => {
-              // Client-side refresh handled via modal callbacks
-            }}
-          />
         </div>
       </main>
 

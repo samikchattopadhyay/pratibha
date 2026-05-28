@@ -39,7 +39,7 @@ interface StudentProfile {
 interface StudentManageLayoutProps {
   readonly student: StudentProfile;
   readonly categories: readonly { id: string; name: string; slug?: string | null; grouping?: string }[];
-  readonly onRefresh: () => void;
+  readonly onRefresh?: () => void;
 }
 
 export default function StudentManageLayout({
@@ -88,7 +88,7 @@ export default function StudentManageLayout({
         }
 
         setSuccessMessage("Achievement deleted successfully");
-        onRefresh();
+        onRefresh?.();
         setTimeout(() => setSuccessMessage(""), 3000);
       } catch (err) {
         console.error(err);
@@ -298,7 +298,7 @@ export default function StudentManageLayout({
         onClose={() => setIsEditWizardOpen(false)}
         onSuccess={() => {
           setIsEditWizardOpen(false);
-          onRefresh();
+          onRefresh?.();
         }}
         categories={categories}
         initialData={studentFormData}
@@ -314,7 +314,7 @@ export default function StudentManageLayout({
         onSuccess={() => {
           setIsAchievementModalOpen(false);
           setEditingAchievementId(null);
-          onRefresh();
+          onRefresh?.();
         }}
         studentId={student.id}
         achievementId={editingAchievementId || undefined}
