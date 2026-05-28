@@ -26,6 +26,10 @@ async function fetchPublicStudent(slugOrId: string) {
         },
       },
       registrations: {
+        where: {
+          status: "VERIFIED",
+          certificate: { isNot: null },
+        },
         include: {
           certificate: {
             select: {
@@ -37,6 +41,7 @@ async function fetchPublicStudent(slugOrId: string) {
           prizeAward: {
             select: {
               rank: true,
+              dispatchedAt: true,
             },
           },
           competitionCategory: {
@@ -44,16 +49,33 @@ async function fetchPublicStudent(slugOrId: string) {
               competition: {
                 select: {
                   title: true,
+                  startDate: true,
+                  endDate: true,
                 },
               },
               category: {
                 select: {
                   name: true,
+                  id: true,
+                },
+              },
+            },
+          },
+          judgeAssignments: {
+            include: {
+              score: {
+                select: {
+                  criteria1: true,
+                  criteria2: true,
+                  criteria3: true,
+                  criteria4: true,
+                  totalScore: true,
                 },
               },
             },
           },
         },
+        orderBy: { createdAt: "desc" },
       },
     },
   });
@@ -75,6 +97,10 @@ async function fetchPublicStudent(slugOrId: string) {
           },
         },
         registrations: {
+          where: {
+            status: "VERIFIED",
+            certificate: { isNot: null },
+          },
           include: {
             certificate: {
               select: {
@@ -86,6 +112,7 @@ async function fetchPublicStudent(slugOrId: string) {
             prizeAward: {
               select: {
                 rank: true,
+                dispatchedAt: true,
               },
             },
             competitionCategory: {
@@ -93,16 +120,33 @@ async function fetchPublicStudent(slugOrId: string) {
                 competition: {
                   select: {
                     title: true,
+                    startDate: true,
+                    endDate: true,
                   },
                 },
                 category: {
                   select: {
                     name: true,
+                    id: true,
+                  },
+                },
+              },
+            },
+            judgeAssignments: {
+              include: {
+                score: {
+                  select: {
+                    criteria1: true,
+                    criteria2: true,
+                    criteria3: true,
+                    criteria4: true,
+                    totalScore: true,
                   },
                 },
               },
             },
           },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
@@ -121,17 +165,51 @@ async function fetchPublicStudent(slugOrId: string) {
     age--;
   }
 
-  // Compute verified achievements
-  const verifiedAchievements = student.registrations
-    .filter((reg) => reg.certificate)
-    .map((reg) => ({
-      type: reg.certificate!.type,
+  // Transform registrations to CompetitionResult format
+  const competitionResults = student.registrations.map((reg) => {
+    const scores = reg.judgeAssignments
+      .filter((ja) => ja.score)
+      .map((ja) => ja.score!.totalScore);
+    const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+
+    const criteria1Scores = reg.judgeAssignments
+      .filter((ja) => ja.score?.criteria1 !== null && ja.score?.criteria1 !== undefined)
+      .map((ja) => ja.score!.criteria1);
+    const criteria2Scores = reg.judgeAssignments
+      .filter((ja) => ja.score?.criteria2 !== null && ja.score?.criteria2 !== undefined)
+      .map((ja) => ja.score!.criteria2);
+    const criteria3Scores = reg.judgeAssignments
+      .filter((ja) => ja.score?.criteria3 !== null && ja.score?.criteria3 !== undefined)
+      .map((ja) => ja.score!.criteria3);
+    const criteria4Scores = reg.judgeAssignments
+      .filter((ja) => ja.score !== null && ja.score !== undefined && ja.score.criteria4 !== null && ja.score.criteria4 !== undefined)
+      .map((ja) => ja.score!.criteria4 as number);
+
+    return {
+      registrationId: reg.id,
       competitionTitle: reg.competitionCategory.competition.title,
+      competitionStartDate: reg.competitionCategory.competition.startDate.toISOString(),
+      competitionEndDate: reg.competitionCategory.competition.endDate.toISOString(),
       categoryName: reg.competitionCategory.category.name,
-      rank: reg.prizeAward?.rank || null,
+      categoryId: reg.competitionCategory.category.id,
+      ageGroup: `${reg.competitionCategory.minAge}-${reg.competitionCategory.maxAge}`,
+      finalRank: reg.finalRank,
+      finalScore: reg.finalScore,
+      prizeRank: (reg.prizeAward?.rank as any) || null,
+      certificateType: reg.certificate!.type,
       certificateUrl: reg.certificate!.certificateUrl,
-      issuedAt: reg.certificate!.issuedAt.toISOString(),
-    }));
+      certificateIssuedAt: reg.certificate!.issuedAt.toISOString(),
+      prizeDispatchedAt: reg.prizeAward?.dispatchedAt?.toISOString() || null,
+      judgeCount: reg.judgeAssignments.length,
+      averageScore,
+      rubricBreakdown: {
+        technique: criteria1Scores.length > 0 ? criteria1Scores.reduce((a, b) => a + b, 0) / criteria1Scores.length : null,
+        expression: criteria2Scores.length > 0 ? criteria2Scores.reduce((a, b) => a + b, 0) / criteria2Scores.length : null,
+        rhythm: criteria3Scores.length > 0 ? criteria3Scores.reduce((a, b) => a + b, 0) / criteria3Scores.length : null,
+        originality: criteria4Scores.length > 0 ? criteria4Scores.reduce((a, b) => a + b, 0) / criteria4Scores.length : null,
+      },
+    };
+  });
 
   return {
     id: student.id,
@@ -147,11 +225,7 @@ async function fetchPublicStudent(slugOrId: string) {
     specialSkills: student.specialSkills,
     trainingInstitutes: student.trainingInstitutes,
     memberSince: student.createdAt.getFullYear().toString(),
-    stats: {
-      totalCompetitions: student.registrations.length,
-      totalAwards: student.registrations.filter((r) => r.certificate).length,
-    },
-    verifiedAchievements,
+    competitionResults,
     externalAchievements: student.externalAchievements,
   };
 }

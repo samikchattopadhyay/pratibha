@@ -1,9 +1,19 @@
 "use client";
-
-import React from "react";
 import Link from "next/link";
-import { Copy, Share2, ExternalLink } from "lucide-react";
+import { Copy, Share2 } from "lucide-react";
 import Button from "@/components/Button";
+import AwardsHighlight from "./AwardsHighlight";
+import CompetitionResultCard from "./CompetitionResultCard";
+import CategoryPerformanceSummary from "./CategoryPerformanceSummary";
+import TierBadge from "./TierBadge";
+import {
+  CompetitionResult,
+  calculateTier,
+  calculatePrizeBreakdown,
+  getTopAchievements,
+  groupByCategory,
+  calculateProfileStats,
+} from "@/lib/student-profile-utils";
 
 interface PublicStudentProfileProps {
   readonly student: {
@@ -20,18 +30,7 @@ interface PublicStudentProfileProps {
     specialSkills: string[];
     trainingInstitutes: string[];
     memberSince: string;
-    stats: {
-      totalCompetitions: number;
-      totalAwards: number;
-    };
-    verifiedAchievements: {
-      type: string;
-      competitionTitle: string;
-      categoryName: string;
-      rank: string | null;
-      certificateUrl: string | null;
-      issuedAt: string;
-    }[];
+    competitionResults?: CompetitionResult[] | null;
     externalAchievements: {
       title: string;
       eventName: string;
@@ -43,29 +42,6 @@ interface PublicStudentProfileProps {
     }[];
   };
   readonly isOwner: boolean;
-}
-
-function getCertificateBadgeColor(type: string) {
-  switch (type) {
-    case "MERIT_1":
-      return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
-    case "MERIT_2":
-      return "bg-gray-400/20 text-gray-600 dark:text-gray-300 border-gray-400/30";
-    case "MERIT_3":
-      return "bg-amber-700/20 text-amber-700 dark:text-amber-500 border-amber-700/30";
-    case "SPECIAL_MENTION":
-      return "bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30";
-    default:
-      return "bg-terracotta/20 text-terracotta border-terracotta/30";
-  }
-}
-
-function getRankEmoji(rank: string | null) {
-  if (!rank) return "🎖️";
-  if (rank.includes("1st") || rank.includes("First")) return "🥇";
-  if (rank.includes("2nd") || rank.includes("Second")) return "🥈";
-  if (rank.includes("3rd") || rank.includes("Third")) return "🥉";
-  return "🎖️";
 }
 
 export default function StudentPublicProfile({
@@ -84,6 +60,34 @@ export default function StudentPublicProfile({
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
+
+  // Calculate stats and aggregations
+  const competitionResults = student.competitionResults || [];
+  const stats = calculateProfileStats(competitionResults);
+  const prizeBreakdown = calculatePrizeBreakdown(competitionResults);
+  const categorySummaries = Object.values(
+    groupByCategory(competitionResults)
+  );
+  const topAchievements = getTopAchievements(competitionResults, 3);
+  const highestScore =
+    competitionResults.length > 0
+      ? competitionResults.reduce(
+          (prev, curr) =>
+            (curr.finalScore && prev.finalScore
+              ? Number(curr.finalScore) > Number(prev.finalScore)
+              : curr.finalScore)
+              ? curr
+              : prev,
+          competitionResults[0]
+        )
+      : null;
+  const tierInfo = calculateTier(
+    stats.goldMedals,
+    stats.silverMedals,
+    stats.bronzeMedals,
+    stats.totalCompetitions,
+    stats.averageScore
+  );
 
   return (
     <div className="space-y-8">
@@ -107,9 +111,20 @@ export default function StudentPublicProfile({
 
           {/* Info */}
           <div className="flex-1">
-            <h1 className="font-serif text-3xl font-bold text-charcoal dark:text-cream">
-              {student.name}
-            </h1>
+            <div className="flex items-start gap-2 mb-2">
+              <h1 className="font-serif text-3xl font-bold text-charcoal dark:text-cream">
+                {student.name}
+              </h1>
+              {competitionResults.length > 0 && (
+                <TierBadge
+                  tier={tierInfo.tier}
+                  label={tierInfo.label}
+                  pointsToNext={tierInfo.pointsToNext}
+                  showLabel={true}
+                />
+              )}
+            </div>
+
             <p className="font-sans text-charcoal/70 dark:text-cream/70 mt-1">
               {student.age} years old · {student.gender}
               {student.city || student.state
@@ -139,32 +154,44 @@ export default function StudentPublicProfile({
             )}
 
             {/* Stats */}
-            <div className="flex gap-6 mt-4 pt-4 border-t border-terracotta/10 dark:border-terracotta/20">
-              <div>
-                <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
-                  {student.stats.totalCompetitions}
-                </p>
-                <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
-                  Competitions
-                </p>
+            {competitionResults.length > 0 && (
+              <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-terracotta/10 dark:border-terracotta/20">
+                <div>
+                  <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
+                    {stats.totalCompetitions}
+                  </p>
+                  <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
+                    Competitions
+                  </p>
+                </div>
+                <div>
+                  <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
+                    {stats.totalAwards}
+                  </p>
+                  <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
+                    Awards
+                  </p>
+                </div>
+                <div>
+                  <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
+                    {stats.totalCategories}
+                  </p>
+                  <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
+                    Categories
+                  </p>
+                </div>
+                {stats.averageScore && (
+                  <div>
+                    <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
+                      {stats.averageScore.toFixed(1)}
+                    </p>
+                    <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
+                      Avg Score
+                    </p>
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
-                  {student.stats.totalAwards}
-                </p>
-                <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
-                  Awards
-                </p>
-              </div>
-              <div>
-                <p className="font-sans font-bold text-terracotta dark:text-gold text-lg">
-                  {student.memberSince}
-                </p>
-                <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 uppercase tracking-wider">
-                  Member Since
-                </p>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -180,48 +207,47 @@ export default function StudentPublicProfile({
         </div>
       </div>
 
+      {/* Awards Highlight */}
+      {competitionResults.length > 0 && (
+        <AwardsHighlight
+          medalCount={prizeBreakdown}
+          highestScore={
+            highestScore && highestScore.finalScore
+              ? {
+                  value: Number(highestScore.finalScore),
+                  category: highestScore.categoryName,
+                  competition: highestScore.competitionTitle,
+                }
+              : null
+          }
+          featuredAchievements={topAchievements}
+        />
+      )}
+
       {/* Verified Achievements */}
-      {student.verifiedAchievements.length > 0 && (
+      {competitionResults.length > 0 && (
         <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
           <h2 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2">
-            🏆 Verified by Pratibha Parishad ✓
+            🏆 Verified Achievements
           </h2>
           <div className="space-y-3">
-            {student.verifiedAchievements.map((achievement, idx) => (
-              <div
-                key={idx}
-                className="bg-cream-dark/5 dark:bg-charcoal rounded-lg border border-terracotta/10 dark:border-terracotta/20 p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`px-3 py-1 rounded-full border text-xs font-bold ${getCertificateBadgeColor(achievement.type)}`}>
-                    {achievement.type.replace("_", " ")}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-sans font-bold text-charcoal dark:text-cream">
-                      {achievement.competitionTitle}
-                    </h4>
-                    <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">
-                      {achievement.categoryName}
-                      {achievement.rank && ` • ${achievement.rank}`}
-                    </p>
-                    <p className="font-sans text-xs text-charcoal/50 dark:text-cream/50 mt-1">
-                      {new Date(achievement.issuedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  {achievement.certificateUrl && (
-                    <a
-                      href={achievement.certificateUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-terracotta dark:text-gold hover:underline font-bold text-xs whitespace-nowrap"
-                    >
-                      View →
-                    </a>
-                  )}
-                </div>
-              </div>
+            {competitionResults.map((competition) => (
+              <CompetitionResultCard
+                key={competition.registrationId}
+                competition={competition}
+              />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Category Performance Summary */}
+      {categorySummaries.length > 0 && (
+        <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
+          <h2 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2">
+            📊 Performance by Category
+          </h2>
+          <CategoryPerformanceSummary categories={categorySummaries} />
         </div>
       )}
 
@@ -245,7 +271,7 @@ export default function StudentPublicProfile({
                   className="bg-cream-dark/5 dark:bg-charcoal rounded-lg border border-terracotta/10 dark:border-terracotta/20 p-4"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-xl">{getRankEmoji(achievement.rank)}</span>
+                    <span className="text-xl">🎖️</span>
                     <div className="flex-1">
                       <h4 className="font-sans font-bold text-charcoal dark:text-cream">
                         {achievement.title}
