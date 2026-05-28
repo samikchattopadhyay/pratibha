@@ -250,7 +250,7 @@ export default function ExternalAchievementModal({
             variant="primary"
             size="md"
             disabled={isSubmitting}
-            className="w-32 font-bold flex items-center justify-center"
+            className="w-40 font-bold flex items-center justify-center"
           >
             {isSubmitting ? (
               <Loading variant="inline" text="Saving..." className="text-current" />
