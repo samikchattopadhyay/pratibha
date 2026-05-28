@@ -109,7 +109,7 @@ export async function POST() {
               type: "CERTIFICATE_READY",
               title: "Certificate Ready",
               body: `${student.name}'s certificate for ${registration.competitionCategory.category.name} has been generated and is ready to download.`,
-              actionUrl: "/parent/dashboard",
+              actionUrl: "/account/dashboard",
               certificateId: cert.id,
               registrationId: registration.id,
               recipientEmail: user.email,

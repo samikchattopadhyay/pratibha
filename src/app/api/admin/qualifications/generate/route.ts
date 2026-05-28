@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
               type: "QUALIFICATION_OFFERED",
               title: "Qualification Slot Offered",
               body: `${student.name} has qualified for ${nationalCompTitle}. A qualification slot is reserved until ${new Date(slot.expiresAt).toLocaleDateString()}.`,
-              actionUrl: "/parent/dashboard",
+              actionUrl: "/account/dashboard",
               registrationId: registration.id,
               recipientEmail: user.email,
             }).catch((err) =>

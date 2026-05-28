@@ -91,7 +91,7 @@ export default function SetupOnboarding() {
   useEffect(() => {
     const loadStatus = async () => {
       try {
-        const res = await fetch("/api/parent/onboarding-status");
+        const res = await fetch("/api/account/onboarding-status");
         if (!res.ok) {
           throw new Error("Failed to load onboarding status");
         }
@@ -109,7 +109,7 @@ export default function SetupOnboarding() {
 
         // If all steps are done, redirect to dashboard
         if (incompleteSteps.length === 0) {
-          router.push("/parent/dashboard");
+          router.push("/account/dashboard");
           return;
         }
       } catch (err) {
@@ -305,7 +305,7 @@ export default function SetupOnboarding() {
       }
 
       // All steps complete, redirect to dashboard
-      router.push("/parent/dashboard");
+      router.push("/account/dashboard");
       router.refresh();
     } catch (err: any) {
       setError(err.message || "An error occurred");

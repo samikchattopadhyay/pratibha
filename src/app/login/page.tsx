@@ -14,7 +14,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasCustomCallback = !!searchParams.get("callbackUrl");
-  const callbackUrl = searchParams.get("callbackUrl") || "/parent/dashboard";
+  const callbackUrl = searchParams.get("callbackUrl") || "/account/dashboard";
   const urlError = searchParams.get("error");
 
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -56,7 +56,7 @@ function LoginForm() {
           } else if (role === "PARENT") {
             // For PARENT users, check if onboarding is complete
             try {
-              const statusRes = await fetch("/api/parent/onboarding-status");
+              const statusRes = await fetch("/api/account/onboarding-status");
               if (statusRes.ok) {
                 const statusData = await statusRes.json();
                 if (!statusData.passwordSet || !statusData.phoneSet || !statusData.emailVerified || !statusData.addressSet) {
@@ -72,7 +72,7 @@ function LoginForm() {
               console.error("Error checking onboarding status:", err);
               // Continue to dashboard on error
             }
-            targetUrl = "/parent/dashboard";
+            targetUrl = "/account/dashboard";
           }
         }
 

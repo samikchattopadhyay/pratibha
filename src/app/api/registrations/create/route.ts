@@ -122,7 +122,7 @@ export async function POST(req: Request) {
         type: "REGISTRATION_CREATED",
         title: "Registration Created",
         body: `${student.name} has been registered for ${compCategory.category.name}. Roll ID: ${registration.registrationId}`,
-        actionUrl: "/parent/dashboard",
+        actionUrl: "/account/dashboard",
         registrationId: registration.id,
         recipientEmail: user.email,
       }).catch((err) => console.error("Failed to send registration created notification:", err));

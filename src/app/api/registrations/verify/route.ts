@@ -101,7 +101,7 @@ export async function POST(req: Request) {
             type: "PAYMENT_RECEIVED",
             title: "Payment Received",
             body: `Payment of ₹${transaction.amount} for ${student.name}'s registration in ${registration.competitionCategory.category.name} has been verified.`,
-            actionUrl: "/parent/dashboard",
+            actionUrl: "/account/dashboard",
             registrationId: registration.id,
             recipientEmail: user.email,
           }).catch((err) =>

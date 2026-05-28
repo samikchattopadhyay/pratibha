@@ -466,7 +466,7 @@ function AdminDashboardContent() {
       const customUser = session.user as { role?: string; id?: string };
       const role = customUser.role;
       if (role !== "SUPER_ADMIN" && role !== "MODERATOR") {
-        router.push("/parent/dashboard");
+        router.push("/account/dashboard");
       }
     }
   }, [sessionStatus, session, router]);

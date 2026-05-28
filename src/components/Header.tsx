@@ -62,7 +62,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
     try {
       const isAdmin = currentPathname.startsWith("/admin");
       const isJudge = currentPathname.startsWith("/judge");
-      const endpoint = isAdmin ? "/api/admin/profile" : isJudge ? "/api/judge/profile" : "/api/parent/profile";
+      const endpoint = isAdmin ? "/api/admin/profile" : isJudge ? "/api/judge/profile" : "/api/account/profile";
 
       const response = await fetch(endpoint);
       if (response.ok) {
@@ -202,11 +202,11 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
 
   const isCurrentlyAdmin = isAdmin !== undefined ? isAdmin : pathname.startsWith("/admin");
   const isCurrentlyJudge = pathname.startsWith("/judge");
-  const isCurrentlyParent = pathname.startsWith("/parent");
+  const isCurrentlyAccount = pathname.startsWith("/account");
 
   const navigation = isCurrentlyAdmin
     ? [{ name: "Council Admin Dashboard", href: "/admin/dashboard" }]
-    : isCurrentlyJudge || isCurrentlyParent
+    : isCurrentlyJudge || isCurrentlyAccount
     ? []
     : [
         { name: "Home", href: "/" },
@@ -226,7 +226,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
   const getDashboardUrl = () => {
     if (isCurrentlyAdmin) return "/admin/profile";
     if (isCurrentlyJudge) return "/judge/profile";
-    return "/parent/profile";
+    return "/account/profile";
   };
 
   const getDashboardLabel = () => {
@@ -240,7 +240,7 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
     const role = user?.role;
     if (role === "SUPER_ADMIN" || role === "MODERATOR" || isCurrentlyAdmin) return "/admin/dashboard";
     if (role === "JUDGE" || isCurrentlyJudge) return "/judge/dashboard";
-    return "/parent/dashboard";
+    return "/account/dashboard";
   };
 
   return (

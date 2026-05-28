@@ -505,11 +505,11 @@ export async function sendEmailPasswordReset(to: string, resetUrl: string): Prom
 }
 
 /**
- * Email for parent account welcome.
+ * Email for account welcome.
  */
-export async function sendParentWelcomeEmail(to: string, parentName: string): Promise<void> {
+export async function sendAccountWelcomeEmail(to: string, parentName: string): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
-  const template = emailTemplates.buildParentWelcomeTemplate(parentName, appUrl);
+  const template = emailTemplates.buildAccountWelcomeTemplate(parentName, appUrl);
   const html = renderEmailTemplate(template);
   await sendEmailViaResend(to, template.subject, html);
 }

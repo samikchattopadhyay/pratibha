@@ -224,7 +224,7 @@ export async function PATCH(request: NextRequest) {
               type: "RESULTS_PUBLISHED",
               title: "Results Published",
               body: `Results for ${student.name}'s submission in ${registration.competitionCategory.category.name} have been finalized. Average score: ${avgScore}/100.`,
-              actionUrl: "/parent/dashboard",
+              actionUrl: "/account/dashboard",
               registrationId: registration.id,
               recipientEmail: user.email,
             }).catch((err) =>

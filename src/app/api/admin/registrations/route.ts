@@ -239,7 +239,7 @@ export async function PATCH(request: NextRequest) {
               type: notificationType as NotificationType,
               title,
               body,
-              actionUrl: "/parent/dashboard",
+              actionUrl: "/account/dashboard",
               registrationId: registration.id,
               recipientEmail: user.email,
             }).catch((err) =>

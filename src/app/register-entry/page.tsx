@@ -72,7 +72,7 @@ function RegisterEntryForm() {
   const loadRegistrationData = useCallback(async () => {
     setLoading(true);
     try {
-      const studentsRes = await fetch("/api/parent/dashboard");
+      const studentsRes = await fetch("/api/account/dashboard");
       const dashboardData = await studentsRes.json();
       
       if (!studentsRes.ok) throw new Error(dashboardData.error || "Failed to load details");
@@ -277,7 +277,7 @@ function RegisterEntryForm() {
 
                   <div className="pt-6 border-t border-terracotta/5 flex flex-col gap-3">
                     <Button
-                      onClick={() => router.push("/parent/dashboard")}
+                      onClick={() => router.push("/account/dashboard")}
                       variant="primary"
                       size="md"
                       className="w-full"
@@ -325,7 +325,7 @@ function RegisterEntryForm() {
                       {students.length === 0 ? (
                         <div className="p-3 bg-cream border border-dashed border-terracotta/20 rounded-lg text-center text-sm text-charcoal/50">
                           No students registered. Please add a student in your{" "}
-                          <a href="/parent/dashboard" className="text-terracotta font-bold underline">Dashboard</a> first.
+                          <a href="/account/dashboard" className="text-terracotta font-bold underline">Dashboard</a> first.
                         </div>
                       ) : (
                         <select

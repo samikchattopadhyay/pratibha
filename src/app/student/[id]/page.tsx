@@ -7,11 +7,12 @@ import prisma from "@/lib/db";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Loading from "@/components/Loading";
-import StudentPublicProfile from "@/components/parent/StudentPublicProfile";
+import StudentPublicProfile from "@/components/account/StudentPublicProfile";
 
-async function fetchPublicStudent(studentId: string) {
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
+async function fetchPublicStudent(slugOrId: string) {
+  // Try to find by slug first
+  let student = await prisma.student.findUnique({
+    where: { slug: slugOrId.toLowerCase() },
     include: {
       externalAchievements: {
         select: {
@@ -56,6 +57,56 @@ async function fetchPublicStudent(studentId: string) {
       },
     },
   });
+
+  // Fallback to ID lookup if slug not found and looks like a UUID
+  if (!student && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId)) {
+    student = await prisma.student.findUnique({
+      where: { id: slugOrId },
+      include: {
+        externalAchievements: {
+          select: {
+            title: true,
+            eventName: true,
+            category: true,
+            year: true,
+            rank: true,
+            description: true,
+            proofUrl: true,
+          },
+        },
+        registrations: {
+          include: {
+            certificate: {
+              select: {
+                type: true,
+                certificateUrl: true,
+                issuedAt: true,
+              },
+            },
+            prizeAward: {
+              select: {
+                rank: true,
+              },
+            },
+            competitionCategory: {
+              include: {
+                competition: {
+                  select: {
+                    title: true,
+                  },
+                },
+                category: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
 
   if (!student || !student.isPublic) {
     return null;
@@ -121,6 +172,8 @@ export async function generateMetadata({
 
   const disciplines = student.disciplineInterests.join(", ");
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pratibha.org";
+  // Use slug in metadata URL if available
+  const profilePath = id.includes("-") && !id.includes("-0")  ? id : student.id;
 
   return {
     title: `${student.name} | Pratibha Parishad`,
@@ -132,7 +185,7 @@ export async function generateMetadata({
       description:
         student.bio ||
         `Explore ${student.name}'s performance portfolio and achievements on Pratibha Parishad.`,
-      url: `${siteUrl}/student/${id}`,
+      url: `${siteUrl}/student/${profilePath}`,
       type: "profile",
     },
   };
@@ -150,7 +203,7 @@ async function StudentPublicPageContent({ studentId }: { studentId: string }) {
   const isOwner =
     session?.user &&
     (await prisma.student.findUnique({
-      where: { id: studentId },
+      where: { id: student.id },
       select: {
         parent: {
           select: {

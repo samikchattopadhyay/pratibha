@@ -290,7 +290,7 @@ export async function POST(
         type: "CERTIFICATE_READY",
         title: "Certificate Ready",
         body: `${plan.registration.student.name}'s certificate is ready to download.`,
-        actionUrl: "/parent/dashboard",
+        actionUrl: "/account/dashboard",
         registrationId: plan.registration.id,
         certificateId: result.dbCertId,
         recipientEmail: parentInfo.email,

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         type: "REGISTRATION_CREATED",
         title: "Welcome to Pratibha Parishad!",
         body: "Your account has been successfully created. You can now start registering for competitions.",
-        actionUrl: "/parent/dashboard",
+        actionUrl: "/account/dashboard",
       },
     });
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message: "Email verified successfully",
-        redirectUrl: "/parent/dashboard",
+        redirectUrl: "/account/dashboard",
       },
       { status: 200 }
     );

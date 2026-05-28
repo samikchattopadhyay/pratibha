@@ -214,7 +214,7 @@ function JudgeDashboardContent() {
     } else if (sessionStatus === "authenticated") {
       const role = (session.user as { role?: string }).role;
       if (role !== "JUDGE" && role !== "SUPER_ADMIN") {
-        router.push("/parent/dashboard");
+        router.push("/account/dashboard");
       } else {
         Promise.resolve().then(() => {
           loadJudgeAssignments();

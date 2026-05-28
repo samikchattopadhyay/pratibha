@@ -226,6 +226,7 @@ model Student {
   dateOfBirth         DateTime
   gender              String
   disciplineInterests String[]            @default([]) // Plan 07 — student category slugs interest
+  slug                String?             @unique         // Student profile slug (readable URL)
 
   // ── Public Profile Fields ──────────────────────────────────────────────────
   profileImageUrl     String?             // Future photo upload

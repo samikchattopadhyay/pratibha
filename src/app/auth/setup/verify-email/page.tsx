@@ -44,7 +44,7 @@ export default function VerifyEmailPage() {
 
       // Redirect to dashboard
       setTimeout(() => {
-        router.push(data.redirectUrl || "/parent/dashboard");
+        router.push(data.redirectUrl || "/account/dashboard");
       }, 2000);
     } catch (err: any) {
       setError(err.message || "An error occurred");
