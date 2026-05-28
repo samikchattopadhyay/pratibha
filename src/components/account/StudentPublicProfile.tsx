@@ -1,7 +1,7 @@
 "use client";
 import { useRef } from "react";
 import Link from "next/link";
-import { Copy, Share2 } from "lucide-react";
+import { Share2 } from "lucide-react";
 import Button from "@/components/Button";
 import AwardsHighlight from "./AwardsHighlight";
 import CompetitionResultCard from "./CompetitionResultCard";
@@ -22,6 +22,7 @@ import {
 interface PublicStudentProfileProps {
   readonly student: {
     id: string;
+    slug: string | null;
     name: string;
     age: number;
     gender: string;
@@ -53,12 +54,8 @@ export default function StudentPublicProfile({
   isOwner,
 }: PublicStudentProfileProps) {
   const profileRef = useRef<HTMLDivElement>(null);
-  const profileUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/student/${student.id}`;
+  const profileUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/profile/${student.slug || student.id}`;
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(profileUrl);
-    alert("Profile link copied to clipboard!");
-  };
 
   const handleShareWhatsApp = () => {
     const message = `Check out ${student.name}'s profile on Pratibha Parishad: ${profileUrl}`;
@@ -434,14 +431,6 @@ export default function StudentPublicProfile({
           {competitionResults.length > 0 && (
             <PdfExportButton studentName={student.name} profileRef={profileRef} />
           )}
-          <Button
-            onClick={handleCopyLink}
-            variant="secondary"
-            size="md"
-            className="font-bold flex items-center justify-center gap-2"
-          >
-            <Copy className="w-4 h-4" /> Copy Link
-          </Button>
           <Button
             onClick={handleShareWhatsApp}
             variant="secondary"

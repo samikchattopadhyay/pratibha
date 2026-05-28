@@ -36,6 +36,7 @@ export interface FetchedCompetitionResult {
 
 export interface FetchedPublicStudent {
   id: string;
+  slug: string | null;
   name: string;
   age: number;
   gender: string;
@@ -328,6 +329,7 @@ export async function fetchPublicStudent(
 
   return {
     id: student.id,
+    slug: student.slug,
     name: student.name,
     age,
     gender: student.gender,

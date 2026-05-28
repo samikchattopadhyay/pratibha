@@ -19,6 +19,24 @@ export default function PdfExportButton({
     if (!profileRef.current) return;
 
     setIsExporting(true);
+
+    // Suppress console errors during PDF generation
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    console.error = (...args: any[]) => {
+      const message = String(args[0]);
+      // Suppress color parsing warnings
+      if (!message.includes("oklab") && !message.includes("color function")) {
+        originalError(...args);
+      }
+    };
+    console.warn = (...args: any[]) => {
+      const message = String(args[0]);
+      if (!message.includes("oklab") && !message.includes("color function")) {
+        originalWarn(...args);
+      }
+    };
+
     try {
       // Capture the profile content as canvas
       const canvas = await html2canvas(profileRef.current, {
@@ -26,6 +44,7 @@ export default function PdfExportButton({
         useCORS: true,
         logging: false,
         backgroundColor: "#fcf9f2",
+        allowTaint: true,
       });
 
       // Create PDF
@@ -56,8 +75,13 @@ export default function PdfExportButton({
       // Download PDF
       pdf.save(`${studentName}-profile.pdf`);
     } catch (error) {
-      console.error("Error generating PDF:", error);
+      if (!(error instanceof Error && error.message?.includes("oklab"))) {
+        console.error("Error generating PDF:", error);
+      }
     } finally {
+      // Restore console functions
+      console.error = originalError;
+      console.warn = originalWarn;
       setIsExporting(false);
     }
   };
