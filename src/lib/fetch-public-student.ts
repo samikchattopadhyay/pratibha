@@ -48,7 +48,7 @@ export interface FetchedPublicStudent {
   specialSkills: string[];
   trainingInstitutes: string[];
   memberSince: string;
-  competitionResults: FetchedCompetitionResult[];
+  competitionResults: FetchedCompetitionResult[] | null;
   externalAchievements: {
     title: string;
     eventName: string;
@@ -59,6 +59,7 @@ export interface FetchedPublicStudent {
     proofUrl: string | null;
   }[];
 }
+
 
 export async function fetchPublicStudent(
   slugOrId: string
@@ -82,7 +83,6 @@ export async function fetchPublicStudent(
         where: {
           status: "VERIFIED",
           certificate: { isNot: null },
-          isHidden: false, // Filter out hidden registrations
         },
         include: {
           certificate: {
@@ -173,7 +173,6 @@ export async function fetchPublicStudent(
           where: {
             status: "VERIFIED",
             certificate: { isNot: null },
-            isHidden: false,
           },
           include: {
             certificate: {
@@ -291,7 +290,7 @@ export async function fetchPublicStudent(
       categoryId: reg.competitionCategory.category.id,
       ageGroup: `${reg.competitionCategory.minAge}-${reg.competitionCategory.maxAge}`,
       finalRank: reg.finalRank,
-      finalScore: reg.finalScore,
+      finalScore: reg.finalScore !== null ? Number(reg.finalScore) : null,
       prizeRank: (reg.prizeAward?.rank as any) || null,
       certificateType: reg.certificate!.type,
       certificateUrl: reg.certificate!.certificateUrl,
@@ -322,8 +321,8 @@ export async function fetchPublicStudent(
             : null,
       },
       prizeItem: reg.prizeAward?.prizeItem || null,
-      isFeatured: reg.isFeatured,
-      isHidden: reg.isHidden,
+      isFeatured: false,
+      isHidden: false,
     };
   });
 
@@ -341,7 +340,7 @@ export async function fetchPublicStudent(
     specialSkills: student.specialSkills,
     trainingInstitutes: student.trainingInstitutes,
     memberSince: student.createdAt.getFullYear().toString(),
-    competitionResults,
-    externalAchievements: student.externalAchievements,
+    competitionResults: competitionResults || [],
+    externalAchievements: student.externalAchievements || [],
   };
 }

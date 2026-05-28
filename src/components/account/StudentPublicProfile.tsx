@@ -67,9 +67,19 @@ export default function StudentPublicProfile({
   };
 
   // Calculate stats and aggregations
-  const competitionResults = student.competitionResults || [];
-  const stats = calculateProfileStats(competitionResults);
-  const prizeBreakdown = calculatePrizeBreakdown(competitionResults);
+  const competitionResults = (student.competitionResults && Array.isArray(student.competitionResults))
+    ? student.competitionResults
+    : [];
+  const stats = competitionResults.length > 0 ? calculateProfileStats(competitionResults) : {
+    totalCompetitions: 0,
+    totalAwards: 0,
+    totalCategories: 0,
+    averageScore: null,
+    goldMedals: 0,
+    silverMedals: 0,
+    bronzeMedals: 0,
+  };
+  const prizeBreakdown = competitionResults.length > 0 ? calculatePrizeBreakdown(competitionResults) : { gold: 0, silver: 0, bronze: 0 };
   const categorySummaries = Object.values(
     groupByCategory(competitionResults)
   );
