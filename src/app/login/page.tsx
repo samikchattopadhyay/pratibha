@@ -15,9 +15,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const hasCustomCallback = !!searchParams.get("callbackUrl");
   const callbackUrl = searchParams.get("callbackUrl") || "/parent/dashboard";
-  
+  const urlError = searchParams.get("error");
+
   const [formData, setFormData] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+  const [error, setError] = useState(urlError === "UNVERIFIED_EMAIL" ? "" : "");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,7 +35,11 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        setError("Invalid email address or password combination");
+        if (res.error === "UNVERIFIED_EMAIL") {
+          setError(`Email not verified. Please check your inbox and verify your email address to continue.`);
+        } else {
+          setError("Invalid email address or password combination");
+        }
         setLoading(false);
       } else {
         // Fetch current session to determine user role and target dashboard
@@ -92,10 +97,19 @@ function LoginForm() {
             </p>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-200 rounded-xl text-red-800 text-sm font-sans flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{error}</span>
+          {(error || urlError === "UNVERIFIED_EMAIL") && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-200 rounded-xl text-red-800 text-sm font-sans space-y-2">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                <span>{error || (urlError === "UNVERIFIED_EMAIL" ? "Email not verified. Please verify your email address to continue." : "")}</span>
+              </div>
+              {(error?.includes("not verified") || urlError === "UNVERIFIED_EMAIL") && (
+                <div className="ml-6 pt-2 text-xs text-red-700">
+                  <Link href={`/auth/verify-email?email=${encodeURIComponent(formData.email)}`} className="text-red-600 font-semibold hover:underline">
+                    Resend verification email
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 

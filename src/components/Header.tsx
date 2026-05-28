@@ -395,15 +395,10 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
-                    <NavLink href="/register" variant="button" size="md" className="flex items-center gap-2">
-                      Register
-                    </NavLink>
-                    <NavLink href="/login" variant="ghost" size="md" className="flex items-center gap-2 text-charcoal/80 hover:text-terracotta dark:text-cream/80 dark:hover:text-gold">
-                      <LogIn className="w-4 h-4" />
-                      Log In
-                    </NavLink>
-                  </div>
+                  <NavLink href="/login" variant="ghost" size="md" className="flex items-center gap-2 text-charcoal/80 hover:text-terracotta dark:text-cream/80 dark:hover:text-gold">
+                    <LogIn className="w-4 h-4" />
+                    Log In
+                  </NavLink>
                 )}
               </>
             )}
@@ -522,27 +517,16 @@ export default function Header({ isAdmin }: { isAdmin?: boolean }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex flex-col space-y-2">
-                    <NavLink
-                      href="/register"
-                      onClick={() => setIsOpen(false)}
-                      variant="button"
-                      size="lg"
-                      className="w-full flex items-center justify-center"
-                    >
-                      Create Parent Account
-                    </NavLink>
-                    <NavLink
-                      href="/login"
-                      onClick={() => setIsOpen(false)}
-                      variant="ghost"
-                      size="lg"
-                      className="w-full flex items-center justify-center"
-                    >
-                      <LogIn className="w-5 h-5" />
-                      Log In
-                    </NavLink>
-                  </div>
+                  <NavLink
+                    href="/login"
+                    onClick={() => setIsOpen(false)}
+                    variant="ghost"
+                    size="lg"
+                    className="w-full flex items-center justify-center"
+                  >
+                    <LogIn className="w-5 h-5" />
+                    Log In
+                  </NavLink>
                 )}
               </>
             )}

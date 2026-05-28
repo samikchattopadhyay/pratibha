@@ -101,6 +101,7 @@ async function main() {
       email: "admin@pratibhaparishad.org",
       passwordHash: adminPassword,
       role: "SUPER_ADMIN",
+      emailVerified: new Date(),
     },
   });
 
@@ -117,6 +118,7 @@ async function main() {
       email: "moderator1@pratibhaparishad.org",
       passwordHash: moderatorPassword,
       role: "MODERATOR",
+      emailVerified: new Date(),
     },
   });
 
@@ -127,6 +129,7 @@ async function main() {
       email: "moderator2@pratibhaparishad.org",
       passwordHash: moderatorPassword,
       role: "MODERATOR",
+      emailVerified: new Date(),
     },
   });
 
@@ -144,6 +147,7 @@ async function main() {
         email: `judge${i}@pratibhaparishad.org`,
         passwordHash: judgePasswordHash,
         role: "JUDGE",
+        emailVerified: new Date(),
       },
     });
   }
@@ -162,6 +166,7 @@ async function main() {
         email: `parent_${i}@example.com`,
         passwordHash: parentPasswordHash,
         role: "PARENT",
+        emailVerified: new Date(),
       },
     });
   }

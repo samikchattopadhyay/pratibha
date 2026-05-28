@@ -37,21 +37,25 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
-          // CRITICAL: Check if email is verified
-          if (!user.emailVerified) {
-            console.warn(
-              `Login attempt with unverified email: ${credentials.email}`
-            );
-            throw new Error("UNVERIFIED_EMAIL");
-          }
-
           const isValid = await bcrypt.compare(
             credentials.password,
             user.passwordHash
           );
 
           if (!isValid) {
+            console.warn(`Invalid password for: ${credentials.email}`);
             return null;
+          }
+
+          // CRITICAL: Check if email is verified (after password validation)
+          console.log(`User ${credentials.email} - emailVerified: ${user.emailVerified}, type: ${typeof user.emailVerified}`);
+          if (!user.emailVerified) {
+            console.warn(
+              `Login attempt with unverified email: ${credentials.email}`
+            );
+            const error = new Error("UNVERIFIED_EMAIL") as Error & { code?: string };
+            error.code = "UNVERIFIED_EMAIL";
+            throw error;
           }
 
           return {
