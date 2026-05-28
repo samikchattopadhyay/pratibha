@@ -309,7 +309,7 @@ function ParentDashboardContent() {
                             </div>
 
                             {/* Name and Details */}
-                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/parent/dashboard?tab=entries&student=${student.id}`)}>
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/account/dashboard?tab=entries&student=${student.id}`)}>
                               <h4 className="font-sans text-base font-bold text-charcoal dark:text-cream hover:text-terracotta dark:hover:text-gold transition-colors truncate">
                                 {student.name}
                               </h4>
@@ -337,7 +337,7 @@ function ParentDashboardContent() {
 
                           <div className="flex items-center gap-3 mt-4 pt-3 border-t border-terracotta/10 dark:border-terracotta/20">
                             <Link
-                              href={`/parent/students/${student.id}`}
+                              href={`/account/students/${student.id}`}
                               className="text-xs font-bold text-terracotta dark:text-gold hover:text-terracotta-light dark:hover:text-gold-light transition-colors flex items-center gap-1"
                             >
                               <Pencil className="w-3.5 h-3.5" /> Edit
@@ -448,7 +448,7 @@ function ParentDashboardContent() {
 
                             <div className="flex items-center gap-3">
                               <Link
-                                href={`/parent/entries/${reg.id}?student=${reg.studentId}`}
+                                href={`/account/entries/${reg.id}?student=${reg.studentId}`}
                                 className="inline-flex items-center gap-1 text-terracotta dark:text-gold hover:text-terracotta-light dark:hover:text-gold-light font-bold uppercase tracking-wider"
                               >
                                 <FileText className="w-3.5 h-3.5" /> View Details

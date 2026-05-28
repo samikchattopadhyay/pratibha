@@ -33,7 +33,7 @@ export function buildPaymentReceivedTemplate(
       `,
       ctaButton: {
         text: "View Dashboard",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };

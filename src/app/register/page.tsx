@@ -46,7 +46,7 @@ export default function RegisterPage() {
         setError(data.error || "Something went wrong. Please check your entries.");
         setLoading(false);
       } else {
-        router.push("/login?callbackUrl=/parent/dashboard&registered=true");
+        router.push("/login?callbackUrl=/account/dashboard&registered=true");
       }
     } catch (err) {
       console.error(err);

@@ -31,7 +31,7 @@ export function buildRegistrationRejectedTemplate(
       `,
       ctaButton: {
         text: "View Details",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };

@@ -32,7 +32,7 @@ export function buildCertificateReadyTemplate(
       `,
       ctaButton: {
         text: "Download Certificate",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };

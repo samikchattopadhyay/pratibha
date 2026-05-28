@@ -170,7 +170,7 @@ export default function StudentPublicProfile({
           {/* Actions */}
           {isOwner && (
             <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <Link href={`/parent/students/${student.id}`}>
+              <Link href={`/account/students/${student.id}`}>
                 <Button variant="primary" size="sm" className="w-full font-bold">
                   Edit Profile
                 </Button>

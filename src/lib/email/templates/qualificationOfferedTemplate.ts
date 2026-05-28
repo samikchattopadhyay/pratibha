@@ -33,7 +33,7 @@ export function buildQualificationOfferedTemplate(
       `,
       ctaButton: {
         text: "Accept Offer",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };

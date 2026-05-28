@@ -32,7 +32,7 @@ export function buildResultsPublishedTemplate(
       `,
       ctaButton: {
         text: "View Results & Certificate",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };

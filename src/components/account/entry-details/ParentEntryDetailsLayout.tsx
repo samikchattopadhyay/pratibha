@@ -20,7 +20,7 @@ export default function ParentEntryDetailsLayout({
 }: ParentEntryDetailsLayoutProps) {
   const searchParams = useSearchParams();
   const studentId = searchParams.get("student") || entry.studentId;
-  const backUrl = `/parent/dashboard?tab=entries&student=${studentId}`;
+  const backUrl = `/account/dashboard?tab=entries&student=${studentId}`;
 
   return (
     <div className="min-h-screen bg-cream-dark/10 dark:bg-charcoal text-charcoal dark:text-cream flex flex-col font-sans">

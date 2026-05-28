@@ -31,7 +31,7 @@ export function buildRegistrationCreatedTemplate(
       `,
       ctaButton: {
         text: "View Registration",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };

@@ -32,7 +32,7 @@ export function buildRegistrationVerifiedTemplate(
       `,
       ctaButton: {
         text: "Check Status",
-        url: `${appUrl}/parent/dashboard`,
+        url: `${appUrl}/account/dashboard`,
       },
     },
   };
