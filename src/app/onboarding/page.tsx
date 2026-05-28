@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import SetupOnboarding from "@/components/auth/SetupOnboarding";
 import Loading from "@/components/Loading";
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const { status, data: session } = useSession();
   const router = useRouter();
 
@@ -44,4 +44,12 @@ export default function OnboardingPage() {
   }
 
   return <SetupOnboarding />;
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<Loading variant="screen" text="Loading onboarding..." />}>
+      <OnboardingContent />
+    </Suspense>
+  );
 }

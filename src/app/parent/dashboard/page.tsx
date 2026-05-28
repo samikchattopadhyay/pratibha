@@ -10,9 +10,6 @@ import Button from "@/components/Button";
 import Loading from "@/components/Loading";
 import { User, Users, FileText, Plus, LogOut, Award, Clock } from "lucide-react";
 import AddStudentWizard from "@/components/parent/AddStudentWizard";
-import ProfileCompletionCard from "@/components/parent/ProfileCompletionCard";
-import ProfileCompletionModal from "@/components/parent/ProfileCompletionModal";
-import { calculateProfileCompletion } from "@/lib/utils/profile";
 
 interface Student {
   id: string;
@@ -85,21 +82,14 @@ function ParentDashboardContent() {
     router.push(`/parent/dashboard?tab=${tab}`);
   };
 
-  const handleProfileCompletionSuccess = (updatedParent: ParentType) => {
-    setParent(updatedParent);
-    setIsProfileCompletionModalOpen(false);
-  };
   const [parent, setParent] = useState<ParentType | null>(null);
-  const profileCompletion = parent ? calculateProfileCompletion(parent) : 0;
-  const isProfileIncomplete = profileCompletion < 100;
   const [students, setStudents] = useState<Student[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; grouping: string }[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProfileCompletionModalOpen, setIsProfileCompletionModalOpen] = useState(false);
   const [studentForm, setStudentForm] = useState<{
     name: string;
     dateOfBirth: string;
@@ -234,18 +224,8 @@ function ParentDashboardContent() {
       <main className="flex-1 bg-cream-dark/10 dark:bg-charcoal py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
-          {/* Profile Completion Card */}
-          {parent && (
-            <ProfileCompletionCard
-              parent={parent}
-              onOpenModal={() => setIsProfileCompletionModalOpen(true)}
-              onClose={() => {}}
-            />
-          )}
-
-          {/* Profile Overview Header & Dashboard Content - Hidden during profile completion */}
-          {!isProfileIncomplete && (
-            <>
+          <>
+            {/* Profile Overview Header & Dashboard Content */}
               <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 sm:p-8 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-terracotta dark:bg-gold text-cream dark:text-charcoal flex items-center justify-center shadow">
@@ -519,7 +499,6 @@ function ParentDashboardContent() {
             </div>
           </div>
             </>
-          )}
         </div>
       </main>
 
@@ -533,16 +512,6 @@ function ParentDashboardContent() {
         }}
         categories={categories}
       />
-
-      {/* MODAL: PROFILE COMPLETION */}
-      {parent && (
-        <ProfileCompletionModal
-          isOpen={isProfileCompletionModalOpen}
-          parent={parent}
-          onClose={() => setIsProfileCompletionModalOpen(false)}
-          onSuccess={handleProfileCompletionSuccess}
-        />
-      )}
 
       <Footer />
     </>

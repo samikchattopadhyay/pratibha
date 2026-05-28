@@ -25,17 +25,25 @@ export async function GET() {
       );
     }
 
-    // PARENT users must complete onboarding (password + phone + email verification)
+    // PARENT users must complete onboarding (password + phone + email verification + address)
     // JUDGE and ADMIN users skip this check
     if (user.role === "PARENT") {
       // Onboarding is complete only if:
       // 1. User's email is verified
       // 2. User has a parent profile with phone
+      // 3. User has completed address (street, city, state, postalCode)
       const parent = await prisma.parent.findUnique({
         where: { userId },
       });
 
-      const isOnboardingComplete = user.emailVerified && parent && parent.phone;
+      const isOnboardingComplete =
+        user.emailVerified &&
+        parent &&
+        parent.phone &&
+        parent.address &&
+        parent.city &&
+        parent.state &&
+        parent.postalCode;
 
       if (!isOnboardingComplete) {
         return NextResponse.json(

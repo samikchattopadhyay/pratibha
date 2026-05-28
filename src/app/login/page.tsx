@@ -56,21 +56,16 @@ function LoginForm() {
           } else if (role === "PARENT") {
             // For PARENT users, check if onboarding is complete
             try {
-              const dashboardRes = await fetch("/api/parent/dashboard");
-              if (!dashboardRes.ok) {
-                const data = await dashboardRes.json();
-                if (data.code === "SETUP_REQUIRED") {
-                  // Generate setup token and redirect to onboarding
-                  const tokenRes = await fetch("/api/parent/generate-setup-token", {
-                    method: "POST",
-                  });
-                  const tokenData = await tokenRes.json();
-                  if (tokenData.token) {
-                    router.push(`/onboarding?token=${tokenData.token}`);
-                    router.refresh();
-                    setLoading(false);
-                    return;
-                  }
+              const statusRes = await fetch("/api/parent/onboarding-status");
+              if (statusRes.ok) {
+                const statusData = await statusRes.json();
+                if (!statusData.passwordSet || !statusData.phoneSet || !statusData.emailVerified || !statusData.addressSet) {
+                  // Onboarding incomplete, redirect to onboarding
+                  const tokenParam = statusData.setupToken ? `?token=${statusData.setupToken}` : "";
+                  router.push(`/onboarding${tokenParam}`);
+                  router.refresh();
+                  setLoading(false);
+                  return;
                 }
               }
             } catch (err) {
