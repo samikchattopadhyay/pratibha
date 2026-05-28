@@ -8,7 +8,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { User, FileText, Plus, Award, Clock } from "lucide-react";
+import { User, FileText, Plus, Award, Clock, Pencil, Globe } from "lucide-react";
 import AddStudentWizard from "@/components/parent/AddStudentWizard";
 
 interface Student {
@@ -17,6 +17,7 @@ interface Student {
   dateOfBirth: string;
   gender: string;
   disciplineInterests?: string[];
+  profileImageUrl?: string;
 }
 
 interface Registration {
@@ -290,34 +291,62 @@ function ParentDashboardContent() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {students.map((student) => (
-                        <div key={student.id} className="bg-cream dark:bg-charcoal-light border border-terracotta/5 dark:border-terracotta/10 rounded-xl p-5 shadow-sm hover:border-terracotta/20 dark:hover:border-terracotta/30 hover:shadow-md transition-all duration-250 flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <div className="cursor-pointer flex-1" onClick={() => router.push(`/parent/dashboard?tab=entries&student=${student.id}`)}>
-                              <h4 className="font-sans text-base font-bold text-charcoal dark:text-cream hover:text-terracotta dark:hover:text-gold transition-colors">{student.name}</h4>
-                              <p className="font-sans text-sm text-charcoal/50 dark:text-cream/50 mt-0.5">
-                                {student.gender} | Age: {calculateAge(student.dateOfBirth)} years old
-                              </p>
-                              {student.disciplineInterests && student.disciplineInterests.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {student.disciplineInterests.map((interest) => (
-                                    <span key={interest} className="inline-block px-2 py-0.5 text-sm font-sans font-semibold rounded bg-terracotta/10 text-terracotta dark:bg-gold/15 dark:text-gold">
-                                      {interest}
-                                    </span>
-                                  ))}
+                        <div key={student.id} className="bg-white dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-xl p-5 shadow-sm hover:border-terracotta/20 dark:hover:border-terracotta/30 hover:shadow-md transition-all duration-250 flex flex-col justify-between">
+                          <div className="flex gap-4">
+                            {/* Avatar or Photo */}
+                            <div className="flex-shrink-0">
+                              {student.profileImageUrl ? (
+                                <img
+                                  src={student.profileImageUrl}
+                                  alt={student.name}
+                                  className="w-12 h-12 rounded-lg object-cover border border-terracotta/20"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-terracotta to-gold flex items-center justify-center text-white font-bold text-sm border border-terracotta/20">
+                                  {student.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
                                 </div>
                               )}
                             </div>
-                            <span className="w-8 h-8 rounded-full bg-gold/10 dark:bg-gold/20 text-gold-dark dark:text-gold flex items-center justify-center font-bold text-xs uppercase shrink-0">
-                              {student.name.charAt(0)}
-                            </span>
+
+                            {/* Name and Details */}
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/parent/dashboard?tab=entries&student=${student.id}`)}>
+                              <h4 className="font-sans text-base font-bold text-charcoal dark:text-cream hover:text-terracotta dark:hover:text-gold transition-colors truncate">
+                                {student.name}
+                              </h4>
+                              <p className="font-sans text-xs text-charcoal/50 dark:text-cream/50 mt-0.5">
+                                {student.gender} • Age: {calculateAge(student.dateOfBirth)}
+                              </p>
+                              {student.disciplineInterests && student.disciplineInterests.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {student.disciplineInterests.map((disciplineId) => {
+                                    const category = categories.find((c) => c.id === disciplineId);
+                                    if (!category) return null;
+                                    return (
+                                      <span
+                                        key={disciplineId}
+                                        className="inline-block px-2 py-0.5 text-xs font-sans font-semibold rounded bg-terracotta/10 text-terracotta dark:bg-gold/15 dark:text-gold"
+                                      >
+                                        {category.name}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-3 mt-4 pt-3 border-t border-terracotta/5 dark:border-terracotta/10">
-                            <Link href={`/parent/students/${student.id}`} className="text-xs font-bold text-terracotta dark:text-gold hover:underline flex items-center gap-1">
-                              ✏️ Edit Profile
+                          <div className="flex items-center gap-3 mt-4 pt-3 border-t border-terracotta/10 dark:border-terracotta/20">
+                            <Link
+                              href={`/parent/students/${student.id}`}
+                              className="text-xs font-bold text-terracotta dark:text-gold hover:text-terracotta-light dark:hover:text-gold-light transition-colors flex items-center gap-1"
+                            >
+                              <Pencil className="w-3.5 h-3.5" /> Edit
                             </Link>
-                            <Link href={`/student/${student.id}`} className="text-xs font-bold text-charcoal/60 dark:text-cream/60 hover:underline flex items-center gap-1">
-                              🌐 Public Profile
+                            <Link
+                              href={`/student/${student.id}`}
+                              className="text-xs font-bold text-charcoal/60 dark:text-cream/60 hover:text-charcoal dark:hover:text-cream transition-colors flex items-center gap-1"
+                            >
+                              <Globe className="w-3.5 h-3.5" /> Public
                             </Link>
                           </div>
                         </div>

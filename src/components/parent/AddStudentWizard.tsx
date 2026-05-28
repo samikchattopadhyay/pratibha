@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
-import { X, ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Plus, Upload, Music, Globe, Layers, BookOpen, Sparkles } from "lucide-react";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
 import SearchableSelect from "@/components/admin/SearchableSelect";
@@ -68,6 +68,19 @@ const CATEGORY_GROUPS_OPTIONS = [
 ];
 
 const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
+
+const stripHtml = (html: string): string => {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
+
+const getInitials = (name: string): string => {
+  return name
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+};
 
 export default function AddStudentWizard({
   isOpen,
@@ -679,50 +692,236 @@ export default function AddStudentWizard({
                   Step 5: Review Details
                 </h4>
 
-                <div className="bg-cream-dark/5 dark:bg-charcoal rounded-xl border border-terracotta/10 p-4 space-y-4 text-sm">
-                  <div>
-                    <h5 className="font-bold text-terracotta dark:text-gold mb-1">👤 Basic Identity</h5>
-                    <p><span className="font-semibold">Name:</span> {formData.name}</p>
-                    <p><span className="font-semibold">DOB:</span> {formData.dateOfBirth} {ageDisplay}</p>
-                    <p><span className="font-semibold">Gender:</span> {formData.gender}</p>
-                    {(formData.schoolClass || formData.schoolName) && (
-                      <p><span className="font-semibold">School:</span> {formData.schoolName || "N/A"} {formData.schoolClass ? `(${formData.schoolClass})` : ""}</p>
-                    )}
-                    {(formData.city || formData.state) && (
-                      <p><span className="font-semibold">Location:</span> {formData.city}{formData.city && formData.state ? ", " : ""}{formData.state}</p>
-                    )}
+                {/* Header Card: Avatar + Key Info */}
+                <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                  <div className="flex gap-4">
+                    {/* Avatar Section */}
+                    <div className="flex-shrink-0">
+                      {formData.profileImageUrl ? (
+                        <img
+                          src={formData.profileImageUrl}
+                          alt={formData.name}
+                          className="w-14 h-14 rounded-lg object-cover border border-terracotta/20"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-terracotta to-gold flex items-center justify-center text-white font-bold text-lg border border-terracotta/20">
+                          {getInitials(formData.name)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Left Column: Name, Gender, Age */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-1">
+                        <h5 className="font-serif text-lg font-bold text-charcoal dark:text-cream truncate">
+                          {formData.name || "Student Name"}
+                        </h5>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {formData.gender && (
+                          <span className="inline-flex items-center h-5 px-2 bg-charcoal/5 dark:bg-cream/5 text-charcoal dark:text-cream border border-charcoal/10 dark:border-cream/10 rounded-full text-xs font-semibold">
+                            {formData.gender}
+                          </span>
+                        )}
+                        {ageDisplay && (
+                          <span className="inline-flex items-center h-5 px-2 bg-terracotta/10 text-terracotta border border-terracotta/20 rounded-full text-xs font-semibold">
+                            {ageDisplay.replace(/[()]/g, "")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Column: DOB, School, Location */}
+                    <div className="flex-1 text-sm space-y-1">
+                      {formData.dateOfBirth && (
+                        <div>
+                          <p className="text-charcoal/60 dark:text-cream/60 text-xs font-semibold uppercase">DOB</p>
+                          <p className="text-charcoal dark:text-cream font-medium">
+                            {new Date(formData.dateOfBirth).toLocaleDateString("en-IN", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      )}
+                      {(formData.schoolName || formData.schoolClass) && (
+                        <div>
+                          <p className="text-charcoal/60 dark:text-cream/60 text-xs font-semibold uppercase">School</p>
+                          <p className="text-charcoal dark:text-cream font-medium truncate">
+                            {formData.schoolName || "N/A"} {formData.schoolClass && `(${formData.schoolClass})`}
+                          </p>
+                        </div>
+                      )}
+                      {(formData.city || formData.state) && (
+                        <div>
+                          <p className="text-charcoal/60 dark:text-cream/60 text-xs font-semibold uppercase">Location</p>
+                          <p className="text-charcoal dark:text-cream font-medium truncate">
+                            {formData.city && formData.state ? `${formData.city}, ${formData.state}` : formData.city || formData.state}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  {(formData.profileImageUrl || formData.bio) && (
-                    <div className="border-t border-terracotta/10 pt-3">
-                      <h5 className="font-bold text-terracotta dark:text-gold mb-1">🎭 Profile & Bio</h5>
-                      {formData.profileImageUrl && (
-                        <p className="truncate"><span className="font-semibold">Photo URL:</span> {formData.profileImageUrl}</p>
-                      )}
-                      {formData.bio && (
-                        <p className="italic mt-1 text-charcoal/80 dark:text-cream/80">"{formData.bio}"</p>
-                      )}
-                    </div>
-                  )}
-
-                  {(formData.disciplineInterests.length > 0 || formData.languages.length > 0 || formData.trainingInstitutes.length > 0 || formData.specialSkills.length > 0) && (
-                    <div className="border-t border-terracotta/10 pt-3">
-                      <h5 className="font-bold text-terracotta dark:text-gold mb-1">🎵 Skills & Training</h5>
-                      {formData.disciplineInterests.length > 0 && (
-                        <p><span className="font-semibold">Disciplines:</span> {formData.disciplineInterests.join(", ")}</p>
-                      )}
-                      {formData.languages.length > 0 && (
-                        <p><span className="font-semibold">Languages:</span> {formData.languages.join(", ")}</p>
-                      )}
-                      {formData.trainingInstitutes.length > 0 && (
-                        <p><span className="font-semibold">Institutes:</span> {formData.trainingInstitutes.join(", ")}</p>
-                      )}
-                      {formData.specialSkills.length > 0 && (
-                        <p><span className="font-semibold">Special Skills:</span> {formData.specialSkills.join(", ")}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
+
+                {/* Bio Section */}
+                {(formData.bio || true) && (
+                  <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <BookOpen className="w-4 h-4 text-terracotta dark:text-gold flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-terracotta dark:text-gold uppercase tracking-wider mb-2">About Me</p>
+                        {formData.bio ? (
+                          <p className="text-sm text-charcoal dark:text-cream leading-relaxed">
+                            {stripHtml(formData.bio).slice(0, 180)}
+                            {stripHtml(formData.bio).length > 180 && "..."}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">Not provided</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Disciplines Section */}
+                {(formData.disciplineInterests.length > 0 || true) && (
+                  <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <Music className="w-4 h-4 text-terracotta dark:text-gold flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-terracotta dark:text-gold uppercase tracking-wider mb-2">Disciplines</p>
+                        {formData.disciplineInterests.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.disciplineInterests.map((disciplineId) => {
+                              const categoryName =
+                                categories.find((c) => c.id === disciplineId)?.name || disciplineId;
+                              return (
+                                <span
+                                  key={disciplineId}
+                                  className="inline-flex items-center h-6 px-3 bg-terracotta/10 text-terracotta dark:text-terracotta-light border border-terracotta/20 dark:border-terracotta/30 rounded-full text-xs font-semibold"
+                                >
+                                  {categoryName}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">None listed</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Languages Section */}
+                {(formData.languages.length > 0 || true) && (
+                  <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <Globe className="w-4 h-4 text-charcoal/60 dark:text-cream/60 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-charcoal/70 dark:text-cream/70 uppercase tracking-wider mb-2">Languages</p>
+                        {formData.languages.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.languages.map((lang) => (
+                              <span
+                                key={lang}
+                                className="inline-flex items-center h-6 px-3 bg-charcoal/5 dark:bg-cream/5 text-charcoal dark:text-cream border border-charcoal/10 dark:border-cream/10 rounded-full text-xs font-semibold"
+                              >
+                                {lang}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">None listed</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Category Groups Section */}
+                {(formData.categoryGrouping.length > 0 || true) && (
+                  <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <Layers className="w-4 h-4 text-gold dark:text-gold flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gold dark:text-gold uppercase tracking-wider mb-2">Category Groups</p>
+                        {formData.categoryGrouping.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.categoryGrouping.map((groupVal) => {
+                              const groupLabel =
+                                CATEGORY_GROUPS_OPTIONS.find((opt) => opt.value === groupVal)?.label || groupVal;
+                              return (
+                                <span
+                                  key={groupVal}
+                                  className="inline-flex items-center h-6 px-3 bg-gold/10 text-gold border border-gold/20 dark:border-gold/30 rounded-full text-xs font-semibold"
+                                >
+                                  {groupLabel}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">None listed</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Training Institutes Section */}
+                {(formData.trainingInstitutes.length > 0 || true) && (
+                  <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <BookOpen className="w-4 h-4 text-charcoal/60 dark:text-cream/60 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-charcoal/70 dark:text-cream/70 uppercase tracking-wider mb-2">Training Institutes</p>
+                        {formData.trainingInstitutes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.trainingInstitutes.map((inst, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center h-6 px-3 bg-charcoal/5 dark:bg-cream/5 text-charcoal dark:text-cream border border-charcoal/10 dark:border-cream/10 rounded-full text-xs font-semibold"
+                              >
+                                {inst}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">None listed</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Special Skills Section */}
+                {(formData.specialSkills.length > 0 || true) && (
+                  <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <Sparkles className="w-4 h-4 text-gold dark:text-gold flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gold dark:text-gold uppercase tracking-wider mb-2">Special Skills</p>
+                        {formData.specialSkills.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {formData.specialSkills.map((sk, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center h-6 px-3 bg-gold/10 text-gold border border-gold/20 dark:border-gold/30 rounded-full text-xs font-semibold"
+                              >
+                                {sk}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">None listed</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <p className="text-xs text-charcoal/60 dark:text-cream/60">
                   Please review the details above. If everything is correct, click the "Save Student Profile" button below to continue.
