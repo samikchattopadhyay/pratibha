@@ -33,6 +33,7 @@ export default function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isInputReadOnly, setIsInputReadOnly] = useState(true);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -161,6 +162,8 @@ export default function SearchableSelect({
                 setHighlightedIndex(0);
               }}
               onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputReadOnly(false)}
+              readOnly={isInputReadOnly}
               autoComplete="off"
               spellCheck="false"
               data-lpignore="true"
