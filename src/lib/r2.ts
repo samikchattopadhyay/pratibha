@@ -87,3 +87,38 @@ export async function uploadBannerImage(
 
   return `/uploads/banners/${fileName}`;
 }
+
+/**
+ * Uploads a student profile photo to Cloudflare R2 bucket under the profile-photos/ prefix.
+ * Falls back to a local public path if environment variables are not configured.
+ */
+export async function uploadProfilePhoto(
+  fileName: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string> {
+  const bucketName = process.env.R2_BUCKET_NAME || "certificates";
+  const key = `profile-photos/${fileName}`;
+
+  if (r2Client) {
+    try {
+      await r2Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: buffer,
+          ContentType: contentType,
+        })
+      );
+
+      const publicUrl = process.env.R2_PUBLIC_URL || "https://pub-certificates.pratibhaparishad.org";
+      return `${publicUrl}/${key}`;
+    } catch (error) {
+      console.error("Cloudflare R2 profile photo upload failed, reverting to local static link:", error);
+    }
+  } else {
+    console.log(`Cloudflare R2 credentials unconfigured. Simulated profile photo save for file: ${fileName}`);
+  }
+
+  return `/uploads/profile-photos/${fileName}`;
+}

@@ -14,6 +14,7 @@ interface ChipMultiSelectProps {
   readonly onChange: (values: string[]) => void;
   readonly placeholder?: string;
   readonly allOptions?: readonly Option[];
+  readonly light?: boolean;
 }
 
 interface PanelPosition {
@@ -28,6 +29,7 @@ export default function ChipMultiSelect({
   onChange,
   placeholder = "Select specializations...",
   allOptions,
+  light = false,
 }: ChipMultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -142,7 +144,11 @@ export default function ChipMultiSelect({
           setIsOpen(true);
           inputRef.current?.focus();
         }}
-        className="relative h-10 w-full bg-charcoal border border-terracotta/20 rounded-lg px-3 flex flex-nowrap gap-2 items-center cursor-text focus-within:border-gold hover:border-terracotta/40 transition-all duration-200"
+        className={`relative h-10 w-full border rounded-lg px-3 flex flex-nowrap gap-2 items-center cursor-text transition-all duration-200 ${
+          light
+            ? "bg-cream dark:bg-charcoal border-terracotta/20 dark:border-terracotta/40 focus-within:border-terracotta dark:focus-within:border-gold hover:border-terracotta/40 dark:hover:border-terracotta/60"
+            : "bg-charcoal border-terracotta/20 focus-within:border-gold hover:border-terracotta/40"
+        }`}
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -177,13 +183,19 @@ export default function ChipMultiSelect({
             onKeyDown={handleKeyDown}
             onFocus={() => setIsOpen(true)}
             placeholder={selectedValues.length === 0 ? placeholder : ""}
-            className="flex-1 min-w-[120px] bg-transparent text-sm text-cream placeholder-cream/35 focus:outline-none"
+            className={`flex-1 min-w-[120px] bg-transparent text-sm focus:outline-none ${
+              light
+                ? "text-charcoal dark:text-cream placeholder-charcoal/35 dark:placeholder-cream/35"
+                : "text-cream placeholder-cream/35"
+            }`}
             aria-autocomplete="list"
           />
         </div>
 
         {/* Sticky Arrow - Outside Scroll Container */}
-        <div className="flex-shrink-0 flex items-center text-cream/40 pointer-events-none pl-2">
+        <div className={`flex-shrink-0 flex items-center pointer-events-none pl-2 ${
+          light ? "text-charcoal/40 dark:text-cream/40" : "text-cream/40"
+        }`}>
           <ChevronDown className="w-4 h-4" />
         </div>
       </div>
@@ -192,7 +204,11 @@ export default function ChipMultiSelect({
       {isOpen && filteredOptions.length > 0 && (
         <ul
           ref={dropdownRef}
-          className="fixed z-[9999] bg-charcoal-light border border-terracotta/20 shadow-2xl rounded-lg max-h-56 overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-terracotta/20"
+          className={`fixed z-[9999] border shadow-2xl rounded-lg max-h-56 overflow-y-auto py-1 scrollbar-thin ${
+            light
+              ? "bg-cream dark:bg-charcoal-light border-terracotta/20 dark:border-terracotta/20 scrollbar-thumb-terracotta/20"
+              : "bg-charcoal-light border-terracotta/20 scrollbar-thumb-terracotta/20"
+          }`}
           style={{
             top: `${panelPosition.top}px`,
             left: `${panelPosition.left}px`,
@@ -210,7 +226,13 @@ export default function ChipMultiSelect({
                 key={opt.value}
                 onClick={() => handleSelectOption(opt.value)}
                 className={`flex items-center justify-between px-4 py-2 text-sm font-semibold cursor-pointer select-none transition-colors ${
-                  isActive
+                  light
+                    ? isActive
+                      ? "bg-terracotta/20 dark:bg-terracotta/20 text-charcoal dark:text-cream"
+                      : isSelected
+                      ? "text-terracotta dark:text-gold bg-terracotta/5 dark:bg-cream/5"
+                      : "text-charcoal/80 dark:text-cream/80 hover:bg-terracotta/5 dark:hover:bg-cream/5"
+                    : isActive
                     ? "bg-terracotta/20 text-cream"
                     : isSelected
                     ? "text-gold bg-cream/5"

@@ -35,8 +35,10 @@ export default function RichTextEditor({
 
   if (!editor) return null;
 
+  const lightClasses = light ? "light-theme" : "";
+
   return (
-    <div className={`border rounded-lg overflow-hidden ${
+    <div className={`border rounded-lg overflow-hidden rich-text-editor ${lightClasses} ${
       light
         ? "bg-cream dark:bg-charcoal border-terracotta/20 dark:border-terracotta/20"
         : "bg-charcoal border-terracotta/20"
@@ -162,7 +164,7 @@ export default function RichTextEditor({
       {/* Editor */}
       <EditorContent
         editor={editor}
-        className={light ? "prose max-w-none" : "prose prose-invert max-w-none"}
+        className="max-w-none"
         style={{
           minHeight: "120px",
           padding: "12px",
@@ -171,81 +173,98 @@ export default function RichTextEditor({
       />
 
       {/* Custom styles for the editor */}
-      <style>{light ? `
-        .ProseMirror {
+      <style>{`
+        /* Light theme */
+        .rich-text-editor.light-theme .ProseMirror {
           outline: none;
-          color: #2a2a2a;
+          color: #1a1a1a;
+          caret-color: #cc6533;
         }
-        @media (prefers-color-scheme: dark) {
-          .ProseMirror {
-            color: #fcf9f2;
-          }
-        }
-        .ProseMirror p.is-editor-empty:first-child::before {
+
+        .rich-text-editor.light-theme .ProseMirror p.is-editor-empty:first-child::before {
           color: #8b7355;
           content: attr(data-placeholder);
           float: left;
           height: 0;
           pointer-events: none;
         }
-        .ProseMirror p {
+
+        .rich-text-editor.light-theme .ProseMirror p {
           margin: 0.5rem 0;
         }
-        .ProseMirror ul,
-        .ProseMirror ol {
+
+        .rich-text-editor.light-theme .ProseMirror ul,
+        .rich-text-editor.light-theme .ProseMirror ol {
           padding-left: 1.5rem;
           margin: 0.5rem 0;
         }
-        .ProseMirror li {
+
+        .rich-text-editor.light-theme .ProseMirror li {
           margin: 0.25rem 0;
         }
-        .ProseMirror strong {
+
+        .rich-text-editor.light-theme .ProseMirror strong {
           font-weight: bold;
           color: #cc6533;
         }
-        @media (prefers-color-scheme: dark) {
-          .ProseMirror strong {
-            color: #e8c454;
-          }
-        }
-        .ProseMirror em {
+
+        .rich-text-editor.light-theme .ProseMirror em {
           font-style: italic;
         }
-        .ProseMirror u {
+
+        .rich-text-editor.light-theme .ProseMirror u {
           text-decoration: underline;
         }
-      ` : `
-        .ProseMirror {
+
+        /* Dark theme */
+        .rich-text-editor:not(.light-theme) .ProseMirror {
           outline: none;
           color: #fcf9f2;
+          caret-color: #e8c454;
         }
-        .ProseMirror p.is-editor-empty:first-child::before {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror p.is-editor-empty:first-child::before {
           color: #8b7355;
           content: attr(data-placeholder);
           float: left;
           height: 0;
           pointer-events: none;
         }
-        .ProseMirror p {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror p {
           margin: 0.5rem 0;
         }
-        .ProseMirror ul,
-        .ProseMirror ol {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror ul,
+        .rich-text-editor:not(.light-theme) .ProseMirror ol {
           padding-left: 1.5rem;
           margin: 0.5rem 0;
         }
-        .ProseMirror li {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror li {
           margin: 0.25rem 0;
         }
-        .ProseMirror strong {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror strong {
           font-weight: bold;
           color: #e8c454;
         }
-        .ProseMirror em {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror em {
           font-style: italic;
         }
-        .ProseMirror u {
+
+        .rich-text-editor:not(.light-theme) .ProseMirror u {
           text-decoration: underline;
+        }
+
+        /* Shared styles */
+        .rich-text-editor .ProseMirror {
+          min-height: 120px;
+        }
+
+        .rich-text-editor .ProseMirror:focus {
+          outline: none;
         }
       `}</style>
     </div>

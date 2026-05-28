@@ -18,9 +18,6 @@ interface StudentProfile {
   state: string | null;
   profileImageUrl: string | null;
   bio: string | null;
-  heightCm: number | null;
-  hairColor: string | null;
-  eyeColor: string | null;
   disciplineInterests: string[];
   languages: string[];
   trainingInstitutes: string[];
@@ -65,9 +62,6 @@ export default function StudentManageLayout({
     city: student.city || "",
     state: student.state || "",
     profileImageUrl: student.profileImageUrl || "",
-    heightCm: student.heightCm?.toString() || "",
-    hairColor: student.hairColor || "",
-    eyeColor: student.eyeColor || "",
     bio: student.bio || "",
     disciplineInterests: student.disciplineInterests,
     languages: student.languages,
