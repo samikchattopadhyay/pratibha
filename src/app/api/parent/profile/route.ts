@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest) {
     const userId = (session.user as { id?: string }).id;
     const body = await request.json();
 
-    const { name, phone, address, city, state, postalCode, country } = body;
+    const { name, phone, address, city, state, postalCode, country, preferredState } = body;
 
     const updateData: {
       name?: string;
@@ -62,7 +62,9 @@ export async function PUT(request: NextRequest) {
       state?: string;
       postalCode?: string;
       country?: string;
+      preferredState?: string;
       profileImageUrl?: string;
+      profileCompletedAt?: Date;
     } = {};
     if (name !== undefined) updateData.name = name;
     if (phone !== undefined) updateData.phone = phone;
@@ -71,8 +73,13 @@ export async function PUT(request: NextRequest) {
     if (state !== undefined) updateData.state = state;
     if (postalCode !== undefined) updateData.postalCode = postalCode;
     if (country !== undefined) updateData.country = country;
+    if (preferredState !== undefined) updateData.preferredState = preferredState;
     if (body.profileImage !== undefined && body.profileImage !== null) {
       updateData.profileImageUrl = body.profileImage;
+    }
+
+    if (address && city && state && postalCode && preferredState) {
+      updateData.profileCompletedAt = new Date();
     }
 
     const updatedParent = await prisma.parent.update({
@@ -86,15 +93,20 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json({
-      email: updatedParent.user.email,
-      name: updatedParent.name,
-      phone: updatedParent.phone,
-      address: updatedParent.address,
-      city: updatedParent.city,
-      state: updatedParent.state,
-      postalCode: updatedParent.postalCode,
-      country: updatedParent.country,
-      profileImageUrl: updatedParent.profileImageUrl,
+      success: true,
+      parent: {
+        id: updatedParent.id,
+        email: updatedParent.user.email,
+        name: updatedParent.name,
+        phone: updatedParent.phone,
+        address: updatedParent.address,
+        city: updatedParent.city,
+        state: updatedParent.state,
+        postalCode: updatedParent.postalCode,
+        preferredState: updatedParent.preferredState,
+        country: updatedParent.country,
+        profileImageUrl: updatedParent.profileImageUrl,
+      },
     });
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "P2002") {

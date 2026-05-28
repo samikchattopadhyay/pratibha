@@ -8,8 +8,10 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { User, Users, FileText, Plus, LogOut, Award, Clock, AlertTriangle } from "lucide-react";
+import { User, Users, FileText, Plus, LogOut, Award, Clock } from "lucide-react";
 import AddStudentWizard from "@/components/parent/AddStudentWizard";
+import ProfileCompletionCard from "@/components/parent/ProfileCompletionCard";
+import ProfileCompletionModal from "@/components/parent/ProfileCompletionModal";
 
 interface Student {
   id: string;
@@ -37,62 +39,17 @@ interface Registration {
 }
 
 interface ParentType {
+  id: string;
   name: string;
   phone: string;
-  address: string;
-  city: string;
-  state: string;
-  postalCode: string;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
   country: string;
   preferredState?: string | null;
 }
 
-// Visual mock data for testing or when database is empty
-const mockParent = {
-  name: "Avik Chattopadhyay",
-  phone: "9830098300",
-  address: "12/A Gariahat Road",
-  city: "Kolkata",
-  state: "West Bengal",
-  postalCode: "700019",
-  country: "India"
-};
-
-const mockStudents = [
-  { id: "s1", name: "Bhaskar Chattopadhyay", dateOfBirth: "2015-05-12T00:00:00.000Z", gender: "Male" },
-  { id: "s2", name: "Pooja Chattopadhyay", dateOfBirth: "2018-09-24T00:00:00.000Z", gender: "Female" }
-];
-
-const mockRegistrations = [
-  {
-    id: "r1",
-    studentId: "s1",
-    studentName: "Bhaskar Chattopadhyay",
-    competitionTitle: "Borsha Bodhon 2026",
-    categoryName: "Bengali Recitation",
-    fbPostUrl: "https://facebook.com/groups/pratibha/posts/12345",
-    paymentStatus: "SUCCESS",
-    registrationId: "PP-2026-REC-0021",
-    status: "VERIFIED",
-    certificate: {
-      id: "c1",
-      certificateId: "CERT-PP-9901-2940",
-      certificateUrl: "#"
-    }
-  },
-  {
-    id: "r2",
-    studentId: "s2",
-    studentName: "Pooja Chattopadhyay",
-    competitionTitle: "Chitra Kala 2026",
-    categoryName: "Drawing",
-    fbPostUrl: "https://facebook.com/groups/pratibha/posts/54321",
-    paymentStatus: "PENDING",
-    registrationId: "PP-2026-ART-0098",
-    status: "PENDING_VERIFICATION",
-    certificate: null
-  }
-];
 
 function ParentDashboardContent() {
   const { status: sessionStatus, data: session } = useSession();
@@ -126,13 +83,20 @@ function ParentDashboardContent() {
   const handleTabChange = (tab: "students" | "entries") => {
     router.push(`/parent/dashboard?tab=${tab}`);
   };
+
+  const handleProfileCompletionSuccess = (updatedParent: ParentType) => {
+    setParent(updatedParent);
+    setIsProfileCompletionModalOpen(false);
+  };
   const [parent, setParent] = useState<ParentType | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; grouping: string }[]>([]);
   
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProfileCompletionModalOpen, setIsProfileCompletionModalOpen] = useState(false);
   const [studentForm, setStudentForm] = useState<{
     name: string;
     dateOfBirth: string;
@@ -141,35 +105,26 @@ function ParentDashboardContent() {
   }>({ name: "", dateOfBirth: "", gender: "Male", disciplineInterests: [] });
   const [modalError, setModalError] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [isUsingMock, setIsUsingMock] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/parent/dashboard");
       const data = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(data.error || "Failed to load dashboard details");
       }
-      
+
       setParent(data.parent);
       setStudents(data.students);
       setRegistrations(data.registrations);
       setCategories(data.categories || []);
-      setIsUsingMock(false);
     } catch (err) {
-      console.warn("Loading mock data fallback. Database connection could be unconfigured.", err);
-      // Fail gracefully: load mock details for simulation
-      setParent({ ...mockParent, preferredState: "West Bengal" });
-      setStudents(mockStudents);
-      setRegistrations(mockRegistrations);
-      setCategories([
-        { id: "c1", name: "Bengali Recitation", grouping: "PERFORMING_ARTS" },
-        { id: "c2", name: "Drawing", grouping: "VISUAL_ARTS" },
-        { id: "c3", name: "Singing", grouping: "PERFORMING_ARTS" }
-      ]);
-      setIsUsingMock(true);
+      const errorMessage = err instanceof Error ? err.message : "Failed to load dashboard";
+      console.error("Dashboard error:", errorMessage, err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -199,22 +154,6 @@ function ParentDashboardContent() {
     e.preventDefault();
     setModalError("");
     setIsAdding(true);
-
-    if (isUsingMock) {
-      // Simulate adding locally
-      const newStudent: Student = {
-        id: "mock-" + Math.random().toString(),
-        name: studentForm.name,
-        dateOfBirth: studentForm.dateOfBirth,
-        gender: studentForm.gender,
-        disciplineInterests: studentForm.disciplineInterests
-      };
-      setStudents(prev => [...prev, newStudent]);
-      setIsModalOpen(false);
-      setStudentForm({ name: "", dateOfBirth: "", gender: "Male", disciplineInterests: [] });
-      setIsAdding(false);
-      return;
-    }
 
     try {
       const res = await fetch("/api/parent/students", {
@@ -255,28 +194,37 @@ function ParentDashboardContent() {
     return <Loading variant="screen" text="Loading dashboard..." />;
   }
 
+  if (error) {
+    return (
+      <>
+        <Header />
+        <main className="flex-1 bg-cream-dark/10 dark:bg-charcoal py-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-red-500/10 border border-red-300 dark:border-red-700 rounded-xl p-6 text-red-800 dark:text-red-200">
+              <h2 className="font-bold text-lg mb-2">Error Loading Dashboard</h2>
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Header />
 
       <main className="flex-1 bg-cream-dark/10 dark:bg-charcoal py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          
-          {/* Mock alert indicator */}
-          {isUsingMock && (
-            <div className="p-4 bg-yellow-500/10 border border-yellow-300 rounded-xl text-yellow-800 text-sm font-sans flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                <strong>Preview Sandbox:</strong> Database connection is currently unconfigured. Showing simulated mock dashboard data.
-              </span>
-              <Button
-                onClick={() => setIsUsingMock(false)}
-                variant="ghost"
-                size="sm"
-              >
-                Hide
-              </Button>
-            </div>
+
+          {/* Profile Completion Card */}
+          {parent && (
+            <ProfileCompletionCard
+              parent={parent}
+              onOpenModal={() => setIsProfileCompletionModalOpen(true)}
+              onClose={() => {}}
+            />
           )}
 
           {/* Profile Overview Header */}
@@ -565,6 +513,16 @@ function ParentDashboardContent() {
         }}
         categories={categories}
       />
+
+      {/* MODAL: PROFILE COMPLETION */}
+      {parent && (
+        <ProfileCompletionModal
+          isOpen={isProfileCompletionModalOpen}
+          parent={parent}
+          onClose={() => setIsProfileCompletionModalOpen(false)}
+          onSuccess={handleProfileCompletionSuccess}
+        />
+      )}
 
       <Footer />
     </>

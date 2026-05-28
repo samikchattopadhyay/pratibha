@@ -75,6 +75,7 @@ export async function GET() {
 
     return NextResponse.json({
       parent: {
+        id: parent.id,
         name: parent.name,
         phone: parent.phone,
         address: parent.address,
