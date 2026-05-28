@@ -6,7 +6,11 @@ import { Mail, Phone, MapPin, Search } from "lucide-react";
 import NavLink from "./NavLink";
 import Button from "./Button";
 
-export default function Footer() {
+interface FooterProps {
+  variant?: "default" | "minimal";
+}
+
+export default function Footer({ variant = "default" }: FooterProps) {
   const [certId, setCertId] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
@@ -15,6 +19,22 @@ export default function Footer() {
       window.location.href = `/verify/${encodeURIComponent(certId.trim())}`;
     }
   };
+
+  if (variant === "minimal") {
+    return (
+      <footer className="bg-charcoal text-cream-dark border-t border-gold/20 mt-auto transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
+            <p className="font-sans text-cream/40">© {new Date().getFullYear()} Pratibha Parishad Council. All rights reserved.</p>
+            <div className="flex gap-6">
+              <NavLink href="/privacy-policy" variant="ghost" className="text-xs text-cream/70 hover:text-gold p-0">Privacy Policy</NavLink>
+              <NavLink href="/terms-of-use" variant="ghost" className="text-xs text-cream/70 hover:text-gold p-0">Terms of Use</NavLink>
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
 
   return (
     <footer className="bg-charcoal text-cream-dark border-t-2 border-gold/30 mt-auto transition-colors duration-300 relative overflow-hidden">

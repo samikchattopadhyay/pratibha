@@ -85,7 +85,7 @@ function ParentDashboardContent() {
   const [parent, setParent] = useState<ParentType | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string; grouping: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; grouping?: string }[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -212,7 +212,7 @@ function ParentDashboardContent() {
             </div>
           </div>
         </main>
-        <Footer />
+        <Footer variant="minimal" />
       </>
     );
   }
@@ -465,7 +465,7 @@ function ParentDashboardContent() {
         categories={categories}
       />
 
-      <Footer />
+      <Footer variant="minimal" />
     </>
   );
 }
