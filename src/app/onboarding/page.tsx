@@ -2,27 +2,44 @@
 
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import SetupOnboarding from "@/components/auth/SetupOnboarding";
 import Loading from "@/components/Loading";
 
 export default function OnboardingPage() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
+      return;
     }
-  }, [status, router]);
+
+    // Redirect non-PARENT users away from onboarding
+    if (status === "authenticated" && session?.user) {
+      const userRole = (session.user as { role?: string }).role;
+      if (userRole !== "PARENT") {
+        if (userRole === "SUPER_ADMIN" || userRole === "MODERATOR") {
+          router.push("/admin/dashboard");
+        } else if (userRole === "JUDGE") {
+          router.push("/judge/dashboard");
+        }
+      }
+    }
+  }, [status, session, router]);
 
   if (status === "loading") {
     return <Loading variant="screen" text="Loading..." />;
   }
 
   if (status === "unauthenticated") {
+    return null;
+  }
+
+  // Check if user is PARENT
+  const userRole = (session?.user as { role?: string })?.role;
+  if (userRole !== "PARENT") {
     return null;
   }
 

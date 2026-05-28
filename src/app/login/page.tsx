@@ -53,7 +53,30 @@ function LoginForm() {
             targetUrl = "/admin/dashboard";
           } else if (role === "JUDGE") {
             targetUrl = "/judge/dashboard";
-          } else {
+          } else if (role === "PARENT") {
+            // For PARENT users, check if onboarding is complete
+            try {
+              const dashboardRes = await fetch("/api/parent/dashboard");
+              if (!dashboardRes.ok) {
+                const data = await dashboardRes.json();
+                if (data.code === "SETUP_REQUIRED") {
+                  // Generate setup token and redirect to onboarding
+                  const tokenRes = await fetch("/api/parent/generate-setup-token", {
+                    method: "POST",
+                  });
+                  const tokenData = await tokenRes.json();
+                  if (tokenData.token) {
+                    router.push(`/onboarding?token=${tokenData.token}`);
+                    router.refresh();
+                    setLoading(false);
+                    return;
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("Error checking onboarding status:", err);
+              // Continue to dashboard on error
+            }
             targetUrl = "/parent/dashboard";
           }
         }
