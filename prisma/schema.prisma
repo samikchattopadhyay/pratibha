@@ -221,10 +221,46 @@ model Student {
   dateOfBirth         DateTime
   gender              String
   disciplineInterests String[]            @default([]) // Plan 07 — student category slugs interest
+
+  // ── Public Profile Fields ──────────────────────────────────────────────────
+  profileImageUrl     String?             // Future photo upload
+  bio                 String?             // Short "About Me" written by parent
+  city                String?             // City of residence (public)
+  state               String?             // State of residence (public)
+  heightCm            Int?                // Height in centimetres
+  hairColor           String?             // e.g. "Black", "Brown"
+  eyeColor            String?             // e.g. "Brown", "Black"
+  trainingInstitutes  String[]            @default([]) // e.g. ["Dover Lane Music Academy"]
+  languages           String[]            @default([]) // e.g. ["Bengali", "Hindi"]
+  specialSkills       String[]            @default([]) // e.g. ["Tabla", "Bharatanatyam"]
+  isPublic            Boolean             @default(false)
+  schoolClass         String?             // e.g. "Class 7"
+  schoolName          String?             // e.g. "St. Xavier's School"
+  // ──────────────────────────────────────────────────────────────────────────
+
+  externalAchievements ExternalAchievement[]
   registrations       Registration[]
   qualificationSlots  QualificationSlot[] // Plan 04
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
+}
+
+model ExternalAchievement {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  title        String    // e.g. "1st Place – School Annual Day"
+  eventName    String    // e.g. "St. Xavier's Annual Cultural Fest"
+  category     String?   // e.g. "Singing", "Drawing"
+  year         Int       // e.g. 2024
+  rank         String?   // e.g. "1st Place", "Runner Up", "Participation"
+  description  String?   // Optional detail paragraph
+  proofUrl     String?   // Link to photo, certificate, or news article
+  displayOrder Int       @default(0)   // For future drag-to-reorder
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // ─── COMPETITION MODELS ───────────────────────────────────────────────────────
@@ -356,6 +392,7 @@ model Judge {
   userId              String            @unique
   user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   name                String
+  phone               String?           // Contact phone number
   specializations     String[]
   profileImageUrl     String?
 

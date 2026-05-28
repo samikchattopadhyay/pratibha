@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import type { JudgeMetadata } from "@/types/judges-details";
@@ -9,10 +11,12 @@ const JudgeIdParamSchema = z.object({
 });
 
 // ✅ Pattern: Type guard for auth
-async function checkAdminAuth(request: NextRequest): Promise<boolean> {
-  // TODO: Implement actual auth check based on your NextAuth setup
-  // This is a placeholder that always returns true
-  return true;
+async function checkAdminAuth(): Promise<boolean> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return false;
+
+  const role = (session.user as { role?: string }).role;
+  return role === "SUPER_ADMIN" || role === "MODERATOR";
 }
 
 // ✅ Pattern: Service function (business logic separated)
@@ -47,7 +51,7 @@ async function fetchJudgeMetadata(judgeId: string): Promise<JudgeMetadata | null
     id: judge.id,
     name: judge.name,
     email: judge.user.email,
-    phone: "", // TODO: Add phone to Judge model if needed
+    phone: (judge as any).phone || "",
     specializations: judge.specializations,
     tier: judge.tier as "LOCAL" | "REGIONAL" | "NATIONAL" | "EXPERT",
     isActive: judge.isAvailable,
@@ -60,7 +64,7 @@ async function fetchJudgeMetadata(judgeId: string): Promise<JudgeMetadata | null
 
 // ✅ Pattern: Route handler with error handling
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -81,7 +85,7 @@ export async function GET(
     }
 
     // 3. Check authorization
-    const isAuthorized = await checkAdminAuth(request);
+    const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
         { code: "UNAUTHORIZED", message: "Admin access required" },
@@ -123,7 +127,7 @@ export async function PATCH(
 ) {
   try {
     const { id: judgeId } = await params;
-    const body: unknown = await request.json();
+    const body = await request.json();
 
     // Validate input
     const validated = UpdateJudgeSchema.safeParse(body);
@@ -135,7 +139,7 @@ export async function PATCH(
     }
 
     // Check authorization
-    const isAuthorized = await checkAdminAuth(request);
+    const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
         { code: "UNAUTHORIZED", message: "Admin access required" },

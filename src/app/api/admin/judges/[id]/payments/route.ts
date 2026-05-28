@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import type { PaymentRecord, PaginatedResponse } from "@/types/judges-details";
@@ -10,9 +12,12 @@ const PaginationSchema = z.object({
 });
 
 // ✅ Pattern: Type guard for auth
-async function checkAdminAuth(request: NextRequest): Promise<boolean> {
-  // TODO: Implement actual auth check
-  return true;
+async function checkAdminAuth(): Promise<boolean> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return false;
+
+  const role = (session.user as { role?: string }).role;
+  return role === "SUPER_ADMIN" || role === "MODERATOR";
 }
 
 // ✅ Pattern: Fetch with Prisma pagination (skip/take)
@@ -73,7 +78,7 @@ export async function GET(
     }
 
     // Check authorization
-    const isAuthorized = await checkAdminAuth(request);
+    const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
         { code: "UNAUTHORIZED", message: "Admin access required" },

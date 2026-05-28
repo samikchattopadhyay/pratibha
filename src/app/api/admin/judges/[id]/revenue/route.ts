@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/db";
 import type { RevenueMetadata } from "@/types/judges-details";
 
 // ✅ Pattern: Type guard for auth
-async function checkAdminAuth(request: NextRequest): Promise<boolean> {
-  // TODO: Implement actual auth check
-  return true;
+async function checkAdminAuth(): Promise<boolean> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return false;
+
+  const role = (session.user as { role?: string }).role;
+  return role === "SUPER_ADMIN" || role === "MODERATOR";
 }
 
 // ✅ Pattern: Service function for revenue calculation
 async function fetchRevenueMetadata(judgeId: string): Promise<RevenueMetadata | null> {
-  const payouts = await prisma.judgePayout.findMany({
-    where: { judgeId },
-    select: { amount: true, status: true },
-  });
+  const [payouts, judge] = await Promise.all([
+    prisma.judgePayout.findMany({
+      where: { judgeId },
+      select: { amount: true, status: true },
+    }),
+    prisma.judge.findUnique({
+      where: { id: judgeId },
+      select: { paymentPerEvaluation: true },
+    }),
+  ]);
 
-  if (!payouts) {
+  if (!payouts || !judge) {
     return null;
   }
 
@@ -27,9 +38,8 @@ async function fetchRevenueMetadata(judgeId: string): Promise<RevenueMetadata | 
     .filter((p) => p.status === "PENDING")
     .reduce((sum, p) => sum + p.amount.toNumber(), 0);
 
-  // TODO: Get these from database or judge-specific settings
-  const hourlyRate = 500;
-  const perEvaluationRate = 150;
+  const perEvaluationRate = judge.paymentPerEvaluation?.toNumber() ?? 150;
+  const hourlyRate = perEvaluationRate * 4;
 
   // Get last payment date
   const lastPayout = await prisma.judgePayout.findFirst({
@@ -48,14 +58,14 @@ async function fetchRevenueMetadata(judgeId: string): Promise<RevenueMetadata | 
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: judgeId } = await params;
 
     // Check authorization
-    const isAuthorized = await checkAdminAuth(request);
+    const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
         { code: "UNAUTHORIZED", message: "Admin access required" },
