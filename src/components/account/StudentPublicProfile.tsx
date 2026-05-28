@@ -241,11 +241,24 @@ export default function StudentPublicProfile({
 
       {/* Verified Achievements */}
       {competitionResults.length > 0 && (
-        <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
-          <h2 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2">
-            🏆 Verified Achievements
-          </h2>
-          <div className="space-y-3">
+        <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-4 sm:p-6 shadow-md space-y-4">
+          <div>
+            <h2 className="font-serif text-xl font-bold text-charcoal dark:text-cream mb-3">
+              🏆 Verified Achievements
+            </h2>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <div className="px-2.5 py-1 bg-gold/15 dark:bg-gold/20 rounded-full border border-gold/30 text-gold font-semibold">
+                🥇 {stats.goldMedals} Wins
+              </div>
+              <div className="px-2.5 py-1 bg-gray-400/15 dark:bg-gray-400/20 rounded-full border border-gray-400/30 text-gray-600 dark:text-gray-300 font-semibold">
+                🥈 {stats.silverMedals} Wins
+              </div>
+              <div className="px-2.5 py-1 bg-orange-600/15 dark:bg-orange-600/20 rounded-full border border-orange-600/30 text-orange-700 dark:text-orange-400 font-semibold">
+                🥉 {stats.bronzeMedals} Wins
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {competitionResults.map((competition) => (
               <CompetitionResultCard
                 key={competition.registrationId}

@@ -31,68 +31,56 @@ export default function CompetitionResultCard({
 
   return (
     <div
-      className={`bg-cream dark:bg-charcoal-light border rounded-xl transition-all overflow-hidden ${
+      className={`bg-cream dark:bg-charcoal-light border rounded-lg transition-all overflow-hidden ${
         competition.prizeRank
-          ? "border-terracotta/30 dark:border-terracotta/40"
+          ? "border-terracotta/30 dark:border-terracotta/40 shadow-sm"
           : "border-terracotta/10 dark:border-terracotta/20"
       }`}
     >
       {/* Card Header */}
-      <div className="p-3 sm:p-4 space-y-2 cursor-pointer hover:bg-cream-dark/5 dark:hover:bg-charcoal/50 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
+      <div className="p-2.5 sm:p-3 space-y-1.5 cursor-pointer hover:bg-cream-dark/5 dark:hover:bg-charcoal/50 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <div className="flex items-baseline gap-2 mb-2">
-              <h3 className="font-serif text-sm sm:text-base font-bold text-charcoal dark:text-cream flex-1">
-                {competition.competitionTitle}
-              </h3>
-              <span className="text-xs font-semibold text-charcoal/60 dark:text-cream/60 flex-shrink-0 whitespace-nowrap">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-serif text-xs sm:text-sm font-bold text-charcoal dark:text-cream leading-tight">
+              {competition.competitionTitle}
+            </h3>
+
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              <span className="text-xs font-semibold px-1.5 py-0.5 bg-terracotta/10 dark:bg-terracotta/20 text-terracotta dark:text-terracotta/90 rounded-full whitespace-nowrap">
+                {competition.categoryName}
+              </span>
+              <span className="text-xs font-semibold text-charcoal/60 dark:text-cream/60 whitespace-nowrap">
                 {new Date(competition.competitionStartDate).toLocaleDateString(
                   "en-US",
-                  { month: "short", year: "numeric" }
+                  { month: "short" }
                 )}
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 mb-2">
-              <span className="text-xs font-semibold px-2 py-0.5 bg-terracotta/10 dark:bg-terracotta/20 text-terracotta dark:text-terracotta/90 rounded-full">
-                {competition.categoryName}
-              </span>
-              {competition.ageGroup && (
-                <span className="text-xs text-charcoal/60 dark:text-cream/60">
-                  {competition.ageGroup}
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="font-sans text-xs text-charcoal/60 dark:text-cream/60">
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="font-sans text-xs text-charcoal/70 dark:text-cream/70">
                 {getRankLabel(competition.prizeRank)}
               </span>
               {competition.finalScore && (
-                <div className="text-right">
-                  <p className="font-serif text-lg font-bold text-gold">
-                    {Number(competition.finalScore).toFixed(1)}
-                  </p>
-                  <p className="font-sans text-xs text-charcoal/60 dark:text-cream/60 leading-none">
-                    /100
-                  </p>
-                </div>
+                <p className="font-serif text-lg font-bold text-gold leading-none">
+                  {Number(competition.finalScore).toFixed(1)}
+                </p>
               )}
             </div>
           </div>
         </div>
 
         {/* Verification and Other Info */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-terracotta/10 dark:border-terracotta/20 text-xs">
+        <div className="flex items-center gap-1 pt-1 border-t border-terracotta/10 dark:border-terracotta/20 text-xs">
           <VerificationBadge variant="icon" size="sm" />
           {competition.judgeCount > 0 && (
-            <span className="text-charcoal/70 dark:text-cream/70">
-              {competition.judgeCount} judge{competition.judgeCount > 1 ? "s" : ""}
+            <span className="text-charcoal/70 dark:text-cream/70 text-xs">
+              {competition.judgeCount}J
             </span>
           )}
           {competition.prizeDispatchedAt && (
-            <span className="text-green-600 dark:text-green-400 font-semibold">
-              ✓ Dispatched
+            <span className="text-green-600 dark:text-green-400 font-semibold text-xs">
+              ✓
             </span>
           )}
         </div>
