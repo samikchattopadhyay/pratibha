@@ -224,15 +224,30 @@ export default function StudentManageLayout({
           label="Profile URL Slug"
           showPreview
         />
-        <Button
-          onClick={handleSaveSlug}
-          variant="primary"
-          size="md"
-          disabled={!slugAvailable || isSavingSlug || slug === (student.slug || "")}
-          className="font-bold"
-        >
-          {isSavingSlug ? "Saving..." : "Save Profile URL"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSaveSlug}
+            variant="primary"
+            size="md"
+            disabled={!slugAvailable || isSavingSlug || slug === (student.slug || "")}
+            className="font-bold"
+          >
+            {isSavingSlug ? "Saving..." : "Save Profile URL"}
+          </Button>
+          <Button
+            onClick={() => {
+              const profileSlug = student.slug || student.id;
+              const link = `${typeof window !== "undefined" ? window.location.origin : "https://pratibha.local"}/profile/${profileSlug}`;
+              window.open(link, "_blank");
+            }}
+            variant="secondary"
+            size="md"
+            disabled={!student.slug}
+            className="font-bold"
+          >
+            <ExternalLink className="w-4 h-4" /> Open Link
+          </Button>
+        </div>
       </div>
 
       {/* Section B: External Achievements Manager */}
