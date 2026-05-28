@@ -127,7 +127,7 @@ export default function SlugInput({
       {error && <p className="text-sm text-red-600">{error}</p>}
       {showPreview && (
         <p className="text-xs text-charcoal/60 dark:text-white/60">
-          https://pratibha.local/student/{value || "your-slug"}
+          https://pratibha.local/profile/{value || "your-slug"}
         </p>
       )}
     </div>

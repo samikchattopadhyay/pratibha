@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Edit2, Trash2, Copy, ExternalLink } from "lucide-react";
 import Button from "@/components/Button";
+import SlugInput from "./SlugInput";
 import AddStudentWizard, { StudentFormData } from "./AddStudentWizard";
 import ExternalAchievementModal from "./ExternalAchievementModal";
 
@@ -54,6 +55,9 @@ export default function StudentManageLayout({
   const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [isPublic, setIsPublic] = useState(student.isPublic);
+  const [slug, setSlug] = useState(student.slug || "");
+  const [slugAvailable, setSlugAvailable] = useState(!!student.slug);
+  const [isSavingSlug, setIsSavingSlug] = useState(false);
 
   const refetchStudent = useCallback(async () => {
     try {
@@ -136,12 +140,45 @@ export default function StudentManageLayout({
   }, [student.id, isPublic]);
 
   const handleCopyLink = () => {
+    if (typeof window === "undefined") return;
     const profilePath = student.slug || student.id;
-    const link = `${window.location.origin}/student/${profilePath}`;
+    const link = `${window.location.origin}/profile/${profilePath}`;
     navigator.clipboard.writeText(link);
     setSuccessMessage("Profile link copied to clipboard!");
     setTimeout(() => setSuccessMessage(""), 3000);
   };
+
+  const handleSaveSlug = useCallback(async () => {
+    if (!slug || !slugAvailable) {
+      alert("Please enter a valid, available slug");
+      return;
+    }
+
+    setIsSavingSlug(true);
+    try {
+      const res = await fetch(`/api/account/students/${student.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to update slug");
+        return;
+      }
+
+      const updatedStudent = await res.json();
+      setStudent(updatedStudent);
+      setSuccessMessage("Profile URL slug updated successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update slug");
+    } finally {
+      setIsSavingSlug(false);
+    }
+  }, [slug, slugAvailable, student.id]);
 
   return (
     <div className="space-y-8">
@@ -170,35 +207,33 @@ export default function StudentManageLayout({
         </Button>
       </div>
 
-      {/* Section A-B: Public Profile URL */}
-      {isPublic && (
-        <div className="bg-white dark:bg-charcoal-light border border-terracotta/20 dark:border-terracotta/30 rounded-2xl p-6 shadow-md space-y-4">
-          <h3 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2">
-            🔗 Public Profile URL
-          </h3>
-          <div className="bg-terracotta/5 dark:bg-gold/5 border border-terracotta/10 dark:border-gold/10 rounded-lg p-4">
-            <p className="text-xs font-semibold text-charcoal/60 dark:text-white/60 uppercase tracking-wider mb-2">
-              Share Profile
-            </p>
-            <p className="font-mono text-sm text-terracotta dark:text-gold break-all mb-3">
-              {window?.location?.origin}/student/{student.slug || student.id}
-            </p>
-            <Button
-              onClick={handleCopyLink}
-              variant="secondary"
-              size="sm"
-              className="font-bold"
-            >
-              <Copy className="w-4 h-4" /> Copy Link
-            </Button>
-          </div>
-          {student.slug && (
-            <p className="text-xs text-charcoal/60 dark:text-white/60">
-              ✓ Personalized URL set. Share this link with others to showcase {student.name}'s profile!
-            </p>
-          )}
-        </div>
-      )}
+      {/* Section A-A: Profile URL Slug */}
+      <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
+        <h3 className="font-serif text-xl font-bold text-charcoal dark:text-cream border-b border-terracotta/5 pb-2">
+          🔗 Personalized Profile URL
+        </h3>
+        <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">
+          Choose a memorable URL slug for your student's public profile. This makes it easier to share!
+        </p>
+        <SlugInput
+          value={slug}
+          onChange={setSlug}
+          onAvailabilityChange={setSlugAvailable}
+          studentId={student.id}
+          disabled={isSavingSlug}
+          label="Profile URL Slug"
+          showPreview
+        />
+        <Button
+          onClick={handleSaveSlug}
+          variant="primary"
+          size="md"
+          disabled={!slugAvailable || isSavingSlug || slug === (student.slug || "")}
+          className="font-bold"
+        >
+          {isSavingSlug ? "Saving..." : "Save Profile URL"}
+        </Button>
+      </div>
 
       {/* Section B: External Achievements Manager */}
       <div className="bg-cream dark:bg-charcoal-light border border-terracotta/10 dark:border-terracotta/20 rounded-2xl p-6 shadow-md space-y-4">
@@ -312,7 +347,8 @@ export default function StudentManageLayout({
               <input
                 type="text"
                 readOnly
-                value={`${typeof window !== "undefined" ? window.location.origin : ""}/student/${student.id}`}
+                suppressHydrationWarning
+                value={`${typeof window !== "undefined" ? window.location.origin : "https://pratibha.local"}/profile/${student.slug || student.id}`}
                 className="flex-1 h-9 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded px-2 text-xs font-mono text-charcoal dark:text-cream focus:outline-none"
               />
               <Button
@@ -324,7 +360,7 @@ export default function StudentManageLayout({
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
-            <Link href={`/student/${student.id}`} target="_blank">
+            <Link href={`/profile/${student.slug || student.id}`} target="_blank">
               <Button
                 variant="ghost"
                 size="sm"

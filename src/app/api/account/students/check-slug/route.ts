@@ -10,8 +10,7 @@ const slugSchema = z.object({
     .string()
     .toLowerCase()
     .trim()
-    .regex(/^[a-z0-9-]+$/, "Only alphanumeric and hyphens allowed")
-    .regex(/^(?!-)(?!.*-)/, "Cannot start or end with hyphen")
+    .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, "Must start and end with alphanumeric, hyphens allowed in middle")
     .min(3, "Minimum 3 characters")
     .max(32, "Maximum 32 characters"),
   excludeStudentId: z.string().uuid().optional(),

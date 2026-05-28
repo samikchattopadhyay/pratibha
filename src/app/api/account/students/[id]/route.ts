@@ -164,13 +164,35 @@ export async function PATCH(
     const updatedStudent = await prisma.student.update({
       where: { id: studentId },
       data: updatePayload,
+      include: {
+        externalAchievements: true,
+      },
     });
 
-    // 4. Response
-    return NextResponse.json(
-      { message: "Student profile updated successfully", studentId: updatedStudent.id },
-      { status: 200 }
-    );
+    // 4. Response - Return full student object
+    return NextResponse.json({
+      id: updatedStudent.id,
+      name: updatedStudent.name,
+      slug: updatedStudent.slug || undefined,
+      dateOfBirth: updatedStudent.dateOfBirth.toISOString(),
+      gender: updatedStudent.gender,
+      schoolClass: updatedStudent.schoolClass || null,
+      schoolName: updatedStudent.schoolName || null,
+      city: updatedStudent.city || null,
+      state: updatedStudent.state || null,
+      profileImageUrl: updatedStudent.profileImageUrl || null,
+      bio: updatedStudent.bio || null,
+      heightCm: updatedStudent.heightCm || null,
+      hairColor: updatedStudent.hairColor || null,
+      eyeColor: updatedStudent.eyeColor || null,
+      disciplineInterests: updatedStudent.disciplineInterests || [],
+      languages: updatedStudent.languages || [],
+      categoryGrouping: [], // Derived from competition registrations, not stored on student
+      trainingInstitutes: updatedStudent.trainingInstitutes || [],
+      specialSkills: updatedStudent.specialSkills || [],
+      isPublic: updatedStudent.isPublic || false,
+      externalAchievements: updatedStudent.externalAchievements || [],
+    }, { status: 200 });
   } catch (error: any) {
     console.error("Student update error:", error);
     return NextResponse.json({ error: "Internal server error occurred" }, { status: 500 });
