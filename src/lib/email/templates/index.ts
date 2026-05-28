@@ -16,3 +16,7 @@ export { buildQualificationOfferedTemplate } from "./qualificationOfferedTemplat
 export { buildJudgeWelcomeTemplate } from "./judgeWelcomeTemplate";
 export { buildPasswordResetTemplate } from "./passwordResetTemplate";
 export { buildParentWelcomeTemplate } from "./parentWelcomeTemplate";
+export {
+  buildEmailVerificationTemplate,
+  buildEmailVerificationSuccessTemplate,
+} from "./emailVerificationTemplate";

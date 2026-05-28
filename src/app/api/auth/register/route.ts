@@ -2,7 +2,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { sendParentWelcomeEmail } from "@/lib/notifications";
+import { generateVerificationToken } from "@/lib/email-verification";
+import { sendEmailVerificationLink } from "@/lib/notifications";
 
 export async function POST(req: Request) {
   try {
@@ -13,6 +14,15 @@ export async function POST(req: Request) {
     if (!email || !password || !name || !phone) {
       return NextResponse.json(
         { error: "Please fill in all required registration fields" },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: "Please provide a valid email address" },
         { status: 400 }
       );
     }
@@ -51,6 +61,7 @@ export async function POST(req: Request) {
           email,
           passwordHash,
           role: "PARENT",
+          emailVerified: null, // Not verified yet
         },
       });
 
@@ -65,14 +76,26 @@ export async function POST(req: Request) {
       return { user, parent };
     });
 
+    // Generate verification token
+    let verificationUrl = "";
     try {
-      await sendParentWelcomeEmail(email, name);
+      const verificationToken = await generateVerificationToken(result.user.id);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+      verificationUrl = `${appUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+
+      // Send verification email
+      await sendEmailVerificationLink(email, name, verificationUrl);
     } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
+      console.error("Failed to send verification email:", emailError);
+      // Don't fail registration if email fails, but log it
     }
 
     return NextResponse.json(
-      { message: "Registration successful", userId: result.user.id },
+      {
+        message: "Registration successful. Please check your email to verify your account.",
+        userId: result.user.id,
+        email: result.user.email,
+      },
       { status: 201 }
     );
   } catch (error: any) {

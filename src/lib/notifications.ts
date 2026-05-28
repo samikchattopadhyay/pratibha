@@ -513,3 +513,37 @@ export async function sendParentWelcomeEmail(to: string, parentName: string): Pr
   const html = renderEmailTemplate(template);
   await sendEmailViaResend(to, template.subject, html);
 }
+
+/**
+ * Email for email verification after registration.
+ */
+export async function sendEmailVerificationLink(
+  to: string,
+  parentName: string,
+  verificationUrl: string
+): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildEmailVerificationTemplate(
+    parentName,
+    verificationUrl,
+    appUrl
+  );
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
+}
+
+/**
+ * Confirmation email after successful verification.
+ */
+export async function sendEmailVerificationSuccess(
+  to: string,
+  parentName: string
+): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
+  const template = emailTemplates.buildEmailVerificationSuccessTemplate(
+    parentName,
+    appUrl
+  );
+  const html = renderEmailTemplate(template);
+  await sendEmailViaResend(to, template.subject, html);
+}

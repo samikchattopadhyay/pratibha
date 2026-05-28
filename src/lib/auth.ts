@@ -28,6 +28,14 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
+          // CRITICAL: Check if email is verified
+          if (!user.emailVerified) {
+            console.warn(
+              `Login attempt with unverified email: ${credentials.email}`
+            );
+            throw new Error("UNVERIFIED_EMAIL");
+          }
+
           const isValid = await bcrypt.compare(
             credentials.password,
             user.passwordHash
@@ -43,7 +51,10 @@ export const authOptions: AuthOptions = {
             name: user.email.split("@")[0],
             role: user.role,
           };
-        } catch (error) {
+        } catch (error: any) {
+          if (error.message === "UNVERIFIED_EMAIL") {
+            throw error;
+          }
           console.error("Auth error:", error);
           return null;
         }
