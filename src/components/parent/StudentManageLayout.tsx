@@ -20,6 +20,7 @@ interface StudentProfile {
   bio: string | null;
   disciplineInterests: string[];
   languages: string[];
+  categoryGrouping: string[];
   trainingInstitutes: string[];
   specialSkills: string[];
   isPublic: boolean;
@@ -65,6 +66,7 @@ export default function StudentManageLayout({
     bio: student.bio || "",
     disciplineInterests: student.disciplineInterests,
     languages: student.languages,
+    categoryGrouping: student.categoryGrouping,
     trainingInstitutes: student.trainingInstitutes,
     specialSkills: student.specialSkills,
   };

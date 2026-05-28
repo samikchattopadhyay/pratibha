@@ -26,6 +26,7 @@ interface StudentProfile {
   eyeColor: string | null;
   disciplineInterests: string[];
   languages: string[];
+  categoryGrouping: string[];
   trainingInstitutes: string[];
   specialSkills: string[];
   isPublic: boolean;
@@ -71,6 +72,7 @@ async function fetchStudentAndCategories(studentId: string, parentId: string) {
     eyeColor: student.eyeColor || null,
     disciplineInterests: student.disciplineInterests || [],
     languages: student.languages || [],
+    categoryGrouping: student.categoryGrouping || [],
     trainingInstitutes: student.trainingInstitutes || [],
     specialSkills: student.specialSkills || [],
     isPublic: student.isPublic || false,

@@ -29,6 +29,7 @@ export interface StudentFormData {
   bio: string;
   disciplineInterests: string[];
   languages: string[];
+  categoryGrouping: string[];
   trainingInstitutes: string[];
   specialSkills: string[];
 }
@@ -55,6 +56,15 @@ const LANGUAGES_OPTIONS = [
   { value: "Sanskrit", label: "Sanskrit" },
   { value: "Odia", label: "Odia" },
   { value: "Tamil", label: "Tamil" },
+];
+
+const CATEGORY_GROUPS_OPTIONS = [
+  { value: "MUSIC_VOCAL", label: "Music (Vocal)" },
+  { value: "MUSIC_INSTRUMENTAL", label: "Music (Instrumental)" },
+  { value: "PERFORMING_ARTS", label: "Performing Arts" },
+  { value: "VISUAL_ARTS", label: "Visual Arts" },
+  { value: "LITERARY_ARTS", label: "Literary Arts" },
+  { value: "SPOKEN_WORD", label: "Spoken Word" },
 ];
 
 const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
@@ -89,6 +99,7 @@ export default function AddStudentWizard({
       bio: "",
       disciplineInterests: [],
       languages: [],
+      categoryGrouping: [],
       trainingInstitutes: [],
       specialSkills: [],
     };
@@ -104,6 +115,16 @@ export default function AddStudentWizard({
       label: cat.name,
     }));
   }, [categories]);
+
+  const filteredCategoryOptions = useMemo(() => {
+    if (formData.categoryGrouping.length === 0) {
+      return categoryOptions;
+    }
+    return categoryOptions.filter((cat) => {
+      const category = categories.find((c) => c.id === cat.value);
+      return category && formData.categoryGrouping.includes(category.grouping || "");
+    });
+  }, [categoryOptions, formData.categoryGrouping, categories]);
 
   // Age calculation helper
   const ageDisplay = useMemo(() => {
@@ -556,17 +577,31 @@ export default function AddStudentWizard({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium block">Discipline Interests (Category Specialization) *</label>
-                  <SearchableSelect
-                    options={categoryOptions}
-                    value={formData.disciplineInterests[0] || ""}
-                    onChange={(val) => setFormData((prev) => ({ ...prev, disciplineInterests: val ? [val] : [] }))}
-                    placeholder="Select discipline interests..."
-                    searchPlaceholder="Search disciplines..."
+                  <label className="text-sm font-medium block">Category Group</label>
+                  <ChipMultiSelect
+                    options={CATEGORY_GROUPS_OPTIONS}
+                    selectedValues={formData.categoryGrouping}
+                    onChange={(vals) => setFormData((prev) => ({ ...prev, categoryGrouping: vals }))}
+                    placeholder="Select category groups..."
+                    light={true}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium block">Category Specialization *</label>
+                  <ChipMultiSelect
+                    options={filteredCategoryOptions}
+                    selectedValues={formData.disciplineInterests}
+                    onChange={(vals) => setFormData((prev) => ({ ...prev, disciplineInterests: vals }))}
+                    placeholder={formData.categoryGrouping.length === 0 ? "Select a Category Group first..." : "Select disciplines..."}
                     light={true}
                   />
                   <p className="text-xs text-charcoal/60 dark:text-cream/60">
-                    {formData.disciplineInterests.length === 0 ? "Select at least one discipline" : "Selected"}
+                    {formData.categoryGrouping.length === 0
+                      ? "Select a Category Group first"
+                      : formData.disciplineInterests.length === 0
+                      ? "Select at least one discipline"
+                      : `${formData.disciplineInterests.length} discipline(s) selected`}
                   </p>
                 </div>
               </div>
