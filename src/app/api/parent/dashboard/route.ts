@@ -13,8 +13,40 @@ export async function GET() {
 
     const userId = (session.user as any).id;
 
-    // Get parent profile
-    const parent = await prisma.parent.findUnique({
+    // Check if user has completed all onboarding steps
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // PARENT users must complete onboarding (password + phone + email verification)
+    // JUDGE and ADMIN users skip this check
+    if (user.role === "PARENT") {
+      // Onboarding is complete only if:
+      // 1. User's email is verified
+      // 2. User has a parent profile with phone
+      const parent = await prisma.parent.findUnique({
+        where: { userId },
+      });
+
+      const isOnboardingComplete = user.emailVerified && parent && parent.phone;
+
+      if (!isOnboardingComplete) {
+        return NextResponse.json(
+          { error: "Onboarding not complete", code: "SETUP_REQUIRED" },
+          { status: 404 }
+        );
+      }
+    }
+
+    // Get parent profile with full details
+    const parentWithDetails = await prisma.parent.findUnique({
       where: { userId },
       include: {
         students: {
@@ -35,7 +67,7 @@ export async function GET() {
       },
     });
 
-    if (!parent) {
+    if (!parentWithDetails) {
       return NextResponse.json(
         { error: "Profile not found", code: "SETUP_REQUIRED" },
         { status: 404 }
@@ -44,7 +76,7 @@ export async function GET() {
 
     // Flatten registrations for easy rendering
     const registrations: any[] = [];
-    parent.students.forEach((student) => {
+    parentWithDetails.students.forEach((student) => {
       student.registrations.forEach((reg) => {
         registrations.push({
           id: reg.id,
@@ -78,17 +110,17 @@ export async function GET() {
 
     return NextResponse.json({
       parent: {
-        id: parent.id,
-        name: parent.name,
-        phone: parent.phone,
-        address: parent.address,
-        city: parent.city,
-        state: parent.state,
-        preferredState: parent.preferredState || parent.state,
-        postalCode: parent.postalCode,
-        country: parent.country,
+        id: parentWithDetails.id,
+        name: parentWithDetails.name,
+        phone: parentWithDetails.phone,
+        address: parentWithDetails.address,
+        city: parentWithDetails.city,
+        state: parentWithDetails.state,
+        preferredState: parentWithDetails.preferredState || parentWithDetails.state,
+        postalCode: parentWithDetails.postalCode,
+        country: parentWithDetails.country,
       },
-      students: parent.students.map((s) => ({
+      students: parentWithDetails.students.map((s) => ({
         id: s.id,
         name: s.name,
         dateOfBirth: s.dateOfBirth,
