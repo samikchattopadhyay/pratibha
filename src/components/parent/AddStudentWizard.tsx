@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import React, { useState, useMemo, useRef } from "react";
+import { X, ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import ChipMultiSelect from "@/components/admin/ChipMultiSelect";
 import SearchableSelect from "@/components/admin/SearchableSelect";
+import RichTextEditor from "@/components/RichTextEditor";
 
 interface AddStudentWizardProps {
   readonly isOpen: boolean;
@@ -25,9 +25,6 @@ export interface StudentFormData {
   city: string;
   state: string;
   profileImageUrl: string;
-  heightCm: string;
-  hairColor: string;
-  eyeColor: string;
   bio: string;
   disciplineInterests: string[];
   languages: string[];
@@ -59,8 +56,6 @@ const LANGUAGES_OPTIONS = [
   { value: "Tamil", label: "Tamil" },
 ];
 
-const HAIR_COLORS = ["Black", "Brown", "Golden", "Grey", "Other"];
-const EYE_COLORS = ["Brown", "Black", "Blue", "Green", "Other"];
 const GENDERS = ["Male", "Female", "Non-binary", "Prefer not to say"];
 
 export default function AddStudentWizard({
@@ -71,8 +66,12 @@ export default function AddStudentWizard({
   initialData,
   studentId,
 }: AddStudentWizardProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
   const [formData, setFormData] = useState<StudentFormData>(() => {
@@ -86,9 +85,6 @@ export default function AddStudentWizard({
       city: "",
       state: "",
       profileImageUrl: "",
-      heightCm: "",
-      hairColor: "",
-      eyeColor: "",
       bio: "",
       disciplineInterests: [],
       languages: [],
@@ -102,13 +98,10 @@ export default function AddStudentWizard({
   const [newSkill, setNewSkill] = useState("");
 
   const categoryOptions = useMemo(() => {
-    return categories.map((cat) => {
-      const val = cat.slug || cat.name.toLowerCase().replace(/\s+/g, "-");
-      return {
-        value: val,
-        label: cat.name,
-      };
-    });
+    return categories.map((cat) => ({
+      value: cat.id,
+      label: cat.name,
+    }));
   }, [categories]);
 
   // Age calculation helper
@@ -148,7 +141,7 @@ export default function AddStudentWizard({
 
   const handleNext = () => {
     if (!validateStep(currentStep)) return;
-    setCurrentStep((prev) => Math.min(prev + 1, 4));
+    setCurrentStep((prev) => Math.min(prev + 1, 5));
   };
 
   const handlePrev = () => {
@@ -190,6 +183,78 @@ export default function AddStudentWizard({
     }));
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedMimes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (file.size > maxSize) {
+      setErrorMsg("File size exceeds 5MB limit");
+      return;
+    }
+
+    if (!allowedMimes.includes(file.type)) {
+      setErrorMsg("Invalid file type. Only JPEG, PNG, and WebP are allowed");
+      return;
+    }
+
+    setSelectedFile(file);
+    setErrorMsg("");
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPhotoPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!selectedFile) {
+      setErrorMsg("Please select a file first");
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setErrorMsg("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const res = await fetch("/api/parent/students/upload-profile-photo", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to upload photo");
+      }
+
+      // Update form with uploaded URL
+      setFormData((prev) => ({
+        ...prev,
+        profileImageUrl: data.url,
+      }));
+
+      // Clear upload state
+      setSelectedFile(null);
+      setPhotoPreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to upload photo");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep(currentStep)) return;
@@ -197,11 +262,8 @@ export default function AddStudentWizard({
     setIsSubmitting(true);
     setErrorMsg("");
 
-    const heightVal = formData.heightCm ? parseInt(formData.heightCm, 10) : null;
-
     const payload = {
       ...formData,
-      heightCm: isNaN(heightVal as any) ? null : heightVal,
     };
 
     try {
@@ -250,10 +312,10 @@ export default function AddStudentWizard({
           <div className="w-full h-2.5 bg-cream-dark/20 dark:bg-charcoal relative overflow-hidden flex items-center justify-end pr-3">
             <div
               className="h-full bg-gradient-to-r from-terracotta to-gold transition-all duration-300 absolute left-0 top-0"
-              style={{ width: `${(currentStep / 4) * 100}%` }}
+              style={{ width: `${(currentStep / 5) * 100}%` }}
             />
             <span className="text-[10px] font-bold text-charcoal/70 dark:text-cream/70 relative z-10">
-              Step {currentStep} of 4
+              Step {currentStep} of 5
             </span>
           </div>
         </div>
@@ -283,7 +345,7 @@ export default function AddStudentWizard({
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                    placeholder="e.g. Bhaskar Chattopadhyay"
+                    placeholder="Enter full name"
                   />
                 </div>
 
@@ -323,7 +385,7 @@ export default function AddStudentWizard({
                       value={formData.schoolClass}
                       onChange={(e) => setFormData({ ...formData, schoolClass: e.target.value })}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                      placeholder="e.g. Class 7"
+                      placeholder="Enter class or grade"
                     />
                   </div>
 
@@ -334,7 +396,7 @@ export default function AddStudentWizard({
                       value={formData.schoolName}
                       onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                      placeholder="e.g. St. Xavier's School"
+                      placeholder="Enter school name"
                     />
                   </div>
                 </div>
@@ -347,7 +409,7 @@ export default function AddStudentWizard({
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                      placeholder="e.g. Kolkata"
+                      placeholder="Enter city"
                     />
                   </div>
 
@@ -373,71 +435,92 @@ export default function AddStudentWizard({
                   Step 2: Appearance & Photo
                 </h4>
 
-                <div className="space-y-1">
-                  <label className="text-sm font-medium block">Profile Photo URL</label>
-                  <input
-                    type="url"
-                    value={formData.profileImageUrl}
-                    onChange={(e) => setFormData({ ...formData, profileImageUrl: e.target.value })}
-                    className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                    placeholder="https://example.com/photo.jpg"
-                  />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">Profile Photo</label>
+
+                  {/* File Upload Area */}
+                  {!formData.profileImageUrl ? (
+                    <div className="border-2 border-dashed border-terracotta/30 dark:border-gold/30 rounded-lg p-6 text-center hover:border-terracotta/50 dark:hover:border-gold/50 transition-colors">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex flex-col items-center gap-2 text-charcoal dark:text-cream hover:text-terracotta dark:hover:text-gold transition-colors"
+                      >
+                        <Upload className="w-6 h-6" />
+                        <span className="text-sm font-medium">Click to upload or drag & drop</span>
+                        <span className="text-xs text-charcoal/50 dark:text-cream/50">PNG, JPEG, or WebP (max 5MB)</span>
+                      </button>
+
+                      {/* Preview after selection */}
+                      {photoPreview && (
+                        <div className="mt-4 flex flex-col items-center gap-2">
+                          <img
+                            src={photoPreview}
+                            alt="Preview"
+                            className="max-h-32 max-w-32 rounded-lg border border-terracotta/20"
+                          />
+                          <p className="text-xs text-charcoal/70 dark:text-cream/70">{selectedFile?.name}</p>
+                          <Button
+                            type="button"
+                            onClick={handleUploadPhoto}
+                            variant="primary"
+                            size="sm"
+                            disabled={isUploadingPhoto}
+                            className="flex items-center gap-1"
+                          >
+                            {isUploadingPhoto ? (
+                              <Loading variant="inline" text="Uploading..." className="text-current" />
+                            ) : (
+                              <>
+                                <Upload className="w-3 h-3" /> Upload Photo
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-terracotta/5 dark:bg-gold/5 border border-terracotta/20 dark:border-gold/20 rounded-lg p-4 flex items-center gap-4">
+                      <img
+                        src={formData.profileImageUrl}
+                        alt="Profile"
+                        className="w-16 h-16 rounded-lg object-cover border border-terracotta/20"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-charcoal dark:text-cream mb-1">Photo Uploaded</p>
+                        <p className="text-xs text-charcoal/60 dark:text-cream/60 truncate">{formData.profileImageUrl}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({ ...prev, profileImageUrl: "" }));
+                          setSelectedFile(null);
+                          setPhotoPreview(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        className="text-terracotta dark:text-gold hover:text-terracotta-light dark:hover:text-gold-light transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium block">Height (in cm)</label>
-                    <input
-                      type="number"
-                      value={formData.heightCm}
-                      onChange={(e) => setFormData({ ...formData, heightCm: e.target.value })}
-                      className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                      placeholder="e.g. 142"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium block">Hair Color</label>
-                    <select
-                      value={formData.hairColor}
-                      onChange={(e) => setFormData({ ...formData, hairColor: e.target.value })}
-                      className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta cursor-pointer"
-                    >
-                      <option value="">Select color...</option>
-                      {HAIR_COLORS.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium block">Eye Color</label>
-                    <select
-                      value={formData.eyeColor}
-                      onChange={(e) => setFormData({ ...formData, eyeColor: e.target.value })}
-                      className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta cursor-pointer"
-                    >
-                      <option value="">Select color...</option>
-                      {EYE_COLORS.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium block">About Me / Bio</label>
-                  <textarea
+                  <RichTextEditor
                     value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    rows={4}
-                    maxLength={300}
-                    className="w-full bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 py-2 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                    placeholder="Describe your child's interests, hobbies, or passions..."
+                    onChange={(val) => setFormData({ ...formData, bio: val })}
+                    placeholder="Write a brief bio about yourself..."
                   />
-                  <p className="text-[10px] text-charcoal/50 dark:text-cream/50 text-right">
-                    {formData.bio.length}/300 characters
-                  </p>
                 </div>
               </div>
             )}
@@ -449,25 +532,51 @@ export default function AddStudentWizard({
                   Step 3: Training & Skills
                 </h4>
 
+                {/* Specialization Group - display only */}
+                {formData.disciplineInterests.length > 0 && (
+                  <div className="bg-terracotta/10 dark:bg-gold/10 border border-terracotta/20 dark:border-gold/20 rounded-lg p-3 space-y-1">
+                    <p className="text-xs font-semibold text-terracotta dark:text-gold uppercase tracking-wider">Specialization Group</p>
+                    <p className="text-sm text-charcoal dark:text-cream font-medium">
+                      {categories.find(c => c.id === formData.disciplineInterests[0])?.grouping || "Not specified"}
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-1">
-                  <label className="text-sm font-medium block">Discipline Interests</label>
-                  <ChipMultiSelect
-                    options={categoryOptions}
-                    selectedValues={formData.disciplineInterests}
-                    onChange={(vals) => setFormData((prev) => ({ ...prev, disciplineInterests: vals }))}
-                    placeholder="Select discipline interests..."
+                  <label className="text-sm font-medium block">Languages Spoken</label>
+                  <SearchableSelect
+                    options={LANGUAGES_OPTIONS}
+                    value={formData.languages[0] || ""}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, languages: val ? [val] : [] }))}
+                    placeholder="Select languages..."
+                    searchPlaceholder="Search languages..."
+                    light={true}
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium block">Languages spoken</label>
-                  <ChipMultiSelect
-                    options={LANGUAGES_OPTIONS}
-                    selectedValues={formData.languages}
-                    onChange={(vals) => setFormData((prev) => ({ ...prev, languages: vals }))}
-                    placeholder="Select languages..."
+                  <label className="text-sm font-medium block">Discipline Interests (Category Specialization) *</label>
+                  <SearchableSelect
+                    options={categoryOptions}
+                    value={formData.disciplineInterests[0] || ""}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, disciplineInterests: val ? [val] : [] }))}
+                    placeholder="Select discipline interests..."
+                    searchPlaceholder="Search disciplines..."
+                    light={true}
                   />
+                  <p className="text-xs text-charcoal/60 dark:text-cream/60">
+                    {formData.disciplineInterests.length === 0 ? "Select at least one discipline" : "Selected"}
+                  </p>
                 </div>
+              </div>
+            )}
+
+            {/* Step 4: Specialization & Training */}
+            {currentStep === 4 && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <h4 className="text-sm font-bold text-terracotta dark:text-gold uppercase tracking-wider border-b border-terracotta/10 pb-2">
+                  Step 4: Specialization & Training
+                </h4>
 
                 {/* Training Institutes - tag style */}
                 <div className="space-y-1">
@@ -479,7 +588,7 @@ export default function AddStudentWizard({
                       onChange={(e) => setNewInstitute(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddInstitute())}
                       className="flex-1 h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                      placeholder="e.g. Dover Lane Music Academy"
+                      placeholder="Enter institute name"
                     />
                     <Button type="button" onClick={handleAddInstitute} variant="secondary" size="md">
                       <Plus className="w-4 h-4" />
@@ -507,7 +616,7 @@ export default function AddStudentWizard({
                       onChange={(e) => setNewSkill(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSkill())}
                       className="flex-1 h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
-                      placeholder="e.g. Classical Vocals, Tabla, Bharatnatyam"
+                      placeholder="Enter skill or talent"
                     />
                     <Button type="button" onClick={handleAddSkill} variant="secondary" size="md">
                       <Plus className="w-4 h-4" />
@@ -527,11 +636,11 @@ export default function AddStudentWizard({
               </div>
             )}
 
-            {/* Step 4: Review Summary */}
-            {currentStep === 4 && (
+            {/* Step 5: Review Details */}
+            {currentStep === 5 && (
               <div className="space-y-4 animate-in fade-in duration-200">
                 <h4 className="text-sm font-bold text-terracotta dark:text-gold uppercase tracking-wider border-b border-terracotta/10 pb-2">
-                  Step 4: Review Details
+                  Step 5: Review Details
                 </h4>
 
                 <div className="bg-cream-dark/5 dark:bg-charcoal rounded-xl border border-terracotta/10 p-4 space-y-4 text-sm">
@@ -548,18 +657,11 @@ export default function AddStudentWizard({
                     )}
                   </div>
 
-                  {(formData.profileImageUrl || formData.bio || formData.heightCm || formData.hairColor || formData.eyeColor) && (
+                  {(formData.profileImageUrl || formData.bio) && (
                     <div className="border-t border-terracotta/10 pt-3">
-                      <h5 className="font-bold text-terracotta dark:text-gold mb-1">🎭 Profile & Appearance</h5>
+                      <h5 className="font-bold text-terracotta dark:text-gold mb-1">🎭 Profile & Bio</h5>
                       {formData.profileImageUrl && (
                         <p className="truncate"><span className="font-semibold">Photo URL:</span> {formData.profileImageUrl}</p>
-                      )}
-                      {(formData.heightCm || formData.hairColor || formData.eyeColor) && (
-                        <p>
-                          {formData.heightCm && <span className="mr-3"><span className="font-semibold">Height:</span> {formData.heightCm} cm</span>}
-                          {formData.hairColor && <span className="mr-3"><span className="font-semibold">Hair:</span> {formData.hairColor}</span>}
-                          {formData.eyeColor && <span><span className="font-semibold">Eyes:</span> {formData.eyeColor}</span>}
-                        </p>
                       )}
                       {formData.bio && (
                         <p className="italic mt-1 text-charcoal/80 dark:text-cream/80">"{formData.bio}"</p>
@@ -623,7 +725,7 @@ export default function AddStudentWizard({
               Cancel
             </Button>
             
-            {currentStep < 4 ? (
+            {currentStep < 5 ? (
               <Button
                 type="button"
                 onClick={handleNext}
