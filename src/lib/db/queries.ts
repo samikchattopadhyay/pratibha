@@ -2107,6 +2107,59 @@ export async function updateCertificateStatusOnly(certificateId: string, status:
   return updated[0];
 }
 
+export async function getPendingShipmentsForCompetition(competitionId: string, shipmentIds?: string[]) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const whereConditions = [
+    inArray(schema.registrations.competitionCategoryId, categoryIds),
+    eq(schema.physicalPrizeOrders.status, "PENDING" as any),
+  ];
+
+  if (shipmentIds && shipmentIds.length > 0) {
+    whereConditions.push(inArray(schema.physicalPrizeOrders.id, shipmentIds));
+  }
+
+  return db.query.physicalPrizeOrders.findMany({
+    where: and(...whereConditions),
+    columns: { id: true, packageSKU: true },
+  });
+}
+
+export async function updateShipmentWithLabel(
+  shipmentId: string,
+  data: {
+    awbNumber: string;
+    shiprocketLabelUrl: string;
+    courierName: string;
+    estimatedDelivery: Date;
+    weightGrams: number;
+    lengthCm: number;
+    widthCm: number;
+    heightCm: number;
+  }
+) {
+  await db
+    .update(schema.physicalPrizeOrders)
+    .set({
+      status: "LABEL_GENERATED" as any,
+      awbNumber: data.awbNumber,
+      shiprocketLabelUrl: data.shiprocketLabelUrl,
+      courierName: data.courierName,
+      estimatedDelivery: data.estimatedDelivery,
+      weightGrams: data.weightGrams as any,
+      lengthCm: data.lengthCm as any,
+      widthCm: data.widthCm as any,
+      heightCm: data.heightCm as any,
+      labelGeneratedAt: new Date(),
+    })
+    .where(eq(schema.physicalPrizeOrders.id, shipmentId));
+}
+
 export async function getCompetitionShipments(competitionId: string, status?: string, limit?: number, offset?: number) {
   const competitionCategories = await db
     .select({ id: schema.competitionCategories.id })

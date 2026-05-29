@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getPendingShipmentsForCompetition,
+  updateShipmentWithLabel,
+} from "@/lib/db/queries";
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +25,6 @@ export async function POST(
 
     const { id: competitionId } = await params;
 
-    // Parse body for selective fulfillment
     let carrier = "SHIPROCKET";
     let shipmentIds: string[] | undefined = undefined;
 
@@ -34,36 +36,11 @@ export async function POST(
       // Body might be empty, default to bulk all
     }
 
-    // Build query conditions
-    const whereCondition: any = {
-      prizeAward: {
-        registration: {
-          competitionCategory: { competitionId },
-        },
-      },
-      status: "PENDING",
-    };
-
-    if (shipmentIds) {
-      whereCondition.id = { in: shipmentIds };
-    }
-
-    // Find pending shipments
-    const pendingShipments = await prisma.physicalPrizeOrder.findMany({
-      where: whereCondition,
-      select: {
-        id: true,
-        packageSKU: true,
-      },
-    });
+    const pendingShipments = await getPendingShipmentsForCompetition(competitionId, shipmentIds);
 
     let createdCount = 0;
 
-    // Package dimensions mapping based on SKU
-    const packageSpecs: Record<
-      string,
-      { weight: number; length: number; width: number; height: number }
-    > = {
+    const packageSpecs: Record<string, { weight: number; length: number; width: number; height: number }> = {
       TROPHY_LARGE: { weight: 1200, length: 30, width: 20, height: 15 },
       TROPHY_MEDIUM: { weight: 800, length: 25, width: 15, height: 12 },
       MEDAL_CERTIFICATE: { weight: 250, length: 32, width: 24, height: 3 },
@@ -71,13 +48,11 @@ export async function POST(
       MEDAL_ONLY: { weight: 150, length: 10, width: 10, height: 5 },
     };
 
-    // Create labels for each pending shipment
     for (const shipment of pendingShipments) {
       try {
         const sku = shipment.packageSKU || "MEDAL_CERTIFICATE";
         const specs = packageSpecs[sku] || packageSpecs.MEDAL_CERTIFICATE;
 
-        // Generate carrier-specific AWB and tracking details
         let awbNumber = "";
         let trackingUrl = "";
         let courierName = "";
@@ -96,27 +71,20 @@ export async function POST(
           trackingUrl = `https://www.delhivery.com/track/share?ids=${awbNumber}`;
           courierName = "Delhivery";
         } else {
-          // Default to Shiprocket
           awbNumber = `SR${randDigits()}${Math.floor(Math.random() * 10)}`;
           trackingUrl = `https://tracking.shiprocket.co/tracking/${awbNumber}`;
           courierName = "Shiprocket (Blue Dart)";
         }
 
-        // Update shipment details including physical metrics and carrier routing
-        await prisma.physicalPrizeOrder.update({
-          where: { id: shipment.id },
-          data: {
-            status: "LABEL_GENERATED",
-            awbNumber,
-            shiprocketLabelUrl: trackingUrl,
-            courierName,
-            estimatedDelivery,
-            weightGrams: specs.weight,
-            lengthCm: specs.length,
-            widthCm: specs.width,
-            heightCm: specs.height,
-            labelGeneratedAt: new Date(),
-          },
+        await updateShipmentWithLabel(shipment.id, {
+          awbNumber,
+          shiprocketLabelUrl: trackingUrl,
+          courierName,
+          estimatedDelivery,
+          weightGrams: specs.weight,
+          lengthCm: specs.length,
+          widthCm: specs.width,
+          heightCm: specs.height,
         });
 
         createdCount++;
