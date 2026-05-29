@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import prisma from "@/lib/db";
+import { getUserByEmail, deleteUnusedPasswordResetTokensByUserId, createPasswordResetToken } from "@/lib/db/queries";
 import { sendEmailPasswordReset } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
@@ -15,29 +15,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await getUserByEmail(email);
 
     if (user) {
       // Delete any existing unused tokens for this user
-      await prisma.passwordResetToken.deleteMany({
-        where: {
-          userId: user.id,
-          usedAt: null,
-        },
-      });
+      await deleteUnusedPasswordResetTokensByUserId(user.id);
 
       // Create new reset token (valid for 1 hour)
       const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-      await prisma.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt,
-        },
+      await createPasswordResetToken({
+        userId: user.id,
+        token,
+        expiresAt,
       });
 
       // Send password reset email

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getUserByEmail, getParentByUserId } from "@/lib/db/queries";
 import {
   generateVerificationToken,
   countRecentVerificationRequests,
@@ -22,9 +22,7 @@ export async function POST(req: Request) {
     }
 
     // 1. Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await getUserByEmail(email);
 
     if (!user) {
       return NextResponse.json(
@@ -66,9 +64,7 @@ export async function POST(req: Request) {
     const verificationUrl = `${appUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;
 
     // Get parent name for email
-    const parent = await prisma.parent.findUnique({
-      where: { userId: user.id },
-    });
+    const parent = await getParentByUserId(user.id);
 
     await sendEmailVerificationLink(
       email,

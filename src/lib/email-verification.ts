@@ -1,4 +1,6 @@
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { emailVerificationTokens, users } from "@/lib/db/schema";
+import { eq, and, gt, lt, isNull } from "drizzle-orm";
 
 const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -30,12 +32,10 @@ export async function generateVerificationToken(userId: string): Promise<string>
   const hashedToken = await sha256(randomToken);
 
   // 3. Store in database
-  await prisma.emailVerificationToken.create({
-    data: {
-      userId,
-      token: hashedToken,
-      expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS),
-    },
+  await db.insert(emailVerificationTokens).values({
+    userId,
+    token: hashedToken,
+    expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_MS),
   });
 
   // 4. Return unhashed token for URL
@@ -54,13 +54,13 @@ export async function verifyEmailToken(
   const hashedToken = await sha256(token);
 
   // 2. Find the token record
-  const record = await prisma.emailVerificationToken.findFirst({
-    where: {
-      token: hashedToken,
-      userId,
-      expiresAt: { gt: new Date() }, // Not expired
-      verifiedAt: null, // Not already used
-    },
+  const record = await db.query.emailVerificationTokens.findFirst({
+    where: and(
+      eq(emailVerificationTokens.token, hashedToken),
+      eq(emailVerificationTokens.userId, userId),
+      gt(emailVerificationTokens.expiresAt, new Date()),
+      isNull(emailVerificationTokens.verifiedAt)
+    ),
   });
 
   if (!record) {
@@ -69,18 +69,18 @@ export async function verifyEmailToken(
 
   // 3. Mark token as used and user as verified in transaction
   try {
-    await prisma.$transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       // Mark token as verified
-      await tx.emailVerificationToken.update({
-        where: { id: record.id },
-        data: { verifiedAt: new Date() },
-      });
+      await tx
+        .update(emailVerificationTokens)
+        .set({ verifiedAt: new Date() })
+        .where(eq(emailVerificationTokens.id, record.id));
 
       // Mark user email as verified
-      await tx.user.update({
-        where: { id: userId },
-        data: { emailVerified: new Date() },
-      });
+      await tx
+        .update(users)
+        .set({ emailVerified: new Date() })
+        .where(eq(users.id, userId));
     });
 
     return true;
@@ -96,8 +96,8 @@ export async function verifyEmailToken(
 export async function isTokenExpired(token: string): Promise<boolean> {
   const hashedToken = await sha256(token);
 
-  const record = await prisma.emailVerificationToken.findUnique({
-    where: { token: hashedToken },
+  const record = await db.query.emailVerificationTokens.findFirst({
+    where: eq(emailVerificationTokens.token, hashedToken),
   });
 
   if (!record) return true;
@@ -112,24 +112,46 @@ export async function countRecentVerificationRequests(
   email: string,
   windowMs: number = 60 * 60 * 1000 // 1 hour default
 ): Promise<number> {
-  return prisma.emailVerificationToken.count({
-    where: {
-      user: { email },
-      createdAt: { gt: new Date(Date.now() - windowMs) },
-    },
-  });
+  const result = await db
+    .select({ count: emailVerificationTokens.id })
+    .from(emailVerificationTokens)
+    .innerJoin(users, eq(emailVerificationTokens.userId, users.id))
+    .where(
+      and(
+        eq(users.email, email),
+        gt(emailVerificationTokens.createdAt, new Date(Date.now() - windowMs))
+      )
+    );
+
+  return result.length;
 }
 
 /**
  * Clean up expired tokens (optional - run via cron job)
  */
 export async function cleanupExpiredTokens(): Promise<number> {
-  const result = await prisma.emailVerificationToken.deleteMany({
-    where: {
-      expiresAt: { lt: new Date() },
-      verifiedAt: null, // Only delete unverified tokens
-    },
-  });
+  // First, count how many we're deleting
+  const toDelete = await db
+    .select({ id: emailVerificationTokens.id })
+    .from(emailVerificationTokens)
+    .where(
+      and(
+        lt(emailVerificationTokens.expiresAt, new Date()),
+        isNull(emailVerificationTokens.verifiedAt)
+      )
+    );
 
-  return result.count;
+  if (toDelete.length === 0) return 0;
+
+  // Then delete them
+  await db
+    .delete(emailVerificationTokens)
+    .where(
+      and(
+        lt(emailVerificationTokens.expiresAt, new Date()),
+        isNull(emailVerificationTokens.verifiedAt)
+      )
+    );
+
+  return toDelete.length;
 }

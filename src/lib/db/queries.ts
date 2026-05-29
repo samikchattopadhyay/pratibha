@@ -1,5 +1,5 @@
 import { db } from "./drizzle";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import * as schema from "./schema";
 
 // ─── USER QUERIES ────────────────────────────────────────────────────────────
@@ -314,6 +314,26 @@ export async function deleteProfileSetupToken(id: string) {
   return db
     .delete(schema.profileSetupTokens)
     .where(eq(schema.profileSetupTokens.id, id));
+}
+
+export async function deleteUnusedPasswordResetTokensByUserId(userId: string) {
+  return db
+    .delete(schema.passwordResetTokens)
+    .where(
+      and(
+        eq(schema.passwordResetTokens.userId, userId),
+        isNull(schema.passwordResetTokens.usedAt)
+      )
+    );
+}
+
+export async function getPasswordResetTokenByTokenWithUser(token: string) {
+  return db.query.passwordResetTokens.findFirst({
+    where: eq(schema.passwordResetTokens.token, token),
+    with: {
+      user: true,
+    },
+  });
 }
 
 // ─── CERTIFICATE QUERIES ─────────────────────────────────────────────────────

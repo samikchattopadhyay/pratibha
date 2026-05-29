@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { users, passwordResetTokens } from "@/lib/db/schema";
+import { getPasswordResetTokenByTokenWithUser, getPasswordResetTokenByToken } from "@/lib/db/queries";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export async function GET(request: NextRequest) {
@@ -14,10 +17,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
-      include: { user: true },
-    });
+    const resetToken = await getPasswordResetTokenByTokenWithUser(token);
 
     if (!resetToken) {
       return NextResponse.json(
@@ -72,9 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
-    });
+    const resetToken = await getPasswordResetTokenByToken(token);
 
     if (!resetToken) {
       return NextResponse.json(
@@ -99,16 +97,16 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: resetToken.userId },
-        data: { passwordHash },
-      });
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ passwordHash })
+        .where(eq(users.id, resetToken.userId));
 
-      await tx.passwordResetToken.update({
-        where: { id: resetToken.id },
-        data: { usedAt: new Date() },
-      });
+      await tx
+        .update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, resetToken.id));
     });
 
     return NextResponse.json(

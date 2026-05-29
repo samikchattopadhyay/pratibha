@@ -1,4 +1,6 @@
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { profileSetupTokens } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const SETUP_TOKEN_EXPIRY = parseInt(process.env.SETUP_TOKEN_EXPIRY || "3600"); // 1 hour default
 
@@ -11,23 +13,24 @@ export async function generateProfileSetupToken(
   globalThis.crypto.getRandomValues(array);
   const token = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
-  const profileSetupToken = await prisma.profileSetupToken.create({
-    data: {
+  const result = await db
+    .insert(profileSetupTokens)
+    .values({
       userId,
       token,
       stage,
       data: data ? data : undefined,
       expiresAt: new Date(Date.now() + SETUP_TOKEN_EXPIRY * 1000),
-    },
-  });
+    })
+    .returning();
 
-  return profileSetupToken;
+  return result[0];
 }
 
 export async function getProfileSetupToken(token: string) {
-  const setupToken = await prisma.profileSetupToken.findUnique({
-    where: { token },
-    include: { user: true },
+  const setupToken = await db.query.profileSetupTokens.findFirst({
+    where: eq(profileSetupTokens.token, token),
+    with: { user: true },
   });
 
   if (!setupToken) {
@@ -52,21 +55,25 @@ export async function updateProfileSetupToken(
   stage: "password" | "phone" | "email_verify",
   data?: Record<string, string | number | boolean | Date>
 ) {
-  const updated = await prisma.profileSetupToken.update({
-    where: { token },
-    data: {
+  const result = await db
+    .update(profileSetupTokens)
+    .set({
       stage,
       data: data ? data : undefined,
       expiresAt: new Date(Date.now() + SETUP_TOKEN_EXPIRY * 1000),
-    },
-  });
+    })
+    .where(eq(profileSetupTokens.token, token))
+    .returning();
 
-  return updated;
+  return result[0];
 }
 
 export async function markProfileSetupTokenAsUsed(token: string) {
-  return prisma.profileSetupToken.update({
-    where: { token },
-    data: { usedAt: new Date() },
-  });
+  const result = await db
+    .update(profileSetupTokens)
+    .set({ usedAt: new Date() })
+    .where(eq(profileSetupTokens.token, token))
+    .returning();
+
+  return result[0];
 }
