@@ -2545,6 +2545,67 @@ export async function getTelegramDeliveryCount(status: string | null, chatId: st
   return result[0]?.count || 0;
 }
 
+export async function getJudgeByUserIdWithAssignmentCount(userId: string) {
+  const judge = await db.query.judges.findFirst({
+    where: eq(schema.judges.userId, userId),
+    with: {
+      user: {
+        columns: { email: true },
+      },
+    },
+  });
+
+  if (!judge) {
+    return null;
+  }
+
+  const assignmentCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.judgeAssignments)
+    .where(eq(schema.judgeAssignments.judgeId, judge.id));
+
+  return {
+    ...judge,
+    assignmentCount: assignmentCount[0]?.count || 0,
+  };
+}
+
+export async function updateJudgeProfile(
+  userId: string,
+  data: {
+    name?: string;
+    specializations?: string[];
+    profileImageUrl?: string;
+  }
+) {
+  const updated = await db
+    .update(schema.judges)
+    .set(data)
+    .where(eq(schema.judges.userId, userId))
+    .returning();
+
+  if (!updated[0]) {
+    return null;
+  }
+
+  const judge = updated[0];
+  const assignmentCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.judgeAssignments)
+    .where(eq(schema.judgeAssignments.judgeId, judge.id));
+
+  const user = await db.query.users.findFirst({
+    where: eq(schema.users.id, userId),
+    columns: { email: true },
+  });
+
+  return {
+    ...judge,
+    user: { email: user?.email || "" },
+    assignmentCount: assignmentCount[0]?.count || 0,
+  };
+}
+
 export async function getTelegramDeliveryById(deliveryId: string) {
   return db.query.telegramMessageDeliveries.findFirst({
     where: eq(schema.telegramMessageDeliveries.id, deliveryId),

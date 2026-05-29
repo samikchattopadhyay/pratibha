@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getJudgeByUserIdWithAssignmentCount,
+  updateJudgeProfile,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -16,17 +19,7 @@ export async function GET() {
 
     const userId = (session.user as { id?: string }).id;
 
-    const judge = await prisma.judge.findUnique({
-      where: { userId },
-      include: {
-        user: {
-          select: { email: true },
-        },
-        _count: {
-          select: { assignments: true },
-        },
-      },
-    });
+    const judge = await getJudgeByUserIdWithAssignmentCount(userId!);
 
     if (!judge) {
       return NextResponse.json({ error: "Judge profile not found" }, { status: 404 });
@@ -36,7 +29,7 @@ export async function GET() {
       email: judge.user.email,
       name: judge.name,
       specializations: judge.specializations,
-      assignmentCount: judge._count.assignments,
+      assignmentCount: judge.assignmentCount,
       profileImageUrl: judge.profileImageUrl,
     });
   } catch (error) {
@@ -74,24 +67,17 @@ export async function PUT(request: NextRequest) {
       updateData.profileImageUrl = body.profileImage;
     }
 
-    const updatedJudge = await prisma.judge.update({
-      where: { userId },
-      data: updateData,
-      include: {
-        user: {
-          select: { email: true },
-        },
-        _count: {
-          select: { assignments: true },
-        },
-      },
-    });
+    const updatedJudge = await updateJudgeProfile(userId!, updateData);
+
+    if (!updatedJudge) {
+      return NextResponse.json({ error: "Judge profile not found" }, { status: 404 });
+    }
 
     return NextResponse.json({
       email: updatedJudge.user.email,
       name: updatedJudge.name,
       specializations: updatedJudge.specializations,
-      assignmentCount: updatedJudge._count.assignments,
+      assignmentCount: updatedJudge.assignmentCount,
       profileImageUrl: updatedJudge.profileImageUrl,
     });
   } catch (error) {
