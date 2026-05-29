@@ -1466,6 +1466,56 @@ export async function getJudgePayoutsPaginated(judgeId: string, limit: number, o
   };
 }
 
+export async function getJudgeRevenueMetadata(judgeId: string) {
+  const [payouts, judge] = await Promise.all([
+    db
+      .select({
+        amount: schema.judgePayouts.amount,
+        status: schema.judgePayouts.status,
+      })
+      .from(schema.judgePayouts)
+      .where(eq(schema.judgePayouts.judgeId, judgeId)),
+    db.query.judges.findFirst({
+      where: eq(schema.judges.id, judgeId),
+      columns: {
+        paymentPerEvaluation: true,
+      },
+    }),
+  ]);
+
+  if (!judge) {
+    return null;
+  }
+
+  const totalEarned = payouts
+    .filter((p) => p.status === "PAID")
+    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+
+  const totalPending = payouts
+    .filter((p) => p.status === "PENDING")
+    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+
+  const perEvaluationRate = judge.paymentPerEvaluation ? parseFloat(judge.paymentPerEvaluation.toString()) : 150;
+  const hourlyRate = perEvaluationRate * 4;
+
+  const lastPayout = await db
+    .select({
+      paymentDate: schema.judgePayouts.paymentDate,
+    })
+    .from(schema.judgePayouts)
+    .where(and(eq(schema.judgePayouts.judgeId, judgeId), eq(schema.judgePayouts.status, "PAID")))
+    .orderBy(desc(schema.judgePayouts.paymentDate))
+    .limit(1);
+
+  return {
+    totalEarned,
+    totalPending,
+    hourlyRate,
+    perEvaluationRate,
+    lastPaymentDate: lastPayout[0]?.paymentDate?.toISOString() ?? null,
+  };
+}
+
 export async function getStudentsForAdminList(params: {
   limit: number;
   offset: number;
