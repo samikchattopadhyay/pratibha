@@ -223,6 +223,81 @@ export async function createCertificateBulk(data: (typeof schema.certificates.$i
   return db.insert(schema.certificates).values(data).returning();
 }
 
+// ─── TRANSACTION QUERIES ──────────────────────────────────────────────────────
+
+export async function getSuccessfulTransactions() {
+  return db.query.transactions.findMany({
+    where: eq(schema.transactions.status, "SUCCESS"),
+    columns: { amount: true, createdAt: true },
+  });
+}
+
+export async function getTransactionCount() {
+  const result = await db
+    .select({ count: schema.transactions.id })
+    .from(schema.transactions);
+  return result.length;
+}
+
+export async function getTransactionsPaginated(limit: number, offset: number) {
+  return db.query.transactions.findMany({
+    limit,
+    offset,
+    with: {
+      registration: {
+        with: {
+          student: {
+            with: {
+              parent: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: (transactions, { desc }) => [desc(transactions.createdAt)],
+  });
+}
+
+// ─── SOCIAL METRICS QUERIES ───────────────────────────────────────────────────
+
+export async function getSocialMetricCount() {
+  const result = await db
+    .select({ count: schema.socialMetrics.id })
+    .from(schema.socialMetrics);
+  return result.length;
+}
+
+export async function getSocialMetricsPaginated(limit: number, offset: number) {
+  return db.query.socialMetrics.findMany({
+    limit,
+    offset,
+    with: {
+      registration: {
+        with: {
+          student: true,
+          competitionCategory: {
+            with: {
+              category: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: (metrics, { desc }) => [desc(metrics.calculatedEngagement)],
+  });
+}
+
+// ─── JUDGE ASSIGNMENT QUERIES ──────────────────────────────────────────────────
+
+export async function getJudgeAssignmentByRegistrationAndJudge(registrationId: string, judgeId: string) {
+  return db.query.judgeAssignments.findFirst({
+    where: and(
+      eq(schema.judgeAssignments.registrationId, registrationId),
+      eq(schema.judgeAssignments.judgeId, judgeId)
+    ),
+  });
+}
+
 // ─── REGISTRATION QUERIES ────────────────────────────────────────────────────
 
 export async function getRegistrationById(id: string) {

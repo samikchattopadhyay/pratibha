@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getSocialMetricCount,
+  getSocialMetricsPaginated,
+} from "@/lib/db/queries";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,35 +21,14 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
 
-    const [totalCount, metrics] = await prisma.$transaction([
-      prisma.socialMetric.count(),
-      prisma.socialMetric.findMany({
-        include: {
-          registration: {
-            include: {
-              student: true,
-              competitionCategory: {
-                include: {
-                  category: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          calculatedEngagement: "desc",
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    const totalCount = await getSocialMetricCount();
+    const metrics = await getSocialMetricsPaginated(limit, (page - 1) * limit);
 
     const formatted = metrics.map((m) => {
       const likes = m.likesCount;
       const comments = m.commentsCount;
       const shares = m.sharesCount;
-      // Formula for velocity/engagement index out of 100
-      const velocityIndex = Number(m.calculatedEngagement);
+      const velocityIndex = parseFloat(m.calculatedEngagement.toString());
 
       return {
         id: m.id,

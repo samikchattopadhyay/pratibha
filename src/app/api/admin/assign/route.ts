@@ -1,6 +1,11 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getJudgeAssignmentByRegistrationAndJudge,
+  createJudgeAssignment,
+  getUserById,
+  getRegistrationForCertificateNotification,
+} from "@/lib/db/queries";
 import { createAndDispatchNotification } from "@/lib/notificationService";
 
 export async function POST(req: Request) {
@@ -22,40 +27,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Required parameters missing" }, { status: 400 });
     }
 
-    // Check if assignment already exists
-    const existing = await prisma.judgeAssignment.findUnique({
-      where: {
-        registrationId_judgeId: { registrationId, judgeId },
-      },
-    });
+    const existing = await getJudgeAssignmentByRegistrationAndJudge(registrationId, judgeId);
 
     if (existing) {
       return NextResponse.json({ error: "This judge is already assigned to evaluate this entry" }, { status: 400 });
     }
 
-    const assignment = await prisma.judgeAssignment.create({
-      data: {
-        registrationId,
-        judgeId,
-        isSubmitted: false,
-      },
+    const result = await createJudgeAssignment({
+      registrationId,
+      judgeId,
+      isSubmitted: false,
     });
 
-    // Send notification to judge (fire-and-forget)
-    const judge = await prisma.user.findUnique({
-      where: { id: judgeId },
-    });
+    const assignment = result[0];
+
+    const judge = await getUserById(judgeId);
 
     if (judge?.email) {
-      const registration = await prisma.registration.findUnique({
-        where: { id: registrationId },
-        include: {
-          student: true,
-          competitionCategory: {
-            include: { category: true },
-          },
-        },
-      });
+      const registration = await getRegistrationForCertificateNotification(registrationId);
 
       if (registration) {
         createAndDispatchNotification({

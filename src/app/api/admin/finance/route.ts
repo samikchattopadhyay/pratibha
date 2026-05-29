@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getSuccessfulTransactions,
+  getTransactionCount,
+  getTransactionsPaginated,
+} from "@/lib/db/queries";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,41 +22,19 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
 
-    // Calculate core metrics
-    const successfulTx = await prisma.transaction.findMany({
-      where: { status: "SUCCESS" },
-    });
+    const successfulTx = await getSuccessfulTransactions();
 
-    const totalRevenue = successfulTx.reduce((acc, curr) => acc + Number(curr.amount), 0);
+    const totalRevenue = successfulTx.reduce((acc, curr) => acc + parseFloat(curr.amount.toString()), 0);
     const totalTransactionsCount = successfulTx.length;
     const avgTicketSize = totalTransactionsCount > 0 ? (totalRevenue / totalTransactionsCount).toFixed(2) : "0.00";
 
-    // Simulate course and medal breakouts from specs
     const medalUpgradesCount = Math.round(totalTransactionsCount * 0.4);
     const medalUpgradesRevenue = medalUpgradesCount * 50;
     const workshopUpsellsRevenue = totalRevenue - medalUpgradesRevenue;
-    const workshopUpsellsCount = Math.round(workshopUpsellsRevenue / 99); // assuming ₹99 avg
+    const workshopUpsellsCount = Math.round(workshopUpsellsRevenue / 99);
 
-    // Get paginated transaction details
-    const [totalTransactions, transactions] = await prisma.$transaction([
-      prisma.transaction.count(),
-      prisma.transaction.findMany({
-        include: {
-          registration: {
-            include: {
-              student: {
-                include: {
-                  parent: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    const totalTransactions = await getTransactionCount();
+    const transactions = await getTransactionsPaginated(limit, (page - 1) * limit);
 
     const formattedTxList = transactions.map((tx) => ({
       id: tx.id,
