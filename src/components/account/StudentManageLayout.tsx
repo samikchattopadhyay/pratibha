@@ -196,7 +196,7 @@ export default function StudentManageLayout({
           ✏️ Edit Student Profile
         </h3>
         <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">
-          Update your student's profile information, appearance details, and skills/training data.
+          Update your student&apos;s profile information, appearance details, and skills/training data.
         </p>
         <Button
           onClick={() => setIsEditWizardOpen(true)}
@@ -214,7 +214,7 @@ export default function StudentManageLayout({
           🔗 Personalized Profile URL
         </h3>
         <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">
-          Choose a memorable URL slug for your student's public profile. This makes it easier to share!
+          Choose a memorable URL slug for your student&apos;s public profile. This makes it easier to share!
         </p>
         <SlugInput
           value={slug}
@@ -271,7 +271,7 @@ export default function StudentManageLayout({
         </div>
 
         <p className="font-sans text-sm text-charcoal/60 dark:text-cream/60">
-          These appear on your child's public profile. Showcase achievements from school competitions, cultural events, or other recognitions.
+          These appear on your child&apos;s public profile. Showcase achievements from school competitions, cultural events, or other recognitions.
         </p>
 
         {student.externalAchievements.length === 0 ? (
@@ -425,6 +425,7 @@ export default function StudentManageLayout({
         }}
         studentId={student.id}
         achievementId={editingAchievementId || undefined}
+        initialData={editingAchievementId ? student.externalAchievements.find((a: { id: string }) => a.id === editingAchievementId) : undefined}
       />
     </div>
   );

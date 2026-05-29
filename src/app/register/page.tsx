@@ -1,67 +1,68 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
-import PasswordInput from "@/components/PasswordInput";
+import FormField from "@/components/forms/FormField";
+import FormError from "@/components/forms/FormError";
+import PasswordField from "@/components/forms/PasswordField";
 import { FacebookLoginButton } from "@/components/auth/FacebookLoginButton";
+import { registerSchema, type RegisterFormData } from "@/schemas/auth";
 import { UserPlus, AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    password: "",
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    watch,
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    mode: "onBlur",
   });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
+  const onSubmit = async (data: RegisterFormData) => {
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(data),
       });
 
-      const data = await res.json();
+      const responseData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong. Please check your entries.");
-        setLoading(false);
+        setError("root", {
+          message: responseData.error || "Something went wrong. Please check your entries.",
+        });
       } else {
         router.push("/login?callbackUrl=/account/dashboard&registered=true");
       }
     } catch (err) {
       console.error(err);
-      setError("An unexpected error occurred. Please try again.");
-      setLoading(false);
+      setError("root", {
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
   };
+
+  const rootError = errors.root?.message;
+  const passwordValue = watch("password");
 
   return (
     <>
       <Header />
-      
+
       <main className="flex-1 bg-cream py-16 px-4 flex items-center justify-center alpana-pattern">
         <div className="w-full max-w-2xl bg-cream border border-terracotta/10 rounded-2xl p-8 shadow-xl relative overflow-hidden">
-          
+
           <div className="text-center space-y-2 mb-8">
             <h1 className="font-serif text-3xl font-bold text-charcoal">
               Create <span className="text-terracotta">Parent Account</span>
@@ -71,19 +72,17 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {error && (
+          {rootError && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-200 rounded-xl text-red-800 text-sm font-sans flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{error}</span>
+              <span>{rootError}</span>
             </div>
           )}
 
-          {/* Facebook OAuth Option */}
           <div className="mb-6">
             <FacebookLoginButton />
           </div>
 
-          {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-terracotta/20"></div>
@@ -95,69 +94,50 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {/* Grid 1: Basic Info */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
             <div className="space-y-4">
               <h3 className="font-serif text-base font-bold text-terracotta border-b border-terracotta/5 pb-1">
                 Account Details
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Parent Full Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="John Doe"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Mobile Number (WhatsApp)</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    required
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="+91 98306 12345"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Email Address</label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                    placeholder="your.email@example.com"
-                  />
-                </div>
-                <PasswordInput
+                <FormField
+                  label="Parent Full Name"
+                  placeholder="John Doe"
+                  error={errors.name?.message}
+                  {...register("name")}
+                />
+                <FormField
+                  label="Mobile Number (WhatsApp)"
+                  type="tel"
+                  placeholder="+91 98306 12345"
+                  error={errors.phone?.message}
+                  {...register("phone")}
+                />
+                <FormField
+                  label="Email Address"
+                  type="email"
+                  placeholder="your.email@example.com"
+                  error={errors.email?.message}
+                  {...register("email")}
+                />
+                <PasswordField
                   label="Create Password"
-                  name="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
                   placeholder="••••••••"
+                  error={errors.password?.message}
                   showRequirements={true}
+                  value={passwordValue}
+                  {...register("password")}
                 />
               </div>
             </div>
 
-
             <Button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               variant="primary"
               size="lg"
-              isLoading={loading}
+              isLoading={isSubmitting}
               className="w-full"
             >
               <UserPlus className="w-4 h-4" />

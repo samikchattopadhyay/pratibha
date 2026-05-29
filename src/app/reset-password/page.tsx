@@ -1,26 +1,38 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
-import PasswordInput from "@/components/PasswordInput";
+import PasswordField from "@/components/forms/PasswordField";
+import FormError from "@/components/forms/FormError";
 import Loading from "@/components/Loading";
+import { resetPasswordSchema, type ResetPasswordFormData } from "@/schemas/auth";
 import { Lock, AlertCircle, CheckCircle } from "lucide-react";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(!token);
   const [tokenValid, setTokenValid] = useState(false);
   const [tokenError, setTokenError] = useState(token ? "" : "No reset token provided");
   const [submitted, setSubmitted] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    watch,
+  } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    mode: "onBlur",
+  });
 
   useEffect(() => {
     if (!token) {
@@ -54,30 +66,28 @@ function ResetPasswordForm() {
     validateToken();
   }, [token]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
+  const onSubmit = async (data: ResetPasswordFormData) => {
     try {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, password: data.password }),
       });
 
-      const data = await res.json();
+      const responseData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong. Please try again.");
-        setLoading(false);
+        setError("root", {
+          message: responseData.error || "Something went wrong. Please try again.",
+        });
       } else {
         setSubmitted(true);
       }
     } catch (err) {
       console.error(err);
-      setError("An unexpected error occurred. Please try again.");
-      setLoading(false);
+      setError("root", {
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
@@ -141,6 +151,9 @@ function ResetPasswordForm() {
     );
   }
 
+  const rootError = errors.root?.message;
+  const passwordValue = watch("password");
+
   return (
     <>
       <Header />
@@ -155,30 +168,44 @@ function ResetPasswordForm() {
             </p>
           </div>
 
-          {error && (
+          {rootError && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-200 rounded-xl text-red-800 text-sm font-sans flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{error}</span>
+              <span>{rootError}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <PasswordInput
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <PasswordField
               label="New Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
               placeholder="••••••••"
+              error={errors.password?.message}
               showRequirements={true}
+              value={passwordValue}
+              {...register("password")}
             />
+
+            <div className="space-y-1.5">
+              <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className={`w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors ${
+                  errors.confirmPassword ? "border-red-300 focus:border-red-400" : ""
+                }`}
+                {...register("confirmPassword")}
+              />
+              {errors.confirmPassword && <FormError error={errors.confirmPassword.message} />}
+            </div>
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               variant="primary"
               size="lg"
-              isLoading={loading}
+              isLoading={isSubmitting}
               className="w-full"
             >
               <Lock className="w-4 h-4" />

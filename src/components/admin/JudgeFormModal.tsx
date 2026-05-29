@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
@@ -8,6 +8,11 @@ import { Judge } from "./ParticipantsTab";
 import ChipMultiSelect from "./ChipMultiSelect";
 import SearchableSelect from "./SearchableSelect";
 import RichTextEditor from "@/components/RichTextEditor";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { judgeSchema } from "@/schemas/admin";
+import FormError from "@/components/forms/FormError";
+import { z } from "zod";
 
 interface JudgeFormModalProps {
   readonly isOpen: boolean;
@@ -99,38 +104,64 @@ export default function JudgeFormModal({
   const [emailError, setEmailError] = useState("");
   const [emailChecking, setEmailChecking] = useState(false);
 
-  const [formData, setFormData] = useState(() => {
-    if (editingJudge) {
-      return {
-        name: editingJudge.name || "",
-        email: editingJudge.email || "",
-        tier: editingJudge.tier || "LOCAL",
-        specializations: editingJudge.specializations || [],
-        bio: editingJudge.bio || "",
-        credentials: editingJudge.credentials || "",
-        stateOfResidence: editingJudge.stateOfResidence || "",
-        states: editingJudge.states || [],
-        languages: editingJudge.languages || [],
-        yearsOfExperience: editingJudge.yearsOfExperience ? editingJudge.yearsOfExperience.toString() : "",
-        isVerified: editingJudge.isVerified || false,
-        isAvailable: editingJudge.isAvailable ?? true,
-      };
-    }
-    return {
+  const { register, handleSubmit: hookHandleSubmit, control, trigger, reset, formState: { errors } } = useForm<z.input<typeof judgeSchema>>({
+    resolver: zodResolver(judgeSchema),
+    mode: "onBlur",
+    defaultValues: {
       name: "",
       email: "",
       tier: "LOCAL",
-      specializations: [] as string[],
+      specializations: [],
       bio: "",
       credentials: "",
       stateOfResidence: "",
-      states: [] as string[],
-      languages: [] as string[],
-      yearsOfExperience: "",
+      states: [],
+      languages: [],
+      yearsOfExperience: null,
       isVerified: false,
       isAvailable: true,
-    };
+    },
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      reset(
+        editingJudge
+          ? {
+              name: editingJudge.name || "",
+              email: editingJudge.email || "",
+              tier: editingJudge.tier || "LOCAL",
+              specializations: editingJudge.specializations || [],
+              bio: editingJudge.bio || "",
+              credentials: editingJudge.credentials || "",
+              stateOfResidence: editingJudge.stateOfResidence || "",
+              states: editingJudge.states || [],
+              languages: editingJudge.languages || [],
+              yearsOfExperience: editingJudge.yearsOfExperience ?? null,
+              isVerified: editingJudge.isVerified || false,
+              isAvailable: editingJudge.isAvailable ?? true,
+            }
+          : {
+              name: "",
+              email: "",
+              tier: "LOCAL",
+              specializations: [],
+              bio: "",
+              credentials: "",
+              stateOfResidence: "",
+              states: [],
+              languages: [],
+              yearsOfExperience: null,
+              isVerified: false,
+              isAvailable: true,
+            }
+      );
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentStep(1);
+      setErrorMsg("");
+      setEmailError("");
+    }
+  }, [isOpen, editingJudge, reset]);
 
   const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
 
@@ -186,21 +217,6 @@ export default function JudgeFormModal({
 
   if (!isOpen) return null;
 
-  const validateStep = (step: number) => {
-    if (step === 1) {
-      if (!formData.name.trim()) {
-        setErrorMsg("Full Name is required");
-        return false;
-      }
-      if (!formData.email.trim()) {
-        setErrorMsg("Email Address is required");
-        return false;
-      }
-    }
-    setErrorMsg("");
-    return true;
-  };
-
   const checkEmailExists = async (email: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/admin/judges/check-email?email=${encodeURIComponent(email)}`);
@@ -235,16 +251,31 @@ export default function JudgeFormModal({
   };
 
   const handleNext = async () => {
-    if (!validateStep(currentStep)) return;
+    let fieldsToValidate: Array<keyof z.input<typeof judgeSchema>> = [];
+    if (currentStep === 1) {
+      fieldsToValidate = ["name", "email"];
+    } else if (currentStep === 2) {
+      fieldsToValidate = ["tier", "yearsOfExperience", "specializations"];
+    } else if (currentStep === 3) {
+      fieldsToValidate = ["bio", "credentials"];
+    }
+
+    if (fieldsToValidate.length > 0) {
+      const isValid = await trigger(fieldsToValidate);
+      if (!isValid) {
+        setErrorMsg("Please fix validation errors before continuing.");
+        return;
+      }
+    }
 
     if (currentStep === 1) {
       if (emailError) {
         setErrorMsg(emailError);
         return;
       }
-      setErrorMsg("");
     }
 
+    setErrorMsg("");
     setCurrentStep((prev) => Math.min(prev + 1, 4));
   };
 
@@ -253,26 +284,28 @@ export default function JudgeFormModal({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateStep(currentStep)) return;
-    
+  const onSubmit = hookHandleSubmit(async (data) => {
+    if (emailError) {
+      setErrorMsg(emailError);
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMsg("");
 
     const payload: JudgePayload = {
-      name: formData.name,
-      email: formData.email,
-      tier: formData.tier,
-      specializations: formData.specializations,
-      bio: formData.bio,
-      credentials: formData.credentials,
-      stateOfResidence: formData.stateOfResidence,
-      states: formData.states,
-      languages: formData.languages,
-      yearsOfExperience: formData.yearsOfExperience ? parseInt(formData.yearsOfExperience, 10) : null,
-      isVerified: formData.isVerified,
-      isAvailable: formData.isAvailable,
+      name: data.name,
+      email: data.email,
+      tier: data.tier,
+      specializations: data.specializations,
+      bio: data.bio,
+      credentials: data.credentials,
+      stateOfResidence: data.stateOfResidence,
+      states: data.states,
+      languages: data.languages,
+      yearsOfExperience: data.yearsOfExperience ?? null,
+      isVerified: data.isVerified ?? false,
+      isAvailable: data.isAvailable ?? true,
     };
 
     if (editingJudge) {
@@ -287,9 +320,9 @@ export default function JudgeFormModal({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save judge details");
+        throw new Error(resData.error || "Failed to save judge details");
       }
 
       onClose();
@@ -302,7 +335,7 @@ export default function JudgeFormModal({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/80 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto">
@@ -346,7 +379,7 @@ export default function JudgeFormModal({
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4 font-sans">
+            <form onSubmit={onSubmit} className="space-y-4 font-sans">
             
             {/* Step 1: Account Credentials */}
             {currentStep === 1 && (
@@ -359,12 +392,11 @@ export default function JudgeFormModal({
                   <label className="text-sm font-medium text-cream block mb-1">Full Name *</label>
                   <input
                     type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    {...register("name")}
                     className="w-full h-10 text-base bg-charcoal border border-terracotta/20 rounded-lg px-3 text-cream placeholder-cream/35 focus:outline-none focus:border-gold transition-all duration-200"
                     placeholder="e.g. Pandit Debojyoti Bose"
                   />
+                  {errors.name && <FormError error={errors.name.message} />}
                 </div>
 
                 <div className="space-y-1">
@@ -372,14 +404,11 @@ export default function JudgeFormModal({
                   <div className="relative">
                     <input
                       type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) => {
-                        setFormData({ ...formData, email: e.target.value });
-                        validateEmailRealTime(e.target.value);
-                      }}
+                      {...register("email", {
+                        onChange: (e) => validateEmailRealTime(e.target.value)
+                      })}
                       className={`w-full h-10 text-base bg-charcoal border rounded-lg px-3 text-cream placeholder-cream/35 focus:outline-none transition-all duration-200 ${
-                        emailError ? "border-red-500/50 focus:border-red-500" : "border-terracotta/20 focus:border-gold"
+                        emailError || errors.email ? "border-red-500/50 focus:border-red-500" : "border-terracotta/20 focus:border-gold"
                       }`}
                       placeholder="e.g. debojyoti@pratibha.org"
                       autoComplete="email"
@@ -393,6 +422,7 @@ export default function JudgeFormModal({
                   {emailError && (
                     <p className="text-xs text-red-400 mt-1">{emailError}</p>
                   )}
+                  {errors.email && <FormError error={errors.email.message} />}
                 </div>
               </div>
             )}
@@ -408,8 +438,7 @@ export default function JudgeFormModal({
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-cream block mb-1">Seniority Tier *</label>
                     <select
-                      value={formData.tier}
-                      onChange={(e) => setFormData({ ...formData, tier: e.target.value })}
+                      {...register("tier")}
                       className="w-full h-10 text-base bg-charcoal border border-terracotta/20 rounded-lg px-3 text-cream focus:outline-none focus:border-gold transition-all duration-200 cursor-pointer"
                     >
                       <option value="LOCAL">LOCAL</option>
@@ -417,17 +446,20 @@ export default function JudgeFormModal({
                       <option value="NATIONAL">NATIONAL</option>
                       <option value="EXPERT">EXPERT</option>
                     </select>
+                    {errors.tier && <FormError error={errors.tier.message} />}
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-cream block mb-1">Years of Experience</label>
                     <input
                       type="number"
-                      value={formData.yearsOfExperience}
-                      onChange={(e) => setFormData({ ...formData, yearsOfExperience: e.target.value })}
+                      {...register("yearsOfExperience", {
+                        setValueAs: (v) => (v === "" ? null : Number(v)),
+                      })}
                       className="w-full h-10 text-base bg-charcoal border border-terracotta/20 rounded-lg px-3 text-cream placeholder-cream/35 focus:outline-none focus:border-gold transition-all duration-200"
                       placeholder="e.g. 15"
                     />
+                    {errors.yearsOfExperience && <FormError error={errors.yearsOfExperience.message} />}
                   </div>
                 </div>
 
@@ -449,13 +481,20 @@ export default function JudgeFormModal({
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-cream block mb-1">Specializations</label>
-                  <ChipMultiSelect
-                    options={filteredSpecializationOptions}
-                    selectedValues={formData.specializations}
-                    onChange={(values) => setFormData((prev) => ({ ...prev, specializations: values }))}
-                    placeholder="Search and select specializations..."
-                    allOptions={specializationOptions}
+                  <Controller
+                    control={control}
+                    name="specializations"
+                    render={({ field }) => (
+                      <ChipMultiSelect
+                        options={filteredSpecializationOptions}
+                        selectedValues={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Search and select specializations..."
+                        allOptions={specializationOptions}
+                      />
+                    )}
                   />
+                  {errors.specializations && <FormError error={errors.specializations.message} />}
                 </div>
               </div>
             )}
@@ -469,20 +508,34 @@ export default function JudgeFormModal({
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-cream block mb-1">Short Biography</label>
-                  <RichTextEditor
-                    value={formData.bio}
-                    onChange={(value) => setFormData((prev) => ({ ...prev, bio: value }))}
-                    placeholder="Short summary of the judge's achievements, training, and background..."
+                  <Controller
+                    control={control}
+                    name="bio"
+                    render={({ field }) => (
+                      <RichTextEditor
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Short summary of the judge's achievements, training, and background..."
+                      />
+                    )}
                   />
+                  {errors.bio && <FormError error={errors.bio.message} />}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-cream block mb-1">Credentials & Qualifications</label>
-                  <RichTextEditor
-                    value={formData.credentials}
-                    onChange={(value) => setFormData((prev) => ({ ...prev, credentials: value }))}
-                    placeholder="Academic degrees, notable rewards, performance experience, or previous panels..."
+                  <Controller
+                    control={control}
+                    name="credentials"
+                    render={({ field }) => (
+                      <RichTextEditor
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Academic degrees, notable rewards, performance experience, or previous panels..."
+                      />
+                    )}
                   />
+                  {errors.credentials && <FormError error={errors.credentials.message} />}
                 </div>
               </div>
             )}
@@ -497,34 +550,55 @@ export default function JudgeFormModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-cream block mb-1">State of Residence</label>
-                    <SearchableSelect
-                      options={STATES_OPTIONS}
-                      value={formData.stateOfResidence}
-                      onChange={(value) => setFormData({ ...formData, stateOfResidence: value })}
-                      placeholder="Search and select state..."
-                      searchPlaceholder="Search states..."
+                    <Controller
+                      control={control}
+                      name="stateOfResidence"
+                      render={({ field }) => (
+                        <SearchableSelect
+                          options={STATES_OPTIONS}
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Search and select state..."
+                          searchPlaceholder="Search states..."
+                        />
+                      )}
                     />
+                    {errors.stateOfResidence && <FormError error={errors.stateOfResidence.message} />}
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-cream block mb-1">Languages</label>
-                    <ChipMultiSelect
-                      options={LANGUAGES_OPTIONS}
-                      selectedValues={formData.languages}
-                      onChange={(values) => setFormData((prev) => ({ ...prev, languages: values }))}
-                      placeholder="Select languages..."
+                    <Controller
+                      control={control}
+                      name="languages"
+                      render={({ field }) => (
+                        <ChipMultiSelect
+                          options={LANGUAGES_OPTIONS}
+                          selectedValues={field.value || []}
+                          onChange={field.onChange}
+                          placeholder="Select languages..."
+                        />
+                      )}
                     />
+                    {errors.languages && <FormError error={errors.languages.message} />}
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-cream block mb-1">Eligible/Active States</label>
-                  <ChipMultiSelect
-                    options={ELIGIBLE_STATES_OPTIONS}
-                    selectedValues={formData.states}
-                    onChange={(values) => setFormData((prev) => ({ ...prev, states: values }))}
-                    placeholder="Select states or National..."
+                  <Controller
+                    control={control}
+                    name="states"
+                    render={({ field }) => (
+                      <ChipMultiSelect
+                        options={ELIGIBLE_STATES_OPTIONS}
+                        selectedValues={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Select states or National..."
+                      />
+                    )}
                   />
+                  {errors.states && <FormError error={errors.states.message} />}
                 </div>
 
                 {/* Toggles: Verified & Available */}
@@ -532,8 +606,7 @@ export default function JudgeFormModal({
                   <label className="flex items-center gap-2 text-sm text-cream/80 cursor-pointer select-none">
                     <input
                       type="checkbox"
-                      checked={formData.isVerified}
-                      onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
+                      {...register("isVerified")}
                       className="rounded border-terracotta/40 bg-charcoal text-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
                     <span>Is Verified Account</span>
@@ -542,8 +615,7 @@ export default function JudgeFormModal({
                   <label className="flex items-center gap-2 text-sm text-cream/80 cursor-pointer select-none">
                     <input
                       type="checkbox"
-                      checked={formData.isAvailable}
-                      onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
+                      {...register("isAvailable")}
                       className="rounded border-terracotta/40 bg-charcoal text-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
                     <span>Available for Assignments</span>
@@ -603,7 +675,7 @@ export default function JudgeFormModal({
             ) : (
               <Button
                 type="button"
-                onClick={handleSubmit}
+                onClick={onSubmit}
                 variant="primary"
                 size="md"
                 className="w-36 font-bold flex items-center justify-center"

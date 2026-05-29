@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Star } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
 import BannerTemplatePicker from "./BannerTemplatePicker";
 import Button from "../Button";
 import RichTextEditor from "../RichTextEditor";
 import { INDIA_STATES, AGE_GROUPS, SCORING_CRITERIA } from "@/lib/constants";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { competitionSchema } from "@/schemas/admin";
+import FormError from "../forms/FormError";
+import { z } from "zod";
 
 interface CriterionConfig {
   key: string;
@@ -15,13 +20,7 @@ interface CriterionConfig {
   description?: string;
 }
 
-interface PrizeEntry {
-  rank: string;
-  type: string;
-  title: string;
-  description?: string;
-  estimatedValue?: string;
-}
+
 
 interface DbCategory {
   id: string;
@@ -43,40 +42,7 @@ interface BannerTemplateProp {
   updatedAt: Date;
 }
 
-interface WizardData {
-  // Step 1 — Basic Details
-  title: string;
-  description: string;
-  scope: "STATE" | "NATIONAL";
-  eligibleStates: string[];
-  registrationDeadline: string;
-  startDate: string;
-  endDate: string;
-  resultDate: string;
-  categoryId: string;
-  categoryName: string;
-  minAge: number;
-  maxAge: number;
-  language: string;
-  capacity: string;
-  facebookGroupUrl: string;
-  difficultyLevel: number;
-  entryFeeINR: string;
-  entryFeePreset: string;
-  bannerSlug: string;
 
-  // Step 2 — Judges
-  selectedJudgeIds: string[];
-
-  // Step 3 — Rules
-  rules: string;
-
-  // Step 4 — Criteria
-  criteriaConfig: CriterionConfig[];
-
-  // Step 5 — Prizes
-  prizes: PrizeEntry[];
-}
 
 interface CreateCompetitionWizardProps {
   isOpen: boolean;
@@ -105,35 +71,86 @@ export default function CreateCompetitionWizard({
     languages?: string[];
     profileImageUrl?: string | null;
   }>>([]);
-  const [data, setData] = useState<WizardData>({
-    title: "",
-    description: "",
-    scope: "STATE",
-    eligibleStates: [],
-    registrationDeadline: "",
-    startDate: "",
-    endDate: "",
-    resultDate: "",
-    categoryId: "",
-    categoryName: "",
-    minAge: 0,
-    maxAge: 0,
-    language: "Any",
-    capacity: "",
-    facebookGroupUrl: "",
-    difficultyLevel: 1,
-    entryFeeINR: "50",
-    entryFeePreset: "50",
-    bannerSlug: "",
-    selectedJudgeIds: [],
-    rules: "",
-    criteriaConfig: [],
-    prizes: [],
+
+  const { register, handleSubmit: hookHandleSubmit, control, trigger, setValue, watch, reset, formState: { errors } } = useForm<z.input<typeof competitionSchema>>({
+    resolver: zodResolver(competitionSchema),
+    mode: "onBlur",
+    defaultValues: {
+      title: "",
+      description: "",
+      scope: "STATE",
+      eligibleStates: [],
+      registrationDeadline: "",
+      startDate: "",
+      endDate: "",
+      resultDate: "",
+      categoryId: "",
+      categoryName: "",
+      minAge: 0,
+      maxAge: 0,
+      language: "Any",
+      capacity: null,
+      facebookGroupUrl: "",
+      difficultyLevel: 1,
+      entryFeeINR: 50,
+      bannerTemplateId: "",
+      judgeIds: [],
+      rules: "",
+      scoringCriteria: [],
+      prizes: [],
+    },
   });
+
+  const watchedValues = watch();
+  const [entryFeePreset, setEntryFeePreset] = useState("50");
   const [judgeSearch, setJudgeSearch] = useState("");
   const [judgeTierFilter, setJudgeTierFilter] = useState("ALL");
   const [judgeSpecFilter, setJudgeSpecFilter] = useState("ALL");
-  const [dynamicRubrics, setDynamicRubrics] = useState<any>(null);
+  const [dynamicRubrics, setDynamicRubrics] = useState<Record<string, Record<string, CriterionConfig[]>> | null>(null);
+
+  const initializeCriteria = useCallback(() => {
+    const cat = dbCategories.find((c) => c.id === watchedValues.categoryId);
+    const grouping = cat?.grouping || "MUSIC_VOCAL";
+    const source = (dynamicRubrics || SCORING_CRITERIA) as Record<string, Record<string, CriterionConfig[]>>;
+    const groupCriteria = source[watchedValues.scope || "STATE"]?.[grouping] || source[watchedValues.scope || "STATE"]?.["MUSIC_VOCAL"] || [];
+    const defaults = groupCriteria.map((c: CriterionConfig) => ({ ...c })) as CriterionConfig[];
+    setValue("scoringCriteria", defaults, { shouldValidate: true });
+  }, [dbCategories, watchedValues.categoryId, watchedValues.scope, dynamicRubrics, setValue]);
+
+  useEffect(() => {
+    if (isOpen) {
+      reset({
+        title: "",
+        description: "",
+        scope: "STATE",
+        eligibleStates: [],
+        registrationDeadline: "",
+        startDate: "",
+        endDate: "",
+        resultDate: "",
+        categoryId: "",
+        categoryName: "",
+        minAge: 0,
+        maxAge: 0,
+        language: "Any",
+        capacity: null,
+        facebookGroupUrl: "",
+        difficultyLevel: 1,
+        entryFeeINR: 50,
+        bannerTemplateId: "",
+        judgeIds: [],
+        rules: "",
+        scoringCriteria: [],
+        prizes: [],
+      });
+      setCurrentStep(1);
+      setError("");
+      setEntryFeePreset("50");
+      setJudgeSearch("");
+      setJudgeTierFilter("ALL");
+      setJudgeSpecFilter("ALL");
+    }
+  }, [isOpen, reset]);
 
   useEffect(() => {
     const fetchRubrics = async () => {
@@ -159,8 +176,8 @@ export default function CreateCompetitionWizard({
   useEffect(() => {
     if (currentStep === 7 && availableJudges.length > 0) {
       // Auto-filter judges by selected category specialization
-      if (data.categoryId) {
-        const cat = dbCategories.find((c) => c.id === data.categoryId);
+      if (watchedValues.categoryId) {
+        const cat = dbCategories.find((c) => c.id === watchedValues.categoryId);
         if (cat) {
           const catSlug = (cat.slug || cat.name)
             .toLowerCase()
@@ -172,13 +189,13 @@ export default function CreateCompetitionWizard({
         setJudgeSpecFilter("ALL");
       }
     }
-  }, [currentStep, data.categoryId, dbCategories, availableJudges.length]);
+  }, [currentStep, watchedValues.categoryId, dbCategories, availableJudges.length]);
 
   useEffect(() => {
     if (currentStep === 9) {
       initializeCriteria();
     }
-  }, [currentStep, data.scope, data.categoryId, dynamicRubrics]);
+  }, [currentStep, initializeCriteria]);
 
   const judgeTiers = useMemo(() => {
     const tiers = new Set<string>();
@@ -208,28 +225,26 @@ export default function CreateCompetitionWizard({
         judgeSpecFilter === "ALL" || judge.specializations.some((s) => s.toLowerCase() === judgeSpecFilter);
 
       let matchesScopeStates = true;
-      if (data.scope === "STATE" && data.eligibleStates.length > 0) {
+      if (watchedValues.scope === "STATE" && (watchedValues.eligibleStates || []).length > 0) {
         // Only show judges that have matching eligible states, or if their states list is empty/unconfigured
         matchesScopeStates =
           !judge.states ||
           judge.states.length === 0 ||
-          data.eligibleStates.some((state) => judge.states?.includes(state));
+          watchedValues.eligibleStates.some((state) => judge.states?.includes(state));
       }
 
       let matchesLanguage = true;
-      if (data.language && data.language !== "Any") {
+      if (watchedValues.language && watchedValues.language !== "Any") {
         // Show judges who speak this language, or if they have no explicit languages configured
         matchesLanguage =
           !judge.languages ||
           judge.languages.length === 0 ||
-          judge.languages.includes(data.language);
+          judge.languages.includes(watchedValues.language);
       }
 
       return matchesSearch && matchesTier && matchesSpec && matchesScopeStates && matchesLanguage;
     });
-  }, [availableJudges, judgeSearch, judgeTierFilter, judgeSpecFilter, data.scope, data.eligibleStates, data.language]);
-
-
+  }, [availableJudges, judgeSearch, judgeTierFilter, judgeSpecFilter, watchedValues.scope, watchedValues.eligibleStates, watchedValues.language]);
 
   const categoryOptions = useMemo(
     () =>
@@ -292,78 +307,47 @@ export default function CreateCompetitionWizard({
     }
   };
 
-  const validateStep = (step: number) => {
-    switch (step) {
-      case 1:
-        if (!data.title) {
-          setError("Competition title is required");
-          return false;
-        }
-        const isValidAgeGroup = AGE_GROUPS.some(
-          (group) => group.min === data.minAge && group.max === data.maxAge
-        );
-        if (!isValidAgeGroup) {
-          setError("Age group is required");
-          return false;
-        }
-        return true;
-      case 2:
-        return true;
-      case 3:
-        if (data.scope === "STATE" && data.eligibleStates.length === 0) {
-          setError("Select at least one eligible state");
-          return false;
-        }
-        return true;
-      case 4:
-        if (!data.categoryId) {
-          setError("Select a category specialization");
-          return false;
-        }
-        return true;
-      case 5:
-        if (!data.registrationDeadline) {
-          setError("Registration deadline is required");
-          return false;
-        }
-        if (!data.startDate || !data.endDate || !data.resultDate) {
-          setError("All dates are required");
-          return false;
-        }
-        return true;
-      case 6:
-        if (!data.bannerSlug) {
-          setError("Select a banner design theme");
-          return false;
-        }
-        return true;
-      case 7:
-        return true;
-      case 8:
-        if (!data.rules || data.rules.replace(/<[^>]*>/g, "").trim().length < 10) {
-          setError("Rules & Regulations are required (at least 10 characters)");
-          return false;
-        }
-        return true;
-      case 9:
-        if (data.criteriaConfig.length === 0) {
-          setError("At least one judging criterion is required");
-          return false;
-        }
-        const totalPoints = data.criteriaConfig.reduce((sum, c) => sum + (c.max || 0), 0);
-        if (totalPoints !== 100) {
-          setError(`Total max points must equal exactly 100. Current total is ${totalPoints}.`);
-          return false;
-        }
-        return true;
-      default:
-        return true;
-    }
-  };
-
-  const handleNext = () => {
+  const handleNext = async () => {
     setError("");
-    if (!validateStep(currentStep)) return;
+    let fieldsToValidate: Array<keyof z.input<typeof competitionSchema>> = [];
+    if (currentStep === 1) {
+      fieldsToValidate = ["title", "minAge", "maxAge", "difficultyLevel", "entryFeeINR"];
+    } else if (currentStep === 2) {
+      fieldsToValidate = ["description"];
+    } else if (currentStep === 3) {
+      fieldsToValidate = ["scope", "eligibleStates"];
+    } else if (currentStep === 4) {
+      fieldsToValidate = ["categoryId", "categoryName", "language"];
+    } else if (currentStep === 5) {
+      fieldsToValidate = ["startDate", "endDate", "registrationDeadline", "resultDate", "capacity"];
+    } else if (currentStep === 6) {
+      fieldsToValidate = ["bannerTemplateId"];
+    } else if (currentStep === 7) {
+      fieldsToValidate = ["judgeIds"];
+    } else if (currentStep === 8) {
+      fieldsToValidate = ["rules"];
+    } else if (currentStep === 9) {
+      fieldsToValidate = ["scoringCriteria"];
+    }
+
+    if (fieldsToValidate.length > 0) {
+      const isValid = await trigger(fieldsToValidate);
+      if (!isValid) {
+        setError("Please fix validation errors before continuing.");
+        return;
+      }
+    }
+
+    // Additional checks
+    if (currentStep === 9) {
+      const criteria = watchedValues.scoringCriteria || [];
+      const totalPoints = criteria.reduce((sum, c) => sum + (c.max || 0), 0);
+      if (totalPoints !== 100) {
+        setError(`Total max points must equal exactly 100. Current total is ${totalPoints}.`);
+        return;
+      }
+    }
+
     if (currentStep < 10) {
       setCurrentStep(currentStep + 1);
     }
@@ -391,165 +375,129 @@ export default function CreateCompetitionWizard({
       implicitLanguage = "English";
     }
 
-    setData((prev) => ({
-      ...prev,
-      categoryId,
-      categoryName: catName,
-      language: implicitLanguage || "Any",
-    }));
+    setValue("categoryId", categoryId, { shouldValidate: true });
+    setValue("categoryName", catName, { shouldValidate: true });
+    setValue("language", implicitLanguage || "Any", { shouldValidate: true });
   };
 
   const handleAgeGroupSelect = (value: string) => {
+    if (!value) {
+      setValue("minAge", 0, { shouldValidate: true });
+      setValue("maxAge", 0, { shouldValidate: true });
+      return;
+    }
     const [min, max] = value.split("-").map(Number);
-    setData((prev) => ({
-      ...prev,
-      minAge: min,
-      maxAge: max,
-    }));
+    setValue("minAge", min, { shouldValidate: true });
+    setValue("maxAge", max, { shouldValidate: true });
   };
 
   const handleDifficultyChange = (level: number) => {
-    setData((prev) => ({
-      ...prev,
-      difficultyLevel: level,
-    }));
+    setValue("difficultyLevel", level, { shouldValidate: true });
   };
 
   const handleEntryFeeChange = (preset: string) => {
-    if (preset === "custom") {
-      setData((prev) => ({
-        ...prev,
-        entryFeePreset: "custom",
-      }));
-    } else {
-      setData((prev) => ({
-        ...prev,
-        entryFeePreset: preset,
-        entryFeeINR: preset,
-      }));
+    setEntryFeePreset(preset);
+    if (preset !== "custom") {
+      setValue("entryFeeINR", Number(preset), { shouldValidate: true });
     }
   };
 
   const handleJudgeToggle = (judgeId: string) => {
-    setData((prev) => ({
-      ...prev,
-      selectedJudgeIds: prev.selectedJudgeIds.includes(judgeId)
-        ? prev.selectedJudgeIds.filter((id) => id !== judgeId)
-        : [...prev.selectedJudgeIds, judgeId],
-    }));
+    const current = watchedValues.judgeIds || [];
+    const next = current.includes(judgeId)
+      ? current.filter((id) => id !== judgeId)
+      : [...current, judgeId];
+    setValue("judgeIds", next, { shouldValidate: true });
   };
 
   const handleAddPrize = () => {
-    setData((prev) => ({
-      ...prev,
-      prizes: [
-        ...prev.prizes,
-        {
-          rank: "FIRST_PLACE",
-          type: "DIGITAL_CERTIFICATE",
-          title: "",
-          description: "",
-          estimatedValue: "",
-        },
-      ],
-    }));
+    const current = watchedValues.prizes || [];
+    setValue("prizes", [
+      ...current,
+      {
+        rank: "FIRST_PLACE",
+        type: "DIGITAL_CERTIFICATE",
+        title: "",
+        description: "",
+        estimatedValue: "",
+      },
+    ], { shouldValidate: true });
   };
 
   const handleRemovePrize = (index: number) => {
-    setData((prev) => ({
-      ...prev,
-      prizes: prev.prizes.filter((_, i) => i !== index),
-    }));
+    const current = watchedValues.prizes || [];
+    setValue("prizes", current.filter((_, i) => i !== index), { shouldValidate: true });
   };
 
   const handleUpdatePrize = (index: number, field: string, value: string) => {
-    setData((prev) => {
-      const newPrizes = [...prev.prizes];
-      newPrizes[index] = { ...newPrizes[index], [field]: value };
-      return { ...prev, prizes: newPrizes };
-    });
+    const current = watchedValues.prizes || [];
+    const updated = [...current];
+    updated[index] = { ...updated[index], [field]: value };
+    setValue("prizes", updated, { shouldValidate: true });
   };
 
   const handleResetCriteria = () => {
     if (!confirm("Reset criteria to defaults for this scope and category? This action cannot be undone.")) {
       return;
     }
-    const cat = dbCategories.find((c) => c.id === data.categoryId);
+    const cat = dbCategories.find((c) => c.id === watchedValues.categoryId);
     const grouping = cat?.grouping || "MUSIC_VOCAL";
-    const source = dynamicRubrics || SCORING_CRITERIA;
-    const groupCriteria = source[data.scope]?.[grouping] || source[data.scope]?.["MUSIC_VOCAL"] || [];
-    const defaults = groupCriteria.map((c: any) => ({ ...c })) as CriterionConfig[];
-    setData((prev) => ({
-      ...prev,
-      criteriaConfig: defaults,
-    }));
+    const source = (dynamicRubrics || SCORING_CRITERIA) as Record<string, Record<string, CriterionConfig[]>>;
+    const groupCriteria = source[watchedValues.scope || "STATE"]?.[grouping] || source[watchedValues.scope || "STATE"]?.["MUSIC_VOCAL"] || [];
+    const defaults = groupCriteria.map((c: CriterionConfig) => ({ ...c })) as CriterionConfig[];
+    setValue("scoringCriteria", defaults, { shouldValidate: true });
   };
 
-  const initializeCriteria = () => {
-    const cat = dbCategories.find((c) => c.id === data.categoryId);
-    const grouping = cat?.grouping || "MUSIC_VOCAL";
-    const source = dynamicRubrics || SCORING_CRITERIA;
-    const groupCriteria = source[data.scope]?.[grouping] || source[data.scope]?.["MUSIC_VOCAL"] || [];
-    const defaults = groupCriteria.map((c: any) => ({ ...c })) as CriterionConfig[];
-    setData((prev) => ({
-      ...prev,
-      criteriaConfig: defaults,
-    }));
-  };
 
   const handleAddCriterion = () => {
-    setData((prev) => ({
-      ...prev,
-      criteriaConfig: [
-        ...prev.criteriaConfig,
-        {
-          key: `criteria_custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-          label: "",
-          max: 10,
-          description: "",
-        },
-      ],
-    }));
+    const current = watchedValues.scoringCriteria || [];
+    setValue("scoringCriteria", [
+      ...current,
+      {
+        key: `criteria_custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        label: "",
+        max: 10,
+        description: "",
+      },
+    ], { shouldValidate: true });
   };
 
   const handleRemoveCriterion = (idx: number) => {
-    setData((prev) => ({
-      ...prev,
-      criteriaConfig: prev.criteriaConfig.filter((_, i) => i !== idx),
-    }));
+    const current = watchedValues.scoringCriteria || [];
+    setValue("scoringCriteria", current.filter((_, i) => i !== idx), { shouldValidate: true });
   };
 
-  const handleSubmit = async () => {
+  const onSubmit = hookHandleSubmit(async (formDataVal) => {
     setIsSubmitting(true);
     setError("");
 
     try {
-      const selected = bannerTemplates.find((t) => t.slug === data.bannerSlug);
+      const selected = bannerTemplates.find((t) => t.id === formDataVal.bannerTemplateId);
       const bannerUrl = selected?.imageUrl || null;
 
       const payload = {
-        title: data.title,
-        description: data.description,
-        scope: data.scope,
-        eligibleStates: data.scope === "STATE" ? data.eligibleStates : [],
-        categoryId: data.categoryId,
-        categoryName: data.categoryName,
-        minAge: data.minAge,
-        maxAge: data.maxAge,
-        language: data.language,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        registrationDeadline: data.registrationDeadline,
-        resultDate: data.resultDate,
-        capacity: data.capacity ? parseInt(data.capacity) : null,
-        facebookGroupUrl: data.facebookGroupUrl || null,
-        entryFeeINR: data.entryFeeINR,
+        title: formDataVal.title,
+        description: formDataVal.description,
+        scope: formDataVal.scope,
+        eligibleStates: formDataVal.scope === "STATE" ? formDataVal.eligibleStates : [],
+        categoryId: formDataVal.categoryId,
+        categoryName: formDataVal.categoryName,
+        minAge: formDataVal.minAge,
+        maxAge: formDataVal.maxAge,
+        language: formDataVal.language,
+        startDate: formDataVal.startDate,
+        endDate: formDataVal.endDate,
+        registrationDeadline: formDataVal.registrationDeadline,
+        resultDate: formDataVal.resultDate,
+        capacity: formDataVal.capacity,
+        facebookGroupUrl: formDataVal.facebookGroupUrl || null,
+        entryFeeINR: formDataVal.entryFeeINR.toString(),
         bannerUrl,
-        difficultyLevel: data.difficultyLevel,
-        rules: data.rules || null,
-        criteriaConfig: data.criteriaConfig,
-        judgeIds: data.selectedJudgeIds,
-        prizes: data.prizes,
+        difficultyLevel: formDataVal.difficultyLevel,
+        rules: formDataVal.rules || null,
+        criteriaConfig: formDataVal.scoringCriteria,
+        judgeIds: formDataVal.judgeIds,
+        prizes: formDataVal.prizes,
       };
 
       const res = await fetch("/api/admin/competitions", {
@@ -570,7 +518,7 @@ export default function CreateCompetitionWizard({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  });
 
   if (!isOpen) return null;
 
@@ -622,20 +570,18 @@ export default function CreateCompetitionWizard({
                 </label>
                 <input
                   type="text"
-                  value={data.title}
-                  onChange={(e) =>
-                    setData((prev) => ({ ...prev, title: e.target.value }))
-                  }
+                  {...register("title")}
                   className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
                   placeholder="e.g., Bengal Fine Arts 2026"
                 />
+                {errors.title && <FormError error={errors.title.message} />}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Age Group *
                 </label>
                 <select
-                  value={`${data.minAge}-${data.maxAge}`}
+                  value={(watchedValues.minAge !== undefined && watchedValues.maxAge !== undefined) ? `${watchedValues.minAge}-${watchedValues.maxAge}` : ""}
                   onChange={(e) => handleAgeGroupSelect(e.target.value)}
                   className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
                 >
@@ -646,25 +592,27 @@ export default function CreateCompetitionWizard({
                     </option>
                   ))}
                 </select>
+                {(errors.minAge || errors.maxAge) && <FormError error={errors.minAge?.message || errors.maxAge?.message} />}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
-                  Difficulty Level ({data.difficultyLevel}/5)
+                  Difficulty Level ({(watchedValues.difficultyLevel || 1)}/5)
                 </label>
                 <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((level) => (
                     <button
+                      type="button"
                       key={level}
                       onClick={() => handleDifficultyChange(level)}
                       className={`transition-colors ${
-                        level <= data.difficultyLevel
+                        level <= (watchedValues.difficultyLevel || 1)
                           ? "text-gold"
                           : "text-cream/30"
                       }`}
                     >
                       <Star
                         className="w-6 h-6"
-                        fill={level <= data.difficultyLevel ? "currentColor" : "none"}
+                        fill={level <= (watchedValues.difficultyLevel || 1) ? "currentColor" : "none"}
                       />
                     </button>
                   ))}
@@ -678,10 +626,11 @@ export default function CreateCompetitionWizard({
                   <div className="flex flex-wrap gap-2">
                     {["50", "100", "150", "200"].map((preset) => (
                       <button
+                        type="button"
                         key={preset}
                         onClick={() => handleEntryFeeChange(preset)}
                         className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          data.entryFeePreset === preset
+                          entryFeePreset === preset
                             ? "bg-gold text-charcoal"
                             : "bg-terracotta/20 text-cream border border-terracotta/30 hover:bg-terracotta/30"
                         }`}
@@ -690,9 +639,10 @@ export default function CreateCompetitionWizard({
                       </button>
                     ))}
                     <button
+                      type="button"
                       onClick={() => handleEntryFeeChange("custom")}
                       className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                        data.entryFeePreset === "custom"
+                        entryFeePreset === "custom"
                           ? "bg-gold text-charcoal"
                           : "bg-terracotta/20 text-cream border border-terracotta/30 hover:bg-terracotta/30"
                       }`}
@@ -700,20 +650,18 @@ export default function CreateCompetitionWizard({
                       Custom
                     </button>
                   </div>
-                  {data.entryFeePreset === "custom" && (
+                  {entryFeePreset === "custom" && (
                     <input
                       type="number"
-                      value={data.entryFeeINR}
+                      value={watchedValues.entryFeeINR || ""}
                       onChange={(e) =>
-                        setData((prev) => ({
-                          ...prev,
-                          entryFeeINR: e.target.value,
-                        }))
+                        setValue("entryFeeINR", Number(e.target.value), { shouldValidate: true })
                       }
                       className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
                       placeholder="Enter custom amount"
                     />
                   )}
+                  {errors.entryFeeINR && <FormError error={errors.entryFeeINR.message} />}
                 </div>
               </div>
             </div>
@@ -723,16 +671,18 @@ export default function CreateCompetitionWizard({
           {currentStep === 2 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Description</h3>
-              <RichTextEditor
-                value={data.description}
-                onChange={(html) =>
-                  setData((prev) => ({
-                    ...prev,
-                    description: html,
-                  }))
-                }
-                placeholder="Brief description of the competition..."
+              <Controller
+                control={control}
+                name="description"
+                render={({ field }) => (
+                  <RichTextEditor
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    placeholder="Brief description of the competition..."
+                  />
+                )}
               />
+              {errors.description && <FormError error={errors.description.message} />}
             </div>
           )}
 
@@ -748,43 +698,43 @@ export default function CreateCompetitionWizard({
                   {(["STATE", "NATIONAL"] as const).map((scope) => (
                     <label
                       key={scope}
-                      className="flex items-center gap-2 text-cream text-sm"
+                      className="flex items-center gap-2 text-cream text-sm cursor-pointer"
                     >
                       <input
                         type="radio"
                         value={scope}
-                        checked={data.scope === scope}
-                        onChange={(e) =>
-                          setData((prev) => ({
-                            ...prev,
-                            scope: e.target.value as "STATE" | "NATIONAL",
-                            eligibleStates: [],
-                            criteriaConfig: [],
-                          }))
-                        }
-                        className="accent-gold"
+                        checked={watchedValues.scope === scope}
+                        onChange={(e) => {
+                          const val = e.target.value as "STATE" | "NATIONAL";
+                          setValue("scope", val, { shouldValidate: true });
+                          setValue("eligibleStates", val === "NATIONAL" ? ["NATIONAL"] : []);
+                        }}
+                        className="accent-gold cursor-pointer"
                       />
                       {scope}
                     </label>
                   ))}
                 </div>
+                {errors.scope && <FormError error={errors.scope.message} />}
               </div>
-              {data.scope === "STATE" && (
+              {watchedValues.scope === "STATE" && (
                 <div>
                   <label className="block text-sm font-semibold text-cream/80 mb-2">
                     Eligible States *
                   </label>
-                  <SearchableSelect
-                    options={stateOptions}
-                    value={data.eligibleStates[0] || ""}
-                    onChange={(state) =>
-                      setData((prev) => ({
-                        ...prev,
-                        eligibleStates: [state],
-                      }))
-                    }
-                    placeholder="Select eligible state"
+                  <Controller
+                    control={control}
+                    name="eligibleStates"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={stateOptions}
+                        value={(field.value || [])[0] || ""}
+                        onChange={(state) => field.onChange([state])}
+                        placeholder="Select eligible state"
+                      />
+                    )}
                   />
+                  {errors.eligibleStates && <FormError error={errors.eligibleStates.message} />}
                 </div>
               )}
             </div>
@@ -798,21 +748,31 @@ export default function CreateCompetitionWizard({
                 <label className="block text-sm font-semibold text-cream/80 mb-2">
                   Category Specialization *
                 </label>
-                <SearchableSelect
-                  options={categoryOptions}
-                  value={data.categoryId}
-                  onChange={handleCategorySelect}
-                  placeholder="Search category..."
+                <Controller
+                  control={control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <SearchableSelect
+                      options={categoryOptions}
+                      value={field.value || ""}
+                      onChange={(val) => {
+                        field.onChange(val);
+                        handleCategorySelect(val);
+                      }}
+                      placeholder="Search category..."
+                    />
+                  )}
                 />
+                {errors.categoryId && <FormError error={errors.categoryId.message} />}
               </div>
               {(() => {
-                const nameLower = data.categoryName.toLowerCase();
+                const nameLower = (watchedValues.categoryName || "").toLowerCase();
                 const isImplicit = nameLower.includes("bengali") || nameLower.includes("rabindra") || nameLower.includes("nazrul") || nameLower.includes("hindi") || nameLower.includes("sanskrit") || nameLower.includes("english");
                 
                 if (isImplicit) {
                   return (
                     <div className="p-3 bg-charcoal-light border border-terracotta/10 rounded text-xs text-cream/70">
-                      Language: <strong className="text-gold">{data.language}</strong> (implicitly set by category)
+                      Language: <strong className="text-gold">{watchedValues.language}</strong> (implicitly set by category)
                     </div>
                   );
                 }
@@ -823,10 +783,7 @@ export default function CreateCompetitionWizard({
                       Language
                     </label>
                     <select
-                      value={data.language}
-                      onChange={(e) =>
-                        setData((prev) => ({ ...prev, language: e.target.value }))
-                      }
+                      {...register("language")}
                       className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
                     >
                       {languageOptions.map((opt) => (
@@ -835,6 +792,7 @@ export default function CreateCompetitionWizard({
                         </option>
                       ))}
                     </select>
+                    {errors.language && <FormError error={errors.language.message} />}
                   </div>
                 );
               })()}
@@ -844,106 +802,87 @@ export default function CreateCompetitionWizard({
           {/* Step 5: Dates & Capacity */}
           {currentStep === 5 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-cream">Dates & Capacity</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={data.startDate}
-                    onChange={(e) =>
-                      setData((prev) => ({ ...prev, startDate: e.target.value }))
-                    }
-                    onClick={(e) => e.currentTarget.showPicker()}
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    End Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={data.endDate}
-                    onChange={(e) =>
-                      setData((prev) => ({ ...prev, endDate: e.target.value }))
-                    }
-                    onClick={(e) => e.currentTarget.showPicker()}
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Registration Deadline *
-                  </label>
-                  <input
-                    type="date"
-                    value={data.registrationDeadline}
-                    onChange={(e) =>
-                      setData((prev) => ({
-                        ...prev,
-                        registrationDeadline: e.target.value,
-                      }))
-                    }
-                    onClick={(e) => e.currentTarget.showPicker()}
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Result Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={data.resultDate}
-                    onChange={(e) =>
-                      setData((prev) => ({
-                        ...prev,
-                        resultDate: e.target.value,
-                      }))
-                    }
-                    onClick={(e) => e.currentTarget.showPicker()}
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Capacity (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    value={data.capacity}
-                    onChange={(e) =>
-                      setData((prev) => ({ ...prev, capacity: e.target.value }))
-                    }
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                    placeholder="Max participants"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-cream/80 mb-2">
-                    Facebook Group URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    value={data.facebookGroupUrl}
-                    onChange={(e) =>
-                      setData((prev) => ({
-                        ...prev,
-                        facebookGroupUrl: e.target.value,
-                      }))
-                    }
-                    className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
-                    placeholder="https://facebook.com/groups/..."
-                  />
-                </div>
-              </div>
+               <h3 className="text-lg font-semibold text-cream">Dates & Capacity</h3>
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-semibold text-cream/80 mb-2">
+                     Start Date *
+                   </label>
+                   <input
+                     type="date"
+                     {...register("startDate")}
+                     onClick={(e) => e.currentTarget.showPicker()}
+                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
+                   />
+                   {errors.startDate && <FormError error={errors.startDate.message} />}
+                 </div>
+                 <div>
+                   <label className="block text-sm font-semibold text-cream/80 mb-2">
+                     End Date *
+                   </label>
+                   <input
+                     type="date"
+                     {...register("endDate")}
+                     onClick={(e) => e.currentTarget.showPicker()}
+                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
+                   />
+                   {errors.endDate && <FormError error={errors.endDate.message} />}
+                 </div>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-semibold text-cream/80 mb-2">
+                     Registration Deadline *
+                   </label>
+                   <input
+                     type="date"
+                     {...register("registrationDeadline")}
+                     onClick={(e) => e.currentTarget.showPicker()}
+                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
+                   />
+                   {errors.registrationDeadline && <FormError error={errors.registrationDeadline.message} />}
+                 </div>
+                 <div>
+                   <label className="block text-sm font-semibold text-cream/80 mb-2">
+                     Result Date *
+                   </label>
+                   <input
+                     type="date"
+                     {...register("resultDate")}
+                     onClick={(e) => e.currentTarget.showPicker()}
+                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta cursor-pointer"
+                   />
+                   {errors.resultDate && <FormError error={errors.resultDate.message} />}
+                 </div>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-semibold text-cream/80 mb-2">
+                     Capacity (Optional)
+                   </label>
+                   <input
+                     type="number"
+                     {...register("capacity", {
+                       setValueAs: (v) => (v === "" ? null : Number(v)),
+                     })}
+                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                     placeholder="Max participants"
+                   />
+                   {errors.capacity && <FormError error={errors.capacity.message} />}
+                 </div>
+                 <div>
+                   <label className="block text-sm font-semibold text-cream/80 mb-2">
+                     Facebook Group URL (Optional)
+                   </label>
+                   <input
+                     type="url"
+                     {...register("facebookGroupUrl")}
+                     className="w-full bg-charcoal border border-terracotta/20 rounded px-3 py-2 text-cream text-sm focus:outline-none focus:border-terracotta"
+                     placeholder="https://facebook.com/groups/..."
+                   />
+                   {errors.facebookGroupUrl && <FormError error={errors.facebookGroupUrl.message} />}
+                 </div>
+               </div>
             </div>
           )}
 
@@ -951,14 +890,19 @@ export default function CreateCompetitionWizard({
           {currentStep === 6 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Banner Design Theme</h3>
-              <BannerTemplatePicker
-                templates={bannerTemplates}
-                value={data.bannerSlug}
-                onChange={(slug) =>
-                  setData((prev) => ({ ...prev, bannerSlug: slug }))
-                }
-                categoryGrouping={dbCategories.find((c) => c.id === data.categoryId)?.grouping || undefined}
+              <Controller
+                control={control}
+                name="bannerTemplateId"
+                render={({ field }) => (
+                  <BannerTemplatePicker
+                    templates={bannerTemplates}
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    categoryGrouping={dbCategories.find((c) => c.id === watchedValues.categoryId)?.grouping || undefined}
+                  />
+                )}
               />
+              {errors.bannerTemplateId && <FormError error={errors.bannerTemplateId.message} />}
             </div>
           )}
 
@@ -967,7 +911,7 @@ export default function CreateCompetitionWizard({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-cream">Judge Selection</h3>
               <div className="flex flex-wrap gap-2 items-center justify-between text-sm text-cream/70">
-                <span>Selected: {data.selectedJudgeIds.length} judges</span>
+                <span>Selected: {(watchedValues.judgeIds || []).length} judges</span>
                 <span className="text-xs">Showing {filteredJudges.length} of {availableJudges.length}</span>
               </div>
 
@@ -1009,7 +953,7 @@ export default function CreateCompetitionWizard({
               <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
                 {filteredJudges.length > 0 ? (
                   filteredJudges.map((judge) => {
-                    const isSelected = data.selectedJudgeIds.includes(judge.id);
+                    const isSelected = (watchedValues.judgeIds || []).includes(judge.id);
                     return (
                       <label
                         key={judge.id}
@@ -1057,6 +1001,7 @@ export default function CreateCompetitionWizard({
                   </p>
                 )}
               </div>
+              {errors.judgeIds && <FormError error={errors.judgeIds.message} />}
             </div>
           )}
 
@@ -1067,18 +1012,20 @@ export default function CreateCompetitionWizard({
               <p className="text-xs text-cream/60">
                 This rulebook will be visible to all participants
               </p>
-              <RichTextEditor
-                value={data.rules}
-                onChange={(html) =>
-                  setData((prev) => ({
-                    ...prev,
-                    rules: html,
-                  }))
-                }
-                placeholder="1. Participants must register before the deadline.
+              <Controller
+                control={control}
+                name="rules"
+                render={({ field }) => (
+                  <RichTextEditor
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    placeholder="1. Participants must register before the deadline.
 2. Original work is mandatory.
 3. ..."
+                  />
+                )}
               />
+              {errors.rules && <FormError error={errors.rules.message} />}
             </div>
           )}
 
@@ -1091,6 +1038,7 @@ export default function CreateCompetitionWizard({
                   <p className="text-xs text-cream/60">Define evaluation metrics and their point allocation.</p>
                 </div>
                 <button
+                  type="button"
                   onClick={handleResetCriteria}
                   className="text-xs px-3 py-1 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 transition-colors"
                 >
@@ -1100,7 +1048,7 @@ export default function CreateCompetitionWizard({
 
               {/* Total points summary card */}
               {(() => {
-                const totalPoints = data.criteriaConfig.reduce((sum, c) => sum + (c.max || 0), 0);
+                const totalPoints = (watchedValues.scoringCriteria || []).reduce((sum, c) => sum + (c.max || 0), 0);
                 const isValid = totalPoints === 100;
                 return (
                   <div className={`p-4 rounded-xl border flex flex-col gap-3 transition-all ${
@@ -1119,13 +1067,13 @@ export default function CreateCompetitionWizard({
                       </div>
                     </div>
 
-                    {data.criteriaConfig.length > 0 && (
+                    {(watchedValues.scoringCriteria || []).length > 0 && (
                       <div className="pt-2 border-t border-current/10 space-y-1.5 text-xs">
                         <span className="font-semibold block opacity-80 uppercase tracking-wider text-[10px]">Calculated Summary Rubric:</span>
-                        {data.criteriaConfig.map((c, i) => (
+                        {(watchedValues.scoringCriteria || []).map((c, i) => (
                           <div key={c.key || i} className="flex justify-between items-center opacity-90 pl-1 border-l-2 border-current/20">
                             <span className="truncate max-w-[350px] font-medium">{c.label || <span className="italic opacity-55">Unnamed Criterion</span>}</span>
-                            <span className="font-mono font-bold whitespace-nowrap">{c.max || 0} pts ({(c.max || 0)}%)</span>
+                            <span className="font-mono font-bold whitespace-nowrap">{c.max || 0} pts ({c.max || 0}%)</span>
                           </div>
                         ))}
                       </div>
@@ -1134,8 +1082,9 @@ export default function CreateCompetitionWizard({
                 );
               })()}
 
-              {data.criteriaConfig.length === 0 && (
+              {(watchedValues.scoringCriteria || []).length === 0 && (
                 <button
+                  type="button"
                   onClick={initializeCriteria}
                   className="w-full py-2 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 transition-colors"
                 >
@@ -1144,7 +1093,7 @@ export default function CreateCompetitionWizard({
               )}
 
               <div className="space-y-3">
-                {data.criteriaConfig.map((criterion, idx) => (
+                {(watchedValues.scoringCriteria || []).map((criterion, idx) => (
                   <div
                     key={criterion.key}
                     className="p-4 bg-charcoal-light border border-terracotta/20 rounded space-y-3 relative group"
@@ -1154,6 +1103,7 @@ export default function CreateCompetitionWizard({
                         Criterion #{idx + 1}
                       </span>
                       <button
+                        type="button"
                         onClick={() => handleRemoveCriterion(idx)}
                         className="text-cream/50 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"
                         title="Remove criterion"
@@ -1170,16 +1120,12 @@ export default function CreateCompetitionWizard({
                         <input
                           type="text"
                           value={criterion.label}
-                          onChange={(e) =>
-                            setData((prev) => {
-                              const newConfig = [...prev.criteriaConfig];
-                              newConfig[idx] = {
-                                ...newConfig[idx],
-                                label: e.target.value,
-                              };
-                              return { ...prev, criteriaConfig: newConfig };
-                            })
-                          }
+                          onChange={(e) => {
+                            const current = watchedValues.scoringCriteria || [];
+                            const updated = [...current];
+                            updated[idx] = { ...updated[idx], label: e.target.value };
+                            setValue("scoringCriteria", updated, { shouldValidate: true });
+                          }}
                           placeholder="e.g., Accuracy"
                           className="w-full bg-charcoal border border-terracotta/20 rounded px-2.5 py-1.5 text-cream text-xs focus:outline-none focus:border-terracotta"
                         />
@@ -1193,16 +1139,12 @@ export default function CreateCompetitionWizard({
                           min="1"
                           max="100"
                           value={criterion.max}
-                          onChange={(e) =>
-                            setData((prev) => {
-                              const newConfig = [...prev.criteriaConfig];
-                              newConfig[idx] = {
-                                ...newConfig[idx],
-                                max: parseInt(e.target.value) || 0,
-                              };
-                              return { ...prev, criteriaConfig: newConfig };
-                            })
-                          }
+                          onChange={(e) => {
+                            const current = watchedValues.scoringCriteria || [];
+                            const updated = [...current];
+                            updated[idx] = { ...updated[idx], max: parseInt(e.target.value) || 0 };
+                            setValue("scoringCriteria", updated, { shouldValidate: true });
+                          }}
                           className="w-full bg-charcoal border border-terracotta/20 rounded px-2.5 py-1.5 text-cream text-xs focus:outline-none focus:border-terracotta font-mono font-bold text-center"
                         />
                       </div>
@@ -1213,16 +1155,12 @@ export default function CreateCompetitionWizard({
                       </label>
                       <textarea
                         value={criterion.description || ""}
-                        onChange={(e) =>
-                          setData((prev) => {
-                            const newConfig = [...prev.criteriaConfig];
-                            newConfig[idx] = {
-                              ...newConfig[idx],
-                              description: e.target.value,
-                            };
-                            return { ...prev, criteriaConfig: newConfig };
-                          })
-                        }
+                        onChange={(e) => {
+                          const current = watchedValues.scoringCriteria || [];
+                          const updated = [...current];
+                          updated[idx] = { ...updated[idx], description: e.target.value };
+                          setValue("scoringCriteria", updated, { shouldValidate: true });
+                        }}
                         placeholder="Guidelines for judges evaluating this criterion..."
                         className="w-full bg-charcoal border border-terracotta/20 rounded px-2.5 py-1.5 text-cream text-xs focus:outline-none focus:border-terracotta resize-none"
                         rows={2}
@@ -1231,8 +1169,10 @@ export default function CreateCompetitionWizard({
                   </div>
                 ))}
               </div>
+              {errors.scoringCriteria && <FormError error={errors.scoringCriteria.message} />}
 
               <button
+                type="button"
                 onClick={handleAddCriterion}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 transition-colors text-xs font-semibold"
               >
@@ -1248,7 +1188,7 @@ export default function CreateCompetitionWizard({
               <h3 className="text-lg font-semibold text-cream">Prizes</h3>
 
               <div className="space-y-3">
-                {data.prizes.map((prize, idx) => (
+                {(watchedValues.prizes || []).map((prize, idx) => (
                   <div
                     key={idx}
                     className="p-4 bg-charcoal-light border border-terracotta/20 rounded space-y-3"
@@ -1258,6 +1198,7 @@ export default function CreateCompetitionWizard({
                         Prize #{idx + 1}
                       </span>
                       <button
+                        type="button"
                         onClick={() => handleRemovePrize(idx)}
                         className="text-cream/50 hover:text-red-400 transition-colors"
                       >
@@ -1353,8 +1294,10 @@ export default function CreateCompetitionWizard({
                   </div>
                 ))}
               </div>
+              {errors.prizes && <FormError error={errors.prizes.message} />}
 
               <button
+                type="button"
                 onClick={handleAddPrize}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-terracotta/20 text-cream border border-terracotta/30 rounded hover:bg-terracotta/30 transition-colors"
               >
@@ -1368,6 +1311,7 @@ export default function CreateCompetitionWizard({
         {/* Footer */}
         <div className="sticky bottom-0 z-10 bg-terracotta/5 dark:bg-gold/5 border-t border-terracotta/10 dark:border-terracotta/20 p-6 flex items-center justify-between gap-3 flex-shrink-0">
           <Button
+            type="button"
             onClick={handlePrev}
             disabled={currentStep === 1}
             variant="outline"
@@ -1380,7 +1324,8 @@ export default function CreateCompetitionWizard({
 
           {currentStep === 10 ? (
             <Button
-              onClick={handleSubmit}
+              type="button"
+              onClick={onSubmit}
               disabled={isSubmitting}
               isLoading={isSubmitting}
               variant="primary"
@@ -1391,6 +1336,7 @@ export default function CreateCompetitionWizard({
             </Button>
           ) : (
             <Button
+              type="button"
               onClick={handleNext}
               variant="primary"
               size="md"

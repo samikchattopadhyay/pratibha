@@ -1,42 +1,53 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
+import FormField from "@/components/forms/FormField";
+import { forgotPasswordSchema, type ForgotPasswordFormData } from "@/schemas/auth";
 import { Mail, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    mode: "onBlur",
+  });
 
+  const onSubmit = async (data: ForgotPasswordFormData) => {
     try {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(data),
       });
 
-      const data = await res.json();
+      const responseData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong. Please try again.");
-        setLoading(false);
+        setError("root", {
+          message: responseData.error || "Something went wrong. Please try again.",
+        });
       } else {
+        setSubmittedEmail(data.email);
         setSubmitted(true);
       }
     } catch (err) {
       console.error(err);
-      setError("An unexpected error occurred. Please try again.");
-      setLoading(false);
+      setError("root", {
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
@@ -54,7 +65,7 @@ export default function ForgotPasswordPage() {
                 Check Your <span className="text-terracotta">Email</span>
               </h1>
               <p className="font-sans text-sm text-charcoal/60">
-                We&apos;ve sent a password reset link to <strong>{email}</strong>
+                We&apos;ve sent a password reset link to <strong>{submittedEmail}</strong>
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
                 <p className="font-sans text-sm text-charcoal">
@@ -82,6 +93,8 @@ export default function ForgotPasswordPage() {
     );
   }
 
+  const rootError = errors.root?.message;
+
   return (
     <>
       <Header />
@@ -96,27 +109,21 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
 
-          {error && (
+          {rootError && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-200 rounded-xl text-red-800 text-sm font-sans flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{error}</span>
+              <span>{rootError}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                placeholder="your.email@example.com"
-              />
-            </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              label="Email Address"
+              type="email"
+              placeholder="your.email@example.com"
+              error={errors.email?.message}
+              {...register("email")}
+            />
 
             <p className="font-sans text-xs text-charcoal/60 pt-2">
               We&apos;ll send a secure password reset link to this email address. The link expires in 1 hour.
@@ -124,10 +131,10 @@ export default function ForgotPasswordPage() {
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               variant="primary"
               size="lg"
-              isLoading={loading}
+              isLoading={isSubmitting}
               className="w-full"
             >
               <Mail className="w-4 h-4" />

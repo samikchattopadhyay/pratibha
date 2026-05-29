@@ -3,10 +3,14 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
+import FormError from "@/components/forms/FormError";
+import { entryRegistrationSchema, type EntryRegistrationFormData } from "@/schemas/entries";
 import { Video, User, List, CreditCard, AlertCircle, CheckCircle } from "lucide-react";
 
 interface Student {
@@ -55,28 +59,31 @@ function RegisterEntryForm() {
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState<Student[]>([]);
   const [competition, setCompetition] = useState<Competition | null>(null);
-  
-  // Form states
-  const [selectedStudent, setSelectedStudent] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [fbUrl, setFbUrl] = useState("");
-  
-  // Feedback states
-  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [isUsingMock, setIsUsingMock] = useState(false);
   const [checkoutDetails, setCheckoutDetails] = useState<{ orderId: string; registrationId: string; amount: number } | null>(null);
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    reset,
+  } = useForm<EntryRegistrationFormData>({
+    resolver: zodResolver(entryRegistrationSchema),
+    mode: "onBlur",
+  });
 
   const loadRegistrationData = useCallback(async () => {
     setLoading(true);
     try {
       const studentsRes = await fetch("/api/account/dashboard");
       const dashboardData = await studentsRes.json();
-      
+
       if (!studentsRes.ok) throw new Error(dashboardData.error || "Failed to load details");
-      
+
       setStudents(dashboardData.students);
 
       // Fetch competition from database if ID is provided
@@ -114,42 +121,10 @@ function RegisterEntryForm() {
     }
   }, [sessionStatus, competitionId, loadRegistrationData, router]);
 
-  const validateFacebookUrl = (url: string) => {
-    const fbRegex = /^(https?:\/\/)?(www\.)?(facebook\.com|fb\.watch|fb\.gg)\/.+$/i;
-    return fbRegex.test(url);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSubmitting(true);
-
-    if (!selectedStudent) {
-      setError("Please select a student profile");
-      setSubmitting(false);
-      return;
-    }
-    if (!selectedCategory) {
-      setError("Please select a competition category");
-      setSubmitting(false);
-      return;
-    }
-    if (!fbUrl) {
-      setError("Please paste the Facebook video URL");
-      setSubmitting(false);
-      return;
-    }
-
-    if (!validateFacebookUrl(fbUrl)) {
-      setError("Invalid link structure. Make sure you copy a valid Facebook post or video URL.");
-      setSubmitting(false);
-      return;
-    }
-
+  const onSubmit = async (data: EntryRegistrationFormData) => {
     if (isUsingMock) {
       setTimeout(() => {
         setSuccess(true);
-        setSubmitting(false);
       }, 1500);
       return;
     }
@@ -159,34 +134,36 @@ function RegisterEntryForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: selectedStudent,
-          competitionCategoryId: selectedCategory,
-          fbPostUrl: fbUrl
-        })
+          studentId: data.studentId,
+          competitionCategoryId: data.categoryId,
+          fbPostUrl: data.fbUrl,
+        }),
       });
 
-      const data = await res.json();
+      const responseData = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Failed to initiate registration");
-        setSubmitting(false);
+        setError("root", {
+          message: responseData.error || "Failed to initiate registration",
+        });
       } else {
-        triggerRazorpay(data.orderId, data.registrationId, data.amount);
+        triggerRazorpay(responseData.orderId, responseData.registrationId, responseData.amount);
       }
     } catch (err) {
       console.error(err);
-      setError("Server connection issue. Failed to connect.");
-      setSubmitting(false);
+      setError("root", {
+        message: "Server connection issue. Failed to connect.",
+      });
     }
   };
 
   const handlePaymentSuccess = async () => {
     if (!checkoutDetails) return;
-    setError("");
-    setSubmitting(true);
+    setPaymentError("");
+    setPaymentSubmitting(true);
     const orderId = checkoutDetails.orderId;
     setCheckoutDetails(null);
-    
+
     try {
       const res = await fetch("/api/registrations/verify", {
         method: "POST",
@@ -201,25 +178,25 @@ function RegisterEntryForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Payment verification failed");
-        setSubmitting(false);
+        setPaymentError(data.error || "Payment verification failed");
+        setPaymentSubmitting(false);
       } else {
         setSuccess(true);
-        setSubmitting(false);
+        setPaymentSubmitting(false);
       }
     } catch (err) {
       console.error(err);
-      setError("Network error. Verification failed.");
-      setSubmitting(false);
+      setPaymentError("Network error. Verification failed.");
+      setPaymentSubmitting(false);
     }
   };
 
   const handlePaymentFailure = async () => {
     if (!checkoutDetails) return;
-    setError("Payment simulation failed or cancelled by user");
+    setPaymentError("Payment simulation failed or cancelled by user");
     const orderId = checkoutDetails.orderId;
     setCheckoutDetails(null);
-    setSubmitting(true);
+    setPaymentSubmitting(true);
 
     try {
       await fetch("/api/registrations/verify", {
@@ -230,7 +207,7 @@ function RegisterEntryForm() {
     } catch (err) {
       console.error(err);
     } finally {
-      setSubmitting(false);
+      setPaymentSubmitting(false);
     }
   };
 
@@ -287,7 +264,7 @@ function RegisterEntryForm() {
                     <Button
                       onClick={() => {
                         setSuccess(false);
-                        setFbUrl("");
+                        reset();
                       }}
                       variant="outline"
                       size="md"
@@ -308,15 +285,14 @@ function RegisterEntryForm() {
                     </p>
                   </div>
 
-                  {error && (
+                  {errors.root && (
                     <div className="mb-6 p-4 bg-red-500/10 border border-red-200 dark:border-red-900/30 rounded-xl text-red-800 dark:text-red-400 text-sm font-sans flex items-start gap-2.5">
                       <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                      <span>{error}</span>
+                      <span>{errors.root.message}</span>
                     </div>
                   )}
 
-                  <form onSubmit={handleSubmit} className="space-y-6 font-sans text-sm">
-                    
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 font-sans text-sm">
                     {/* Select Student */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-bold text-charcoal/60 dark:text-cream/60 uppercase flex items-center gap-1.5">
@@ -328,16 +304,24 @@ function RegisterEntryForm() {
                           <a href="/account/dashboard" className="text-terracotta font-bold underline">Dashboard</a> first.
                         </div>
                       ) : (
-                        <select
-                          value={selectedStudent}
-                          onChange={(e) => setSelectedStudent(e.target.value)}
-                          className="w-full bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 py-2.5 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta dark:focus:border-gold"
-                        >
-                          <option value="" className="bg-cream dark:bg-charcoal text-charcoal dark:text-cream">-- Choose Student profile --</option>
-                          {students.map(s => (
-                            <option key={s.id} value={s.id} className="bg-cream dark:bg-charcoal text-charcoal dark:text-cream">{s.name}</option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            {...register("studentId")}
+                            className={`w-full bg-white dark:bg-charcoal-light border rounded-lg px-3 py-2.5 text-charcoal dark:text-cream focus:outline-none transition-colors ${
+                              errors.studentId
+                                ? "border-red-300 focus:border-red-400"
+                                : "border-charcoal/10 dark:border-terracotta/30 focus:border-terracotta dark:focus:border-gold"
+                            }`}
+                          >
+                            <option value="">-- Choose Student profile --</option>
+                            {students.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                          {errors.studentId && <FormError error={errors.studentId.message} />}
+                        </>
                       )}
                     </div>
 
@@ -346,16 +330,24 @@ function RegisterEntryForm() {
                       <label className="text-sm font-bold text-charcoal/60 dark:text-cream/60 uppercase flex items-center gap-1.5">
                         <List className="w-3.5 h-3.5 text-terracotta" /> Select Division Category
                       </label>
-                      <select
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                          className="w-full bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 py-2.5 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta dark:focus:border-gold"
-                      >
-                        <option value="" className="bg-cream dark:bg-charcoal text-charcoal dark:text-cream">-- Choose Fine Arts Division --</option>
-                        {competition?.categories.map(cat => (
-                          <option key={cat.id} value={cat.id} className="bg-cream dark:bg-charcoal text-charcoal dark:text-cream">{cat.categoryName}</option>
-                        ))}
-                      </select>
+                      <>
+                        <select
+                          {...register("categoryId")}
+                          className={`w-full bg-white dark:bg-charcoal-light border rounded-lg px-3 py-2.5 text-charcoal dark:text-cream focus:outline-none transition-colors ${
+                            errors.categoryId
+                              ? "border-red-300 focus:border-red-400"
+                              : "border-charcoal/10 dark:border-terracotta/30 focus:border-terracotta dark:focus:border-gold"
+                          }`}
+                        >
+                          <option value="">-- Choose Fine Arts Division --</option>
+                          {competition?.categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.categoryName}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.categoryId && <FormError error={errors.categoryId.message} />}
+                      </>
                     </div>
 
                     {/* Paste Facebook URL */}
@@ -365,12 +357,15 @@ function RegisterEntryForm() {
                       </label>
                       <input
                         type="url"
-                        required
-                        value={fbUrl}
-                        onChange={(e) => setFbUrl(e.target.value)}
                         placeholder="https://www.facebook.com/groups/id/posts/id"
-                        className="w-full bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 py-2.5 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta dark:focus:border-gold"
+                        className={`w-full bg-white dark:bg-charcoal-light border rounded-lg px-3 py-2.5 text-charcoal dark:text-cream focus:outline-none transition-colors ${
+                          errors.fbUrl
+                            ? "border-red-300 focus:border-red-400"
+                            : "border-charcoal/10 dark:border-terracotta/30 focus:border-terracotta dark:focus:border-gold"
+                        }`}
+                        {...register("fbUrl")}
                       />
+                      {errors.fbUrl && <FormError error={errors.fbUrl.message} />}
                       <p className="text-sm text-charcoal/50 dark:text-cream/50 leading-relaxed">
                         Make sure you upload your child&apos;s video inside our Facebook Group and set the privacy setting of the post to public. Copy and paste the post link here.
                       </p>
@@ -387,13 +382,13 @@ function RegisterEntryForm() {
 
                     <Button
                       type="submit"
-                      disabled={submitting || students.length === 0}
+                      disabled={isSubmitting || students.length === 0}
                       variant="primary"
                       size="lg"
                       className="w-full"
-                      isLoading={submitting}
+                      isLoading={isSubmitting}
                     >
-                      {submitting ? (
+                      {isSubmitting ? (
                         <span>Processing Checkout...</span>
                       ) : (
                         <>
@@ -422,8 +417,8 @@ function RegisterEntryForm() {
                 <CreditCard className="w-5 h-5 text-terracotta dark:text-gold" />
                 Secure Payment Checkout
               </h3>
-              <button 
-                onClick={() => { setCheckoutDetails(null); setSubmitting(false); }} 
+              <button
+                onClick={() => { setCheckoutDetails(null); setPaymentSubmitting(false); }}
                 className="text-charcoal/50 dark:text-cream/50 hover:text-charcoal dark:hover:text-cream text-lg font-bold"
               >
                 ✕

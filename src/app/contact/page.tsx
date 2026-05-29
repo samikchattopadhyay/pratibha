@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -6,33 +6,32 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Mail, Phone, MapPin, Send, MessageSquare } from "lucide-react";
 import Button from "@/components/Button";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { contactSchema, ContactFormData } from "@/schemas/admin";
+import FormError from "@/components/forms/FormError";
 
 export default function ContactPage() {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: ""
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ContactFormData>({
+    resolver: zodResolver(contactSchema),
+    mode: "onBlur",
+    defaultValues: {
+      name: "",
+      email: "",
+      subject: "",
+      message: ""
+    }
   });
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (_data: ContactFormData) => {
     setStatus("submitting");
     
     // Simulate API delay
     setTimeout(() => {
       setStatus("success");
-      setFormData({ name: "", email: "", subject: "", message: "" });
+      reset();
     }, 1200);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
   };
 
   return (
@@ -131,31 +130,27 @@ export default function ContactPage() {
                   </Button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Your Name</label>
                       <input
                         type="text"
-                        name="name"
-                        required
-                        value={formData.name}
-                        onChange={handleChange}
+                        {...register("name")}
                         className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
                         placeholder="Avik Sen"
                       />
+                      {errors.name && <FormError error={errors.name.message} />}
                     </div>
                     <div className="space-y-1.5">
                       <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Email Address</label>
                       <input
                         type="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleChange}
+                        {...register("email")}
                         className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
                         placeholder="avik@example.com"
                       />
+                      {errors.email && <FormError error={errors.email.message} />}
                     </div>
                   </div>
 
@@ -163,26 +158,22 @@ export default function ContactPage() {
                     <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Subject</label>
                     <input
                       type="text"
-                      name="subject"
-                      required
-                      value={formData.subject}
-                      onChange={handleChange}
+                      {...register("subject")}
                       className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
                       placeholder="Payment issue / Certificate correction / Partnership request"
                     />
+                    {errors.subject && <FormError error={errors.subject.message} />}
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Message</label>
                     <textarea
-                      name="message"
+                      {...register("message")}
                       rows={5}
-                      required
-                      value={formData.message}
-                      onChange={handleChange}
                       className="w-full font-sans text-sm bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors resize-none"
                       placeholder="Please describe your query in detail..."
                     />
+                    {errors.message && <FormError error={errors.message.message} />}
                   </div>
 
                   <Button

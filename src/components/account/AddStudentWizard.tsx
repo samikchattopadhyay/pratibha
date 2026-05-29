@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, Plus, Upload, Music, Globe, Layers, BookOpen, Sparkles } from "lucide-react";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
@@ -8,6 +8,11 @@ import SearchableSelect from "@/components/admin/SearchableSelect";
 import ChipMultiSelect from "@/components/admin/ChipMultiSelect";
 import RichTextEditor from "@/components/RichTextEditor";
 import SlugInput from "./SlugInput";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { studentFormSchema, StudentFormData } from "@/schemas/entries";
+import FormError from "@/components/forms/FormError";
+import { z } from "zod";
 
 interface AddStudentWizardProps {
   readonly isOpen: boolean;
@@ -18,23 +23,7 @@ interface AddStudentWizardProps {
   readonly studentId?: string;
 }
 
-export interface StudentFormData {
-  name: string;
-  dateOfBirth: string;
-  gender: string;
-  slug?: string;
-  schoolClass: string;
-  schoolName: string;
-  city: string;
-  state: string;
-  profileImageUrl: string;
-  bio: string;
-  disciplineInterests: string[];
-  languages: string[];
-  categoryGrouping: string[];
-  trainingInstitutes: string[];
-  specialSkills: string[];
-}
+export type { StudentFormData };
 
 const INDIA_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
@@ -100,9 +89,10 @@ export default function AddStudentWizard({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [formData, setFormData] = useState<StudentFormData>(() => {
-    if (initialData) return initialData;
-    return {
+  const { register, handleSubmit, control, trigger, setValue, watch, reset, formState: { errors } } = useForm<z.input<typeof studentFormSchema>>({
+    resolver: zodResolver(studentFormSchema),
+    mode: "onBlur",
+    defaultValues: initialData || {
       name: "",
       dateOfBirth: "",
       gender: "",
@@ -118,10 +108,39 @@ export default function AddStudentWizard({
       categoryGrouping: [],
       trainingInstitutes: [],
       specialSkills: [],
-    };
+    },
   });
 
+  const watchedValues = watch();
+
+  useEffect(() => {
+    if (isOpen) {
+      reset(initialData || {
+        name: "",
+        dateOfBirth: "",
+        gender: "",
+        slug: "",
+        schoolClass: "",
+        schoolName: "",
+        city: "",
+        state: "",
+        profileImageUrl: "",
+        bio: "",
+        disciplineInterests: [],
+        languages: [],
+        categoryGrouping: [],
+        trainingInstitutes: [],
+        specialSkills: [],
+      });
+      setCurrentStep(1);
+      setErrorMsg("");
+      setSelectedFile(null);
+      setPhotoPreview(null);
+    }
+  }, [isOpen, initialData, reset]);
+
   // Slug state
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [slugAvailable, setSlugAvailable] = useState(false);
 
   // Tag inputs state
@@ -136,19 +155,21 @@ export default function AddStudentWizard({
   }, [categories]);
 
   const filteredCategoryOptions = useMemo(() => {
-    if (formData.categoryGrouping.length === 0) {
+    const groupings = watchedValues.categoryGrouping || [];
+    if (groupings.length === 0) {
       return categoryOptions;
     }
     return categoryOptions.filter((cat) => {
       const category = categories.find((c) => c.id === cat.value);
-      return category && formData.categoryGrouping.includes(category.grouping || "");
+      return category && groupings.includes(category.grouping || "");
     });
-  }, [categoryOptions, formData.categoryGrouping, categories]);
+  }, [categoryOptions, watchedValues.categoryGrouping, categories]);
 
   // Age calculation helper
   const ageDisplay = useMemo(() => {
-    if (!formData.dateOfBirth) return "";
-    const birthDate = new Date(formData.dateOfBirth);
+    const dob = watchedValues.dateOfBirth;
+    if (!dob) return "";
+    const birthDate = new Date(dob);
     if (isNaN(birthDate.getTime())) return "";
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -157,31 +178,30 @@ export default function AddStudentWizard({
       age--;
     }
     return age >= 0 ? `(${age} years old)` : "";
-  }, [formData.dateOfBirth]);
+  }, [watchedValues.dateOfBirth]);
 
   if (!isOpen) return null;
 
-  const validateStep = (step: number): boolean => {
-    if (step === 1) {
-      if (!formData.name.trim()) {
-        setErrorMsg("Full Name is required");
-        return false;
-      }
-      if (!formData.dateOfBirth) {
-        setErrorMsg("Date of Birth is required");
-        return false;
-      }
-      if (!formData.gender) {
-        setErrorMsg("Gender is required");
-        return false;
+  const handleNext = async () => {
+    let fieldsToValidate: Array<keyof z.input<typeof studentFormSchema>> = [];
+    if (currentStep === 1) {
+      fieldsToValidate = ["name", "dateOfBirth", "gender", "slug", "schoolClass", "schoolName", "city", "state"];
+    } else if (currentStep === 2) {
+      fieldsToValidate = ["profileImageUrl", "bio"];
+    } else if (currentStep === 3) {
+      fieldsToValidate = ["languages", "categoryGrouping", "disciplineInterests"];
+    } else if (currentStep === 4) {
+      fieldsToValidate = ["trainingInstitutes", "specialSkills"];
+    }
+
+    if (fieldsToValidate.length > 0) {
+      const isValid = await trigger(fieldsToValidate);
+      if (!isValid) {
+        setErrorMsg("Please fix validation errors before continuing.");
+        return;
       }
     }
     setErrorMsg("");
-    return true;
-  };
-
-  const handleNext = () => {
-    if (!validateStep(currentStep)) return;
     setCurrentStep((prev) => Math.min(prev + 1, 5));
   };
 
@@ -191,37 +211,33 @@ export default function AddStudentWizard({
   };
 
   const handleAddInstitute = () => {
-    if (newInstitute.trim() && !formData.trainingInstitutes.includes(newInstitute.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        trainingInstitutes: [...prev.trainingInstitutes, newInstitute.trim()],
-      }));
-      setNewInstitute("");
+    if (newInstitute.trim()) {
+      const current = watchedValues.trainingInstitutes || [];
+      if (!current.includes(newInstitute.trim())) {
+        setValue("trainingInstitutes", [...current, newInstitute.trim()], { shouldValidate: true });
+        setNewInstitute("");
+      }
     }
   };
 
   const handleRemoveInstitute = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      trainingInstitutes: prev.trainingInstitutes.filter((_, i) => i !== index),
-    }));
+    const current = watchedValues.trainingInstitutes || [];
+    setValue("trainingInstitutes", current.filter((_: string, i: number) => i !== index), { shouldValidate: true });
   };
 
   const handleAddSkill = () => {
-    if (newSkill.trim() && !formData.specialSkills.includes(newSkill.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        specialSkills: [...prev.specialSkills, newSkill.trim()],
-      }));
-      setNewSkill("");
+    if (newSkill.trim()) {
+      const current = watchedValues.specialSkills || [];
+      if (!current.includes(newSkill.trim())) {
+        setValue("specialSkills", [...current, newSkill.trim()], { shouldValidate: true });
+        setNewSkill("");
+      }
     }
   };
 
   const handleRemoveSkill = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      specialSkills: prev.specialSkills.filter((_, i) => i !== index),
-    }));
+    const current = watchedValues.specialSkills || [];
+    setValue("specialSkills", current.filter((_: string, i: number) => i !== index), { shouldValidate: true });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,12 +279,12 @@ export default function AddStudentWizard({
     setErrorMsg("");
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      const formPayload = new FormData();
+      formPayload.append("file", selectedFile);
 
       const res = await fetch("/api/account/students/upload-profile-photo", {
         method: "POST",
-        body: formData,
+        body: formPayload,
       });
 
       const data = await res.json();
@@ -278,10 +294,7 @@ export default function AddStudentWizard({
       }
 
       // Update form with uploaded URL
-      setFormData((prev) => ({
-        ...prev,
-        profileImageUrl: data.url,
-      }));
+      setValue("profileImageUrl", data.url, { shouldValidate: true });
 
       // Clear upload state
       setSelectedFile(null);
@@ -289,23 +302,17 @@ export default function AddStudentWizard({
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to upload photo");
+    } catch (err: unknown) {
+      const errorText = err instanceof Error ? err.message : "Failed to upload photo";
+      setErrorMsg(errorText);
     } finally {
       setIsUploadingPhoto(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateStep(currentStep)) return;
-
+  const onSubmit = handleSubmit(async (data) => {
     setIsSubmitting(true);
     setErrorMsg("");
-
-    const payload = {
-      ...formData,
-    };
 
     try {
       const method = studentId ? "PATCH" : "POST";
@@ -314,22 +321,23 @@ export default function AddStudentWizard({
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(data),
       });
 
-      const data = await res.json();
+      const resData = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save student profile");
+        throw new Error(resData.error || "Failed to save student profile");
       }
 
-      onSuccess(data.studentId || studentId);
+      onSuccess(resData.studentId || studentId);
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || "An error occurred");
+    } catch (err: unknown) {
+      const errorText = err instanceof Error ? err.message : "An error occurred";
+      setErrorMsg(errorText);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/80 backdrop-blur-sm p-4 overflow-y-auto">
@@ -369,7 +377,7 @@ export default function AddStudentWizard({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4 font-sans text-charcoal dark:text-cream">
+          <form onSubmit={onSubmit} className="space-y-4 font-sans text-charcoal dark:text-cream">
             
             {/* Step 1: Basic Identity */}
             {currentStep === 1 && (
@@ -382,12 +390,11 @@ export default function AddStudentWizard({
                   <label className="text-sm font-medium block">Full Name *</label>
                   <input
                     type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    {...register("name")}
                     className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
                     placeholder="Enter full name"
                   />
+                  {errors.name && <FormError error={errors.name.message} />}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -395,19 +402,16 @@ export default function AddStudentWizard({
                     <label className="text-sm font-medium block">Date of Birth * {ageDisplay}</label>
                     <input
                       type="date"
-                      required
-                      value={formData.dateOfBirth ? formData.dateOfBirth.split("T")[0] : ""}
-                      onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                      {...register("dateOfBirth")}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
                     />
+                    {errors.dateOfBirth && <FormError error={errors.dateOfBirth.message} />}
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-sm font-medium block">Gender *</label>
                     <select
-                      value={formData.gender}
-                      required
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                      {...register("gender")}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta cursor-pointer"
                     >
                       <option value="">Select gender...</option>
@@ -415,38 +419,46 @@ export default function AddStudentWizard({
                         <option key={g} value={g}>{g}</option>
                       ))}
                     </select>
+                    {errors.gender && <FormError error={errors.gender.message} />}
                   </div>
                 </div>
 
-                <SlugInput
-                  value={formData.slug || ""}
-                  onChange={(slug) => setFormData({ ...formData, slug })}
-                  onAvailabilityChange={setSlugAvailable}
-                  studentId={studentId}
-                  label="Public Profile URL Slug (Optional)"
+                <Controller
+                  control={control}
+                  name="slug"
+                  render={({ field }) => (
+                    <SlugInput
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                      onAvailabilityChange={setSlugAvailable}
+                      studentId={studentId}
+                      label="Public Profile URL Slug (Optional)"
+                    />
+                  )}
                 />
+                {errors.slug && <FormError error={errors.slug.message} />}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-sm font-medium block">School Class / Grade</label>
                     <input
                       type="text"
-                      value={formData.schoolClass}
-                      onChange={(e) => setFormData({ ...formData, schoolClass: e.target.value })}
+                      {...register("schoolClass")}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
                       placeholder="Enter class or grade"
                     />
+                    {errors.schoolClass && <FormError error={errors.schoolClass.message} />}
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-sm font-medium block">School Name</label>
                     <input
                       type="text"
-                      value={formData.schoolName}
-                      onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
+                      {...register("schoolName")}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
                       placeholder="Enter school name"
                     />
+                    {errors.schoolName && <FormError error={errors.schoolName.message} />}
                   </div>
                 </div>
 
@@ -455,23 +467,30 @@ export default function AddStudentWizard({
                     <label className="text-sm font-medium block">City</label>
                     <input
                       type="text"
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      {...register("city")}
                       className="w-full h-10 bg-cream dark:bg-charcoal border border-terracotta/20 dark:border-terracotta/40 rounded-lg px-3 text-charcoal dark:text-cream focus:outline-none focus:border-terracotta"
                       placeholder="Enter city"
                     />
+                    {errors.city && <FormError error={errors.city.message} />}
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-sm font-medium block">State</label>
-                    <SearchableSelect
-                      options={STATE_OPTIONS}
-                      value={formData.state}
-                      onChange={(val) => setFormData({ ...formData, state: val })}
-                      placeholder="Select state..."
-                      searchPlaceholder="Search Indian states..."
-                      light={true}
+                    <Controller
+                      control={control}
+                      name="state"
+                      render={({ field }) => (
+                        <SearchableSelect
+                          options={STATE_OPTIONS}
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Select state..."
+                          searchPlaceholder="Search Indian states..."
+                          light={true}
+                        />
+                      )}
                     />
+                    {errors.state && <FormError error={errors.state.message} />}
                   </div>
                 </div>
               </div>
@@ -488,7 +507,7 @@ export default function AddStudentWizard({
                   <label className="text-sm font-medium block">Profile Photo</label>
 
                   {/* File Upload Area */}
-                  {!formData.profileImageUrl ? (
+                  {!watchedValues.profileImageUrl ? (
                     <div className="border-2 border-dashed border-terracotta/30 dark:border-gold/30 rounded-lg p-6 text-center hover:border-terracotta/50 dark:hover:border-gold/50 transition-colors">
                       <input
                         ref={fileInputRef}
@@ -538,18 +557,18 @@ export default function AddStudentWizard({
                   ) : (
                     <div className="bg-terracotta/5 dark:bg-gold/5 border border-terracotta/20 dark:border-gold/20 rounded-lg p-4 flex items-center gap-4">
                       <img
-                        src={formData.profileImageUrl}
+                        src={watchedValues.profileImageUrl}
                         alt="Profile"
                         className="w-16 h-16 rounded-lg object-cover border border-terracotta/20"
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-charcoal dark:text-cream mb-1">Photo Uploaded</p>
-                        <p className="text-xs text-charcoal/60 dark:text-cream/60 truncate">{formData.profileImageUrl}</p>
+                        <p className="text-xs text-charcoal/60 dark:text-cream/60 truncate">{watchedValues.profileImageUrl}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
-                          setFormData((prev) => ({ ...prev, profileImageUrl: "" }));
+                          setValue("profileImageUrl", "");
                           setSelectedFile(null);
                           setPhotoPreview(null);
                           if (fileInputRef.current) fileInputRef.current.value = "";
@@ -560,17 +579,25 @@ export default function AddStudentWizard({
                       </button>
                     </div>
                   )}
+                  {errors.profileImageUrl && <FormError error={errors.profileImageUrl.message} />}
                 </div>
 
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium block">About Me / Bio</label>
-                  <RichTextEditor
-                    value={formData.bio}
-                    onChange={(val) => setFormData({ ...formData, bio: val })}
-                    placeholder="Write a brief bio about yourself..."
-                    light={true}
+                  <Controller
+                    control={control}
+                    name="bio"
+                    render={({ field }) => (
+                      <RichTextEditor
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Write a brief bio about yourself..."
+                        light={true}
+                      />
+                    )}
                   />
+                  {errors.bio && <FormError error={errors.bio.message} />}
                 </div>
               </div>
             )}
@@ -583,52 +610,73 @@ export default function AddStudentWizard({
                 </h4>
 
                 {/* Specialization Group - display only */}
-                {formData.disciplineInterests.length > 0 && (
+                {(watchedValues.disciplineInterests || []).length > 0 && (
                   <div className="bg-terracotta/10 dark:bg-gold/10 border border-terracotta/20 dark:border-gold/20 rounded-lg p-3 space-y-1">
                     <p className="text-xs font-semibold text-terracotta dark:text-gold uppercase tracking-wider">Specialization Group</p>
                     <p className="text-sm text-charcoal dark:text-cream font-medium">
-                      {categories.find(c => c.id === formData.disciplineInterests[0])?.grouping || "Not specified"}
+                      {categories.find(c => c.id === (watchedValues.disciplineInterests || [])[0])?.grouping || "Not specified"}
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium block">Languages Spoken</label>
-                  <ChipMultiSelect
-                    options={LANGUAGES_OPTIONS}
-                    selectedValues={formData.languages}
-                    onChange={(vals) => setFormData((prev) => ({ ...prev, languages: vals }))}
-                    placeholder="Select languages..."
-                    light={true}
+                  <Controller
+                    control={control}
+                    name="languages"
+                    render={({ field }) => (
+                      <ChipMultiSelect
+                        options={LANGUAGES_OPTIONS}
+                        selectedValues={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Select languages..."
+                        light={true}
+                      />
+                    )}
                   />
+                  {errors.languages && <FormError error={errors.languages.message} />}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium block">Category Group</label>
-                  <ChipMultiSelect
-                    options={CATEGORY_GROUPS_OPTIONS}
-                    selectedValues={formData.categoryGrouping}
-                    onChange={(vals) => setFormData((prev) => ({ ...prev, categoryGrouping: vals }))}
-                    placeholder="Select category groups..."
-                    light={true}
+                  <Controller
+                    control={control}
+                    name="categoryGrouping"
+                    render={({ field }) => (
+                      <ChipMultiSelect
+                        options={CATEGORY_GROUPS_OPTIONS}
+                        selectedValues={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Select category groups..."
+                        light={true}
+                      />
+                    )}
                   />
+                  {errors.categoryGrouping && <FormError error={errors.categoryGrouping.message} />}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium block">Category Specialization *</label>
-                  <ChipMultiSelect
-                    options={filteredCategoryOptions}
-                    selectedValues={formData.disciplineInterests}
-                    onChange={(vals) => setFormData((prev) => ({ ...prev, disciplineInterests: vals }))}
-                    placeholder={formData.categoryGrouping.length === 0 ? "Select a Category Group first..." : "Select disciplines..."}
-                    light={true}
+                  <Controller
+                    control={control}
+                    name="disciplineInterests"
+                    render={({ field }) => (
+                      <ChipMultiSelect
+                        options={filteredCategoryOptions}
+                        selectedValues={field.value || []}
+                        onChange={field.onChange}
+                        placeholder={(watchedValues.categoryGrouping || []).length === 0 ? "Select a Category Group first..." : "Select disciplines..."}
+                        light={true}
+                      />
+                    )}
                   />
+                  {errors.disciplineInterests && <FormError error={errors.disciplineInterests.message} />}
                   <p className="text-xs text-charcoal/60 dark:text-cream/60">
-                    {formData.categoryGrouping.length === 0
+                    {(watchedValues.categoryGrouping || []).length === 0
                       ? "Select a Category Group first"
-                      : formData.disciplineInterests.length === 0
+                      : (watchedValues.disciplineInterests || []).length === 0
                       ? "Select at least one discipline"
-                      : `${formData.disciplineInterests.length} discipline(s) selected`}
+                      : `${(watchedValues.disciplineInterests || []).length} discipline(s) selected`}
                   </p>
                 </div>
               </div>
@@ -658,7 +706,7 @@ export default function AddStudentWizard({
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {formData.trainingInstitutes.map((inst, idx) => (
+                    {(watchedValues.trainingInstitutes || []).map((inst: string, idx: number) => (
                       <span key={idx} className="h-7 inline-flex items-center gap-1.5 bg-terracotta/10 text-terracotta dark:text-gold border border-terracotta/20 rounded-full pl-3 pr-2 text-xs font-semibold">
                         {inst}
                         <button type="button" onClick={() => handleRemoveInstitute(idx)} className="hover:bg-terracotta/20 rounded-full p-0.5">
@@ -667,6 +715,7 @@ export default function AddStudentWizard({
                       </span>
                     ))}
                   </div>
+                  {errors.trainingInstitutes && <FormError error={errors.trainingInstitutes.message} />}
                 </div>
 
                 {/* Special Skills - tag style */}
@@ -686,7 +735,7 @@ export default function AddStudentWizard({
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {formData.specialSkills.map((sk, idx) => (
+                    {(watchedValues.specialSkills || []).map((sk: string, idx: number) => (
                       <span key={idx} className="h-7 inline-flex items-center gap-1.5 bg-gold/10 text-gold border border-gold/30 rounded-full pl-3 pr-2 text-xs font-semibold">
                         {sk}
                         <button type="button" onClick={() => handleRemoveSkill(idx)} className="hover:bg-gold/20 rounded-full p-0.5">
@@ -695,6 +744,7 @@ export default function AddStudentWizard({
                       </span>
                     ))}
                   </div>
+                  {errors.specialSkills && <FormError error={errors.specialSkills.message} />}
                 </div>
               </div>
             )}
@@ -711,15 +761,15 @@ export default function AddStudentWizard({
                   <div className="flex gap-4">
                     {/* Avatar Section */}
                     <div className="flex-shrink-0">
-                      {formData.profileImageUrl ? (
+                      {watchedValues.profileImageUrl ? (
                         <img
-                          src={formData.profileImageUrl}
-                          alt={formData.name}
+                          src={watchedValues.profileImageUrl}
+                          alt={watchedValues.name}
                           className="w-14 h-14 rounded-lg object-cover border border-terracotta/20"
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-terracotta to-gold flex items-center justify-center text-white font-bold text-lg border border-terracotta/20">
-                          {getInitials(formData.name)}
+                          {watchedValues.name ? getInitials(watchedValues.name) : ""}
                         </div>
                       )}
                     </div>
@@ -728,13 +778,13 @@ export default function AddStudentWizard({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between mb-1">
                         <h5 className="font-serif text-lg font-bold text-charcoal dark:text-cream truncate">
-                          {formData.name || "Student Name"}
+                          {watchedValues.name || "Student Name"}
                         </h5>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        {formData.gender && (
+                        {watchedValues.gender && (
                           <span className="inline-flex items-center h-5 px-2 bg-charcoal/5 dark:bg-cream/5 text-charcoal dark:text-cream border border-charcoal/10 dark:border-cream/10 rounded-full text-xs font-semibold">
-                            {formData.gender}
+                            {watchedValues.gender}
                           </span>
                         )}
                         {ageDisplay && (
@@ -747,11 +797,11 @@ export default function AddStudentWizard({
 
                     {/* Right Column: DOB, School, Location */}
                     <div className="flex-1 text-sm space-y-1">
-                      {formData.dateOfBirth && (
+                      {watchedValues.dateOfBirth && (
                         <div>
                           <p className="text-charcoal/60 dark:text-cream/60 text-xs font-semibold uppercase">DOB</p>
                           <p className="text-charcoal dark:text-cream font-medium">
-                            {new Date(formData.dateOfBirth).toLocaleDateString("en-IN", {
+                            {new Date(watchedValues.dateOfBirth).toLocaleDateString("en-IN", {
                               year: "numeric",
                               month: "short",
                               day: "numeric",
@@ -759,19 +809,19 @@ export default function AddStudentWizard({
                           </p>
                         </div>
                       )}
-                      {(formData.schoolName || formData.schoolClass) && (
+                      {(watchedValues.schoolName || watchedValues.schoolClass) && (
                         <div>
                           <p className="text-charcoal/60 dark:text-cream/60 text-xs font-semibold uppercase">School</p>
                           <p className="text-charcoal dark:text-cream font-medium truncate">
-                            {formData.schoolName || "N/A"} {formData.schoolClass && `(${formData.schoolClass})`}
+                            {watchedValues.schoolName || "N/A"} {watchedValues.schoolClass && `(${watchedValues.schoolClass})`}
                           </p>
                         </div>
                       )}
-                      {(formData.city || formData.state) && (
+                      {(watchedValues.city || watchedValues.state) && (
                         <div>
                           <p className="text-charcoal/60 dark:text-cream/60 text-xs font-semibold uppercase">Location</p>
                           <p className="text-charcoal dark:text-cream font-medium truncate">
-                            {formData.city && formData.state ? `${formData.city}, ${formData.state}` : formData.city || formData.state}
+                            {watchedValues.city && watchedValues.state ? `${watchedValues.city}, ${watchedValues.state}` : watchedValues.city || watchedValues.state}
                           </p>
                         </div>
                       )}
@@ -780,16 +830,16 @@ export default function AddStudentWizard({
                 </div>
 
                 {/* Bio Section */}
-                {(formData.bio || true) && (
+                {(watchedValues.bio || true) && (
                   <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
                     <div className="flex items-start gap-3">
                       <BookOpen className="w-4 h-4 text-terracotta dark:text-gold flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-terracotta dark:text-gold uppercase tracking-wider mb-2">About Me</p>
-                        {formData.bio ? (
+                        {watchedValues.bio ? (
                           <p className="text-sm text-charcoal dark:text-cream leading-relaxed">
-                            {stripHtml(formData.bio).slice(0, 180)}
-                            {stripHtml(formData.bio).length > 180 && "..."}
+                            {stripHtml(watchedValues.bio).slice(0, 180)}
+                            {stripHtml(watchedValues.bio).length > 180 && "..."}
                           </p>
                         ) : (
                           <p className="text-sm text-charcoal/50 dark:text-cream/50 italic">Not provided</p>
@@ -800,15 +850,15 @@ export default function AddStudentWizard({
                 )}
 
                 {/* Disciplines Section */}
-                {(formData.disciplineInterests.length > 0 || true) && (
+                {((watchedValues.disciplineInterests || []).length > 0 || true) && (
                   <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
                     <div className="flex items-start gap-3">
                       <Music className="w-4 h-4 text-terracotta dark:text-gold flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-terracotta dark:text-gold uppercase tracking-wider mb-2">Disciplines</p>
-                        {formData.disciplineInterests.length > 0 ? (
+                        {(watchedValues.disciplineInterests || []).length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {formData.disciplineInterests.map((disciplineId) => {
+                            {(watchedValues.disciplineInterests || []).map((disciplineId: string) => {
                               const categoryName =
                                 categories.find((c) => c.id === disciplineId)?.name || disciplineId;
                               return (
@@ -830,15 +880,15 @@ export default function AddStudentWizard({
                 )}
 
                 {/* Languages Section */}
-                {(formData.languages.length > 0 || true) && (
+                {((watchedValues.languages || []).length > 0 || true) && (
                   <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
                     <div className="flex items-start gap-3">
                       <Globe className="w-4 h-4 text-charcoal/60 dark:text-cream/60 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-charcoal/70 dark:text-cream/70 uppercase tracking-wider mb-2">Languages</p>
-                        {formData.languages.length > 0 ? (
+                        {(watchedValues.languages || []).length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {formData.languages.map((lang) => (
+                            {(watchedValues.languages || []).map((lang: string) => (
                               <span
                                 key={lang}
                                 className="inline-flex items-center h-6 px-3 bg-charcoal/5 dark:bg-cream/5 text-charcoal dark:text-cream border border-charcoal/10 dark:border-cream/10 rounded-full text-xs font-semibold"
@@ -856,15 +906,15 @@ export default function AddStudentWizard({
                 )}
 
                 {/* Category Groups Section */}
-                {(formData.categoryGrouping.length > 0 || true) && (
+                {((watchedValues.categoryGrouping || []).length > 0 || true) && (
                   <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
                     <div className="flex items-start gap-3">
                       <Layers className="w-4 h-4 text-gold dark:text-gold flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-gold dark:text-gold uppercase tracking-wider mb-2">Category Groups</p>
-                        {formData.categoryGrouping.length > 0 ? (
+                        {(watchedValues.categoryGrouping || []).length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {formData.categoryGrouping.map((groupVal) => {
+                            {(watchedValues.categoryGrouping || []).map((groupVal: string) => {
                               const groupLabel =
                                 CATEGORY_GROUPS_OPTIONS.find((opt) => opt.value === groupVal)?.label || groupVal;
                               return (
@@ -886,15 +936,15 @@ export default function AddStudentWizard({
                 )}
 
                 {/* Training Institutes Section */}
-                {(formData.trainingInstitutes.length > 0 || true) && (
+                {((watchedValues.trainingInstitutes || []).length > 0 || true) && (
                   <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
                     <div className="flex items-start gap-3">
                       <BookOpen className="w-4 h-4 text-charcoal/60 dark:text-cream/60 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-charcoal/70 dark:text-cream/70 uppercase tracking-wider mb-2">Training Institutes</p>
-                        {formData.trainingInstitutes.length > 0 ? (
+                        {(watchedValues.trainingInstitutes || []).length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {formData.trainingInstitutes.map((inst, idx) => (
+                            {(watchedValues.trainingInstitutes || []).map((inst: string, idx: number) => (
                               <span
                                 key={idx}
                                 className="inline-flex items-center h-6 px-3 bg-charcoal/5 dark:bg-cream/5 text-charcoal dark:text-cream border border-charcoal/10 dark:border-cream/10 rounded-full text-xs font-semibold"
@@ -912,15 +962,15 @@ export default function AddStudentWizard({
                 )}
 
                 {/* Special Skills Section */}
-                {(formData.specialSkills.length > 0 || true) && (
+                {((watchedValues.specialSkills || []).length > 0 || true) && (
                   <div className="bg-white dark:bg-charcoal rounded-xl border border-terracotta/10 dark:border-terracotta/20 p-4">
                     <div className="flex items-start gap-3">
                       <Sparkles className="w-4 h-4 text-gold dark:text-gold flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-gold dark:text-gold uppercase tracking-wider mb-2">Special Skills</p>
-                        {formData.specialSkills.length > 0 ? (
+                        {(watchedValues.specialSkills || []).length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
-                            {formData.specialSkills.map((sk, idx) => (
+                            {(watchedValues.specialSkills || []).map((sk: string, idx: number) => (
                               <span
                                 key={idx}
                                 className="inline-flex items-center h-6 px-3 bg-gold/10 text-gold border border-gold/20 dark:border-gold/30 rounded-full text-xs font-semibold"
@@ -938,7 +988,7 @@ export default function AddStudentWizard({
                 )}
 
                 <p className="text-xs text-charcoal/60 dark:text-cream/60">
-                  Please review the details above. If everything is correct, click the "Save Student Profile" button below to continue.
+                  Please review the details above. If everything is correct, click the &quot;Save Student Profile&quot; button below to continue.
                 </p>
               </div>
             )}
@@ -988,7 +1038,7 @@ export default function AddStudentWizard({
             ) : (
               <Button
                 type="button"
-                onClick={handleSubmit}
+                onClick={onSubmit}
                 variant="primary"
                 size="md"
                 className="w-48 font-bold flex items-center justify-center"

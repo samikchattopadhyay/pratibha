@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,13 +14,14 @@ interface SettingsSubTabProps {
 }
 
 const JudgeSettingsSchema = z.object({
-  maxEvaluationsPerDay: z.number().min(1).max(50),
-  restPeriodHours: z.number().min(0).max(24),
-  paymentPerEvaluation: z.number().min(0).max(10000),
+  maxEvaluationsPerDay: z.number().min(1, "Must be at least 1").max(50, "Maximum is 50"),
+  restPeriodHours: z.number().min(0, "Must be at least 0").max(24, "Maximum is 24"),
+  paymentPerEvaluation: z.number().min(0, "Must be at least 0").max(10000, "Maximum is 10000"),
   revenueShareLOCAL: z.number().min(0).max(100).nullable().optional(),
   revenueShareREGIONAL: z.number().min(0).max(100).nullable().optional(),
   revenueShareNATIONAL: z.number().min(0).max(100).nullable().optional(),
   revenueShareEXPERT: z.number().min(0).max(100).nullable().optional(),
+  preferredCategories: z.array(z.string()).min(1, "Select at least 1 category"),
   emailNotifications: z.boolean(),
   smsNotifications: z.boolean(),
 });
@@ -38,14 +39,13 @@ const AVAILABLE_CATEGORIES = [
 
 export default function SettingsSubTab({ judge, judgeId }: SettingsSubTabProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [submitMessage, setSubmitMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    judge.specializations.length > 0 ? Array.from(judge.specializations) : []
-  );
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<SettingsFormData>({
     resolver: zodResolver(JudgeSettingsSchema),
@@ -57,20 +57,41 @@ export default function SettingsSubTab({ judge, judgeId }: SettingsSubTabProps) 
       revenueShareREGIONAL: null,
       revenueShareNATIONAL: null,
       revenueShareEXPERT: null,
+      preferredCategories: judge.specializations.length > 0 ? Array.from(judge.specializations) : [],
       emailNotifications: true,
       smsNotifications: false,
     },
   });
 
-  const onSubmit = async (data: SettingsFormData) => {
-    if (selectedCategories.length === 0) {
-      setSubmitMessage({
-        type: "error",
-        text: "Select at least 1 category",
-      });
-      return;
-    }
+  // Fetch settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`/api/admin/judges/${judgeId}/settings`);
+        if (!res.ok) throw new Error("Failed to load settings");
+        const data = await res.json();
+        reset({
+          maxEvaluationsPerDay: data.maxEvaluationsPerDay,
+          restPeriodHours: data.restPeriodHours,
+          paymentPerEvaluation: data.paymentPerEvaluation,
+          revenueShareLOCAL: data.revenueShareByTier?.LOCAL ?? null,
+          revenueShareREGIONAL: data.revenueShareByTier?.REGIONAL ?? null,
+          revenueShareNATIONAL: data.revenueShareByTier?.NATIONAL ?? null,
+          revenueShareEXPERT: data.revenueShareByTier?.EXPERT ?? null,
+          preferredCategories: data.preferredCategories || [],
+          emailNotifications: data.emailNotifications,
+          smsNotifications: data.smsNotifications,
+        });
+      } catch (err) {
+        console.error("[SettingsSubTab] Load error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSettings();
+  }, [judgeId, reset]);
 
+  const onSubmit = async (data: SettingsFormData) => {
     setIsSubmitting(true);
     setSubmitMessage(null);
 
@@ -79,8 +100,16 @@ export default function SettingsSubTab({ judge, judgeId }: SettingsSubTabProps) 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...data,
-          preferredCategories: selectedCategories,
+          maxEvaluationsPerDay: data.maxEvaluationsPerDay,
+          restPeriodHours: data.restPeriodHours,
+          paymentPerEvaluation: data.paymentPerEvaluation,
+          revenueShareLOCAL: data.revenueShareLOCAL,
+          revenueShareREGIONAL: data.revenueShareREGIONAL,
+          revenueShareNATIONAL: data.revenueShareNATIONAL,
+          revenueShareEXPERT: data.revenueShareEXPERT,
+          preferredCategories: data.preferredCategories,
+          emailNotifications: data.emailNotifications,
+          smsNotifications: data.smsNotifications,
         }),
       });
 
@@ -103,13 +132,13 @@ export default function SettingsSubTab({ judge, judgeId }: SettingsSubTabProps) 
     }
   };
 
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
+  if (isLoading) {
+    return (
+      <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 flex justify-center items-center min-h-[400px]">
+        <Loading variant="overlay" text="Loading settings..." />
+      </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -303,17 +332,17 @@ export default function SettingsSubTab({ judge, judgeId }: SettingsSubTabProps) 
                 <label key={category} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedCategories.includes(category)}
-                    onChange={() => toggleCategory(category)}
+                    value={category}
+                    {...register("preferredCategories")}
                     className="w-4 h-4 accent-gold"
                   />
                   <span className="text-cream text-sm">{category}</span>
                 </label>
               ))}
             </div>
-            {selectedCategories.length === 0 && (
+            {errors.preferredCategories && (
               <p className="text-red-400 text-xs mt-2">
-                Select at least 1 category
+                {errors.preferredCategories.message}
               </p>
             )}
           </div>

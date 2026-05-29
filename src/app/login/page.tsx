@@ -1,6 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +10,9 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
+import FormField from "@/components/forms/FormField";
+import FormError from "@/components/forms/FormError";
+import { loginSchema, type LoginFormData } from "@/schemas/auth";
 import { LogIn, AlertCircle } from "lucide-react";
 
 function LoginForm() {
@@ -17,32 +22,36 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") || "/account/dashboard";
   const urlError = searchParams.get("error");
 
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [error, setError] = useState(urlError === "UNVERIFIED_EMAIL" ? "" : "");
-  const [loading, setLoading] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    mode: "onBlur",
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
+  const onSubmit = async (data: LoginFormData) => {
     try {
       const res = await signIn("credentials", {
         redirect: false,
-        email: formData.email,
-        password: formData.password,
+        email: data.email,
+        password: data.password,
         callbackUrl,
       });
 
       if (res?.error) {
         if (res.error === "UNVERIFIED_EMAIL") {
-          setError(`Email not verified. Please check your inbox and verify your email address to continue.`);
+          setError("root", {
+            message: "Email not verified. Please check your inbox and verify your email address to continue.",
+          });
         } else {
-          setError("Invalid email address or password combination");
+          setError("root", {
+            message: "Invalid email address or password combination",
+          });
         }
-        setLoading(false);
       } else {
-        // Fetch current session to determine user role and target dashboard
         const sessionRes = await fetch("/api/auth/session");
         const sessionData = await sessionRes.json();
         const role = sessionData?.user?.role;
@@ -54,23 +63,19 @@ function LoginForm() {
           } else if (role === "JUDGE") {
             targetUrl = "/judge/dashboard";
           } else if (role === "PARENT") {
-            // For PARENT users, check if onboarding is complete
             try {
               const statusRes = await fetch("/api/account/onboarding-status");
               if (statusRes.ok) {
                 const statusData = await statusRes.json();
                 if (!statusData.passwordSet || !statusData.phoneSet || !statusData.emailVerified || !statusData.addressSet) {
-                  // Onboarding incomplete, redirect to onboarding
                   const tokenParam = statusData.setupToken ? `?token=${statusData.setupToken}` : "";
                   router.push(`/onboarding${tokenParam}`);
                   router.refresh();
-                  setLoading(false);
                   return;
                 }
               }
             } catch (err) {
               console.error("Error checking onboarding status:", err);
-              // Continue to dashboard on error
             }
             targetUrl = "/account/dashboard";
           }
@@ -81,25 +86,21 @@ function LoginForm() {
       }
     } catch (err) {
       console.error(err);
-      setError("An unexpected error occurred. Please try again.");
-      setLoading(false);
+      setError("root", {
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  const rootError = errors.root?.message;
 
   return (
     <>
       <Header />
-      
+
       <main className="flex-1 bg-cream py-16 px-4 flex items-center justify-center alpana-pattern">
         <div className="w-full max-w-md bg-cream border border-terracotta/10 rounded-2xl p-8 shadow-xl relative overflow-hidden">
-          
+
           <div className="absolute right-0 top-0 opacity-[0.03] pointer-events-none select-none text-terracotta">
             <svg width="150" height="150" viewBox="0 0 100 100" fill="currentColor">
               <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="1" fill="none" />
@@ -115,15 +116,15 @@ function LoginForm() {
             </p>
           </div>
 
-          {(error || urlError === "UNVERIFIED_EMAIL") && (
+          {(rootError || urlError === "UNVERIFIED_EMAIL") && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-200 rounded-xl text-red-800 text-sm font-sans space-y-2">
               <div className="flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
-                <span>{error || (urlError === "UNVERIFIED_EMAIL" ? "Email not verified. Please verify your email address to continue." : "")}</span>
+                <span>{rootError || (urlError === "UNVERIFIED_EMAIL" ? "Email not verified. Please verify your email address to continue." : "")}</span>
               </div>
-              {(error?.includes("not verified") || urlError === "UNVERIFIED_EMAIL") && (
+              {(rootError?.includes("not verified") || urlError === "UNVERIFIED_EMAIL") && (
                 <div className="ml-6 pt-2 text-xs text-red-700">
-                  <Link href={`/auth/verify-email?email=${encodeURIComponent(formData.email)}`} className="text-red-600 font-semibold hover:underline">
+                  <Link href={`/auth/verify-email?email=${encodeURIComponent(register("email").name)}`} className="text-red-600 font-semibold hover:underline">
                     Resend verification email
                   </Link>
                 </div>
@@ -131,19 +132,14 @@ function LoginForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Email Address</label>
-              <input
-                type="email"
-                name="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
-                placeholder="your.email@example.com"
-              />
-            </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              label="Email Address"
+              placeholder="your.email@example.com"
+              type="email"
+              error={errors.email?.message}
+              {...register("email")}
+            />
 
             <div className="space-y-1.5">
               <div className="flex justify-between">
@@ -152,21 +148,21 @@ function LoginForm() {
               </div>
               <input
                 type="password"
-                name="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
                 placeholder="••••••••"
+                className={`w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors ${
+                  errors.password ? "border-red-300 focus:border-red-400" : ""
+                }`}
+                {...register("password")}
               />
+              {errors.password && <FormError error={errors.password.message} />}
             </div>
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               variant="primary"
               size="lg"
-              isLoading={loading}
+              isLoading={isSubmitting}
               className="w-full"
             >
               <LogIn className="w-4 h-4" />

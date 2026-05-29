@@ -4,8 +4,46 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
-import { Plus } from "lucide-react";
+
 import SearchableSelect from "@/components/admin/SearchableSelect";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import FormError from "@/components/forms/FormError";
+
+const generalSettingsSchema = z.object({
+  whatsappUrl: z.string().url("Invalid WhatsApp API URL").min(1, "WhatsApp API URL is required"),
+  fbInterval: z.number().min(1, "Interval must be at least 1 minute"),
+});
+
+const categoryFormSchema = z.object({
+  name: z.string().min(1, "Category name is required").min(2, "Name must be at least 2 characters").max(100, "Too long"),
+  grouping: z.string().min(1, "Visual grouping is required"),
+});
+
+const categoryGroupSchema = z.object({
+  name: z.string().min(1, "Grouping name is required").min(2, "Name must be at least 2 characters").max(100, "Too long"),
+});
+
+const bannerFormSchema = z.object({
+  name: z.string().min(1, "Template name is required").min(3, "Name must be at least 3 characters").max(100, "Too long"),
+  description: z.string().optional(),
+  imageUrl: z.string().min(1, "Image is required"),
+  tags: z.array(z.string()).max(20, "Too many tags").default([]),
+});
+
+const rubricCriterionSchema = z.object({
+  label: z.string().min(1, "Criterion label is required").min(3, "Label must be at least 3 characters").max(100, "Too long"),
+  max: z.number().min(1, "Max points must be at least 1").max(100, "Max points cannot exceed 100"),
+  description: z.string().optional(),
+});
+
+interface CriterionConfig {
+  key: string;
+  label: string;
+  max: number;
+  description?: string;
+}
 
 interface Category {
   id: string;
@@ -31,7 +69,7 @@ interface SettingsTabProps {
   setWhatsappUrl: (url: string) => void;
   fbInterval: string;
   setFbInterval: (interval: string) => void;
-  handleSaveSettings: () => Promise<void>;
+  handleSaveSettings: (url?: string, interval?: string) => Promise<void>;
   categories: Category[];
   handleAddCategory: (name: string, grouping: string) => Promise<void>;
   bannerTemplates: BannerTemplate[];
@@ -50,9 +88,9 @@ const CATEGORY_GROUPS = [
 
 export default function SettingsTab({
   whatsappUrl,
-  setWhatsappUrl,
+  setWhatsappUrl: _setWhatsappUrl,
   fbInterval,
-  setFbInterval,
+  setFbInterval: _setFbInterval,
   handleSaveSettings,
   categories,
   handleAddCategory,
@@ -62,21 +100,103 @@ export default function SettingsTab({
 }: SettingsTabProps) {
   const searchParams = useSearchParams();
   const [activeSubTab, setActiveSubTab] = useState<"general" | "categories" | "banners" | "groupings" | "rubrics">("general");
-  const [newCatName, setNewCatName] = useState("");
-  const [newCatGroup, setNewCatGroup] = useState("MUSIC_VOCAL");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
-  const [bannerName, setBannerName] = useState("");
-  const [bannerDesc, setBannerDesc] = useState("");
-  const [bannerTags, setBannerTags] = useState<string[]>([]);
   const [bannerTagInput, setBannerTagInput] = useState("");
   const [bannerTagSuggestions, setBannerTagSuggestions] = useState<string[]>([]);
   const [showBannerTagSuggestions, setShowBannerTagSuggestions] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
-  const [uploadedBannerUrl, setUploadedBannerUrl] = useState("");
   const [bannerErrorMsg, setBannerErrorMsg] = useState("");
   const [isSeedingCategories, setIsSeedingCategories] = useState(false);
+
+  // Form 1: General Settings
+  const {
+    register: registerGeneral,
+    handleSubmit: handleSubmitGeneral,
+    reset: resetGeneral,
+    formState: { errors: errorsGeneral },
+  } = useForm<z.input<typeof generalSettingsSchema>>({
+    resolver: zodResolver(generalSettingsSchema),
+    defaultValues: {
+      whatsappUrl,
+      fbInterval: parseInt(fbInterval) || 30,
+    },
+  });
+
+  useEffect(() => {
+    resetGeneral({
+      whatsappUrl,
+      fbInterval: parseInt(fbInterval) || 30,
+    });
+  }, [whatsappUrl, fbInterval, resetGeneral]);
+
+  const onSaveGeneral = handleSubmitGeneral(async (values) => {
+    await handleSaveSettings(values.whatsappUrl, values.fbInterval.toString());
+  });
+
+  // Form 2: Specialization (Category)
+  const {
+    register: registerCat,
+    handleSubmit: handleSubmitCat,
+    reset: resetCat,
+    formState: { errors: errorsCat },
+  } = useForm<z.input<typeof categoryFormSchema>>({
+    resolver: zodResolver(categoryFormSchema),
+    defaultValues: {
+      name: "",
+      grouping: "MUSIC_VOCAL",
+    },
+  });
+
+  // Form 3: Category Group (Visual Grouping)
+  const {
+    register: registerGroup,
+    handleSubmit: handleSubmitGroup,
+    reset: resetGroup,
+    formState: { errors: errorsGroup },
+  } = useForm<z.input<typeof categoryGroupSchema>>({
+    resolver: zodResolver(categoryGroupSchema),
+    defaultValues: {
+      name: "",
+    },
+  });
+
+  // Form 4: Banner Template
+  const {
+    register: registerBanner,
+    handleSubmit: handleSubmitBanner,
+    setValue: setValueBanner,
+    watch: watchBanner,
+    reset: resetBanner,
+    formState: { errors: errorsBanner },
+  } = useForm<z.input<typeof bannerFormSchema>>({
+    resolver: zodResolver(bannerFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      imageUrl: "",
+      tags: [],
+    },
+  });
+
+  const bannerTags = watchBanner("tags") || [];
+  const uploadedBannerUrl = watchBanner("imageUrl") || "";
+
+  // Form 5: Rubric Criterion
+  const {
+    register: registerCrit,
+    handleSubmit: handleSubmitCrit,
+    reset: resetCrit,
+    formState: { errors: errorsCrit },
+  } = useForm<z.input<typeof rubricCriterionSchema>>({
+    resolver: zodResolver(rubricCriterionSchema),
+    defaultValues: {
+      label: "",
+      max: 0,
+      description: "",
+    },
+  });
 
   const handleSeedCategories = async () => {
     setIsSeedingCategories(true);
@@ -96,22 +216,16 @@ export default function SettingsTab({
     }
   };
 
-  const [rubrics, setRubrics] = useState<any>(null);
+  const [rubrics, setRubrics] = useState<Record<string, Record<string, CriterionConfig[]>> | null>(null);
   const [selectedGroup, setSelectedGroup] = useState("MUSIC_VOCAL");
   const [selectedScope, setSelectedScope] = useState<"STATE" | "NATIONAL">("STATE");
   const [isSavingRubrics, setIsSavingRubrics] = useState(false);
   const [rubricError, setRubricError] = useState("");
   const [rubricSuccess, setRubricSuccess] = useState("");
-  const [newGroupName, setNewGroupName] = useState("");
 
-  const [newCritLabel, setNewCritLabel] = useState("");
-  const [newCritMax, setNewCritMax] = useState<number>(0);
-  const [newCritDesc, setNewCritDesc] = useState("");
 
-  const handleAddNewCriterionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCritLabel.trim() || !newCritMax || !rubrics) return;
-
+  const handleAddNewCriterionSubmit = handleSubmitCrit(async (values) => {
+    if (!rubrics) return;
     const updated = { ...rubrics };
     if (!updated[selectedScope]) updated[selectedScope] = {};
     if (!updated[selectedScope][selectedGroup]) updated[selectedScope][selectedGroup] = [];
@@ -120,16 +234,14 @@ export default function SettingsTab({
     const key = `criteria_custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     currentList.push({
       key,
-      label: newCritLabel.trim(),
-      max: newCritMax,
-      description: newCritDesc.trim(),
+      label: values.label.trim(),
+      max: values.max,
+      description: values.description?.trim() || "",
     });
     updated[selectedScope][selectedGroup] = currentList;
 
     setRubrics(updated);
-    setNewCritLabel("");
-    setNewCritMax(0);
-    setNewCritDesc("");
+    resetCrit();
     setRubricError("");
     setRubricSuccess("");
 
@@ -152,7 +264,59 @@ export default function SettingsTab({
     } finally {
       setIsSavingRubrics(false);
     }
-  };
+  });
+
+  const onSubmitGroupForm = handleSubmitGroup(async (values) => {
+    if (!rubrics) return;
+    setRubricError("");
+    setRubricSuccess("");
+
+    const formattedKey = values.name.trim().toUpperCase().replace(/[\s-]+/g, "_").replace(/[^\w]/g, "");
+    if (!formattedKey) {
+      setRubricError("Invalid group name format");
+      return;
+    }
+
+    if (rubrics.STATE[formattedKey] || rubrics.NATIONAL[formattedKey]) {
+      setRubricError("Group already exists");
+      return;
+    }
+
+    const updated = { ...rubrics };
+    updated.STATE[formattedKey] = [
+      { key: "criteria1", label: "Technical Competence", max: 40, description: "Accuracy and basic technical execution." },
+      { key: "criteria2", label: "Artistic Presentation", max: 30, description: "Styling, expression, and delivery choice." },
+      { key: "criteria3", label: "Overall Impression", max: 30, description: "General aesthetic and performance balance." },
+    ];
+    updated.NATIONAL[formattedKey] = [
+      { key: "criteria1", label: "Technical Competence", max: 35, description: "Technical proficiency and execution accuracy." },
+      { key: "criteria2", label: "Artistic Presentation", max: 25, description: "Performance delivery, stylistic choices, and emotional depth." },
+      { key: "criteria3", label: "General Aesthetic Choice", max: 25, description: "Composition selection, complexity, and overall balance." },
+      { key: "criteria4", label: "Originality & Innovation", max: 15, description: "Creative uniqueness and novel presentation." },
+    ];
+
+    setIsSavingRubrics(true);
+    try {
+      const res = await fetch("/api/admin/rubrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        setRubrics(updated);
+        resetGroup();
+        setRubricSuccess(`Category Group "${values.name}" added successfully!`);
+        setTimeout(() => setRubricSuccess(""), 3000);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to add group");
+      }
+    } catch (err) {
+      setRubricError(err instanceof Error ? err.message : "Error adding category group");
+    } finally {
+      setIsSavingRubrics(false);
+    }
+  });
 
   const [showCriterionModal, setShowCriterionModal] = useState(false);
   const [editingCriterionIdx, setEditingCriterionIdx] = useState<number | null>(null);
@@ -246,7 +410,7 @@ export default function SettingsTab({
           const keys = Object.keys(data.STATE || {});
           if (keys.length > 0) {
             setSelectedGroup(keys[0]);
-            setNewCatGroup(keys[0]);
+            resetCat({ name: "", grouping: keys[0] });
           }
         }
       } catch (err) {
@@ -254,60 +418,9 @@ export default function SettingsTab({
       }
     };
     fetchRubrics();
-  }, []);
+  }, [resetCat]);
 
-  const handleAddCategoryGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGroupName.trim() || !rubrics) return;
-    setRubricError("");
-    setRubricSuccess("");
-
-    const formattedKey = newGroupName.trim().toUpperCase().replace(/[\s-]+/g, "_").replace(/[^\w]/g, "");
-    if (!formattedKey) {
-      setRubricError("Invalid group name format");
-      return;
-    }
-
-    if (rubrics.STATE[formattedKey] || rubrics.NATIONAL[formattedKey]) {
-      setRubricError("Group already exists");
-      return;
-    }
-
-    const updated = { ...rubrics };
-    updated.STATE[formattedKey] = [
-      { key: "criteria1", label: "Technical Competence", max: 40, description: "Accuracy and basic technical execution." },
-      { key: "criteria2", label: "Artistic Presentation", max: 30, description: "Styling, expression, and delivery choice." },
-      { key: "criteria3", label: "Overall Impression", max: 30, description: "General aesthetic and performance balance." },
-    ];
-    updated.NATIONAL[formattedKey] = [
-      { key: "criteria1", label: "Technical Competence", max: 35, description: "Technical proficiency and execution accuracy." },
-      { key: "criteria2", label: "Artistic Presentation", max: 25, description: "Performance delivery, stylistic choices, and emotional depth." },
-      { key: "criteria3", label: "General Aesthetic Choice", max: 25, description: "Composition selection, complexity, and overall balance." },
-      { key: "criteria4", label: "Originality & Innovation", max: 15, description: "Creative uniqueness and novel presentation." },
-    ];
-
-    setIsSavingRubrics(true);
-    try {
-      const res = await fetch("/api/admin/rubrics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      if (res.ok) {
-        setRubrics(updated);
-        setNewGroupName("");
-        setRubricSuccess(`Category Group "${newGroupName}" added successfully!`);
-        setTimeout(() => setRubricSuccess(""), 3000);
-      } else {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to add group");
-      }
-    } catch (err) {
-      setRubricError(err instanceof Error ? err.message : "Error adding category group");
-    } finally {
-      setIsSavingRubrics(false);
-    }
-  };
+  // handleAddCategoryGroup is now replaced by onSubmitGroupForm locally
 
   const handleRemoveCategoryGroup = async (groupKey: string) => {
     if (!rubrics) return;
@@ -338,7 +451,7 @@ export default function SettingsTab({
         if (selectedGroup === groupKey) {
           const keys = Object.keys(updated.STATE);
           setSelectedGroup(keys[0] || "");
-          setNewCatGroup(keys[0] || "");
+          resetCat({ name: "", grouping: keys[0] || "" });
         }
         setRubricSuccess(`Category Group "${groupKey}" deleted successfully!`);
         setTimeout(() => setRubricSuccess(""), 3000);
@@ -353,12 +466,13 @@ export default function SettingsTab({
     }
   };
 
-  const handleUpdateRubricCriterion = (idx: number, field: string, value: any) => {
+  const handleUpdateRubricCriterion = (idx: number, field: string, value: string | number) => {
     if (!rubrics) return;
-    setRubrics((prev: any) => {
+    setRubrics((prev) => {
+      if (!prev) return null;
       const updated = { ...prev };
       const currentList = [...(updated[selectedScope]?.[selectedGroup] || [])];
-      currentList[idx] = { ...currentList[idx], [field]: value };
+      currentList[idx] = { ...currentList[idx], [field]: value } as CriterionConfig;
       updated[selectedScope][selectedGroup] = currentList;
       return updated;
     });
@@ -366,7 +480,8 @@ export default function SettingsTab({
 
   const handleAddRubricCriterion = () => {
     if (!rubrics) return;
-    setRubrics((prev: any) => {
+    setRubrics((prev) => {
+      if (!prev) return null;
       const updated = { ...prev };
       const currentList = [...(updated[selectedScope]?.[selectedGroup] || [])];
       currentList.push({
@@ -419,7 +534,7 @@ export default function SettingsTab({
 
     // Validation: check sum for selected group and scope
     const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
-    const totalPoints = currentList.reduce((sum: number, c: any) => sum + (parseInt(c.max) || 0), 0);
+    const totalPoints = currentList.reduce((sum: number, c: CriterionConfig) => sum + (c.max || 0), 0);
     if (totalPoints !== 100) {
       setRubricError(`Rubric points must sum up to exactly 100. Current total is ${totalPoints}.`);
       return;
@@ -462,25 +577,23 @@ export default function SettingsTab({
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   };
 
-  const onSubmitCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCatName.trim()) return;
+  const onSubmitCategoryForm = handleSubmitCat(async (values) => {
     setIsSubmitting(true);
     setErrorMsg("");
     try {
-      await handleAddCategory(newCatName.trim(), newCatGroup);
-      setNewCatName("");
+      await handleAddCategory(values.name, values.grouping);
+      resetCat({ name: "", grouping: values.grouping });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to add category");
     } finally {
       setIsSubmitting(false);
     }
-  };
+  });
 
   const addBannerTag = (tagValue?: string) => {
     const tag = (tagValue || bannerTagInput).trim();
     if (tag && !bannerTags.includes(tag)) {
-      setBannerTags([...bannerTags, tag]);
+      setValueBanner("tags", [...bannerTags, tag], { shouldValidate: true });
       setBannerTagInput("");
       setShowBannerTagSuggestions(false);
     }
@@ -511,7 +624,7 @@ export default function SettingsTab({
   };
 
   const removeBannerTag = (index: number) => {
-    setBannerTags(bannerTags.filter((_, i) => i !== index));
+    setValueBanner("tags", bannerTags.filter((_, i) => i !== index), { shouldValidate: true });
   };
 
   const handleBannerTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -520,35 +633,31 @@ export default function SettingsTab({
       addBannerTag();
     } else if (e.key === "Backspace" && !bannerTagInput && bannerTags.length > 0) {
       const lastTag = bannerTags[bannerTags.length - 1];
-      setBannerTags(bannerTags.slice(0, -1));
+      setValueBanner("tags", bannerTags.slice(0, -1), { shouldValidate: true });
       setBannerTagInput(lastTag);
     } else if (e.key === "Escape") {
       setShowBannerTagSuggestions(false);
     }
   };
 
-  const onSubmitBanner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bannerFile || !bannerName.trim() || !uploadedBannerUrl) {
+  const onSubmitBannerForm = handleSubmitBanner(async (values) => {
+    if (!bannerFile || !values.imageUrl) {
       setBannerErrorMsg("Please upload an image and provide a template name");
       return;
     }
     setIsUploadingBanner(true);
     setBannerErrorMsg("");
     try {
-      await handleAddBannerTemplate(bannerName.trim(), uploadedBannerUrl, bannerDesc, bannerTags);
+      await handleAddBannerTemplate(values.name, values.imageUrl, values.description || "", values.tags || []);
       setBannerFile(null);
-      setBannerName("");
-      setBannerDesc("");
-      setBannerTags([]);
+      resetBanner();
       setBannerTagInput("");
-      setUploadedBannerUrl("");
     } catch (err) {
       setBannerErrorMsg(err instanceof Error ? err.message : "Failed to add banner template");
     } finally {
       setIsUploadingBanner(false);
     }
-  };
+  });
 
   const onUploadBannerImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -570,10 +679,11 @@ export default function SettingsTab({
       if (!res.ok) throw new Error(data.error || "Failed to upload image");
 
       setBannerFile(file);
-      setUploadedBannerUrl(data.url);
+      setValueBanner("imageUrl", data.url, { shouldValidate: true });
     } catch (err) {
       setBannerErrorMsg(err instanceof Error ? err.message : "Failed to upload image");
       setBannerFile(null);
+      setValueBanner("imageUrl", "", { shouldValidate: true });
     } finally {
       setIsUploadingBanner(false);
     }
@@ -640,34 +750,34 @@ export default function SettingsTab({
         {activeSubTab === "general" && (
           <div className="bg-charcoal-light border border-terracotta/15 rounded-2xl p-6 space-y-4 shadow-md max-w-xl">
             <h3 className="font-serif text-base font-bold">Workspace Configuration</h3>
-            <div className="space-y-4 text-sm font-semibold">
+            <form onSubmit={onSaveGeneral} className="space-y-4 text-sm font-semibold">
               <div className="space-y-1">
                 <label className="block text-cream/60">WhatsApp Business API URL</label>
                 <input 
                   type="text" 
-                  value={whatsappUrl} 
-                  onChange={(e) => setWhatsappUrl(e.target.value)}
+                  {...registerGeneral("whatsappUrl")}
                   className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta" 
                 />
+                {errorsGeneral.whatsappUrl && <FormError error={errorsGeneral.whatsappUrl.message} />}
               </div>
               <div className="space-y-1">
                 <label className="block text-cream/60">FB Scraper Recurrence Interval (minutes)</label>
                 <input 
                   type="number" 
-                  value={fbInterval} 
-                  onChange={(e) => setFbInterval(e.target.value)}
+                  {...registerGeneral("fbInterval", { valueAsNumber: true })}
                   className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta" 
                 />
+                {errorsGeneral.fbInterval && <FormError error={errorsGeneral.fbInterval.message} />}
               </div>
               <Button
-                onClick={handleSaveSettings}
+                type="submit"
                 variant="primary"
                 size="md"
                 className="w-full sm:w-auto"
               >
                 Save Configuration
               </Button>
-            </div>
+            </form>
           </div>
         )}
 
@@ -785,7 +895,7 @@ export default function SettingsTab({
             </div>
 
             {/* Add New Category Form */}
-            <form onSubmit={onSubmitCategory} className="border-t border-terracotta/10 pt-6 space-y-4">
+            <form onSubmit={onSubmitCategoryForm} className="border-t border-terracotta/10 pt-6 space-y-4">
               <h4 className="font-serif text-sm font-bold">Add New Specialization</h4>
               {errorMsg && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold">
@@ -798,30 +908,29 @@ export default function SettingsTab({
                   <input 
                     type="text" 
                     placeholder="e.g. Kathak Dance" 
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
+                    {...registerCat("name")}
                     className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta" 
-                    required
                   />
+                  {errorsCat.name && <FormError error={errorsCat.name.message} />}
                 </div>
                 <div className="space-y-1 text-sm font-semibold">
                   <label className="block text-cream/60">Visual Grouping</label>
                   <select 
-                    value={newCatGroup}
-                    onChange={(e) => setNewCatGroup(e.target.value)}
+                    {...registerCat("grouping")}
                     className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta"
                   >
                     {getCategoryGroupOptions().map((group) => (
                       <option key={group.value} value={group.value}>{group.label}</option>
                     ))}
                   </select>
+                  {errorsCat.grouping && <FormError error={errorsCat.grouping.message} />}
                 </div>
               </div>
               <Button
                 type="submit"
                 variant="secondary"
                 size="md"
-                disabled={isSubmitting || !newCatName.trim()}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? "Adding Specialization..." : "+ Add Specialization"}
               </Button>
@@ -840,7 +949,7 @@ export default function SettingsTab({
 
             {rubrics && (() => {
               const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
-              const total = currentList.reduce((sum: number, c: any) => sum + (parseInt(c.max) || 0), 0);
+              const total = currentList.reduce((sum: number, c: CriterionConfig) => sum + (c.max || 0), 0);
               if (total > 100) {
                 return (
                   <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-semibold flex items-center gap-2">
@@ -887,7 +996,7 @@ export default function SettingsTab({
                       ]}
                       value={selectedScope}
                       onChange={(val) => {
-                        setSelectedScope(val as any);
+                        setSelectedScope(val as "STATE" | "NATIONAL");
                         setRubricError("");
                       }}
                       searchPlaceholder="Search geographic scope..."
@@ -907,7 +1016,7 @@ export default function SettingsTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {(rubrics[selectedScope]?.[selectedGroup] || []).map((criterion: any, idx: number) => (
+                        {(rubrics[selectedScope]?.[selectedGroup] || []).map((criterion: CriterionConfig, idx: number) => (
                           <tr
                             key={criterion.key || idx}
                             className="border-b border-terracotta/10 last:border-b-0 hover:bg-cream/5 transition-all text-xs font-semibold"
@@ -962,11 +1071,10 @@ export default function SettingsTab({
                       <input
                         type="text"
                         placeholder="e.g. Tone & Articulation"
-                        value={newCritLabel}
-                        onChange={(e) => setNewCritLabel(e.target.value)}
+                        {...registerCrit("label")}
                         className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta"
-                        required
                       />
+                      {errorsCrit.label && <FormError error={errorsCrit.label.message} />}
                     </div>
                     <div className="space-y-1 text-xs font-semibold">
                       <label className="block text-cream/60">Max Points</label>
@@ -975,28 +1083,26 @@ export default function SettingsTab({
                         min="1"
                         max="100"
                         placeholder="e.g. 30"
-                        value={newCritMax || ""}
-                        onChange={(e) => setNewCritMax(parseInt(e.target.value) || 0)}
+                        {...registerCrit("max", { valueAsNumber: true })}
                         className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta text-center font-mono font-bold"
-                        required
                       />
+                      {errorsCrit.max && <FormError error={errorsCrit.max.message} />}
                     </div>
                     <div className="space-y-1 text-xs font-semibold">
                       <label className="block text-cream/60">Description</label>
                       <input
                         type="text"
                         placeholder="Evaluation guideline / description..."
-                        value={newCritDesc}
-                        onChange={(e) => setNewCritDesc(e.target.value)}
+                        {...registerCrit("description")}
                         className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta"
                       />
+                      {errorsCrit.description && <FormError error={errorsCrit.description.message} />}
                     </div>
                   </div>
                   <Button
                     type="submit"
                     variant="secondary"
                     size="md"
-                    disabled={!newCritLabel.trim() || !newCritMax}
                     className="w-full sm:w-auto"
                   >
                     + Add Criterion
@@ -1006,7 +1112,7 @@ export default function SettingsTab({
                  {/* Calculated Summary Rubric */}
                 {(() => {
                   const currentList = rubrics[selectedScope]?.[selectedGroup] || [];
-                  const total = currentList.reduce((sum: number, c: any) => sum + (parseInt(c.max) || 0), 0);
+                  const total = currentList.reduce((sum: number, c: CriterionConfig) => sum + (c.max || 0), 0);
                   const isValid = total === 100;
                   return (
                     <div className="bg-charcoal border border-terracotta/15 rounded-xl p-4 space-y-3">
@@ -1021,7 +1127,7 @@ export default function SettingsTab({
                       
                       {currentList.length > 0 ? (
                         <div className="space-y-1.5 text-xs">
-                          {currentList.map((c: any, index: number) => (
+                          {currentList.map((c: CriterionConfig, index: number) => (
                             <div key={c.key || index} className="flex justify-between text-cream/70">
                               <span>{c.label || "Untitled Criterion"}</span>
                               <span className="font-mono font-bold text-cream">{c.max} pts</span>
@@ -1210,7 +1316,7 @@ export default function SettingsTab({
             </div>
 
             {/* Upload New Banner Form */}
-            <form onSubmit={onSubmitBanner} className="border-t border-terracotta/10 pt-6 space-y-4">
+            <form onSubmit={onSubmitBannerForm} className="border-t border-terracotta/10 pt-6 space-y-4">
               <h4 className="font-serif text-sm font-bold">Add New Banner Template</h4>
               {bannerErrorMsg && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold">
@@ -1238,6 +1344,7 @@ export default function SettingsTab({
                     ✓ Image uploaded successfully
                   </div>
                 )}
+                {errorsBanner.imageUrl && <FormError error={errorsBanner.imageUrl.message} />}
               </div>
 
               {/* Template Details */}
@@ -1247,11 +1354,10 @@ export default function SettingsTab({
                   <input
                     type="text"
                     placeholder="e.g. Bharatanatyam Dance"
-                    value={bannerName}
-                    onChange={(e) => setBannerName(e.target.value)}
+                    {...registerBanner("name")}
                     className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta"
-                    required
                   />
+                  {errorsBanner.name && <FormError error={errorsBanner.name.message} />}
                 </div>
                 <div className="space-y-2 text-sm font-semibold relative">
                   <label className="block text-cream/60">Tags (press comma or enter)</label>
@@ -1304,17 +1410,18 @@ export default function SettingsTab({
                       ))}
                     </div>
                   )}
+                  {errorsBanner.tags && <FormError error={errorsBanner.tags.message} />}
                 </div>
 
               <div className="space-y-1 text-sm font-semibold">
                 <label className="block text-cream/60">Description (Optional)</label>
                 <textarea
                   placeholder="Describe this banner template..."
-                  value={bannerDesc}
-                  onChange={(e) => setBannerDesc(e.target.value)}
+                  {...registerBanner("description")}
                   rows={2}
                   className="w-full bg-charcoal border border-terracotta/30 rounded p-2.5 text-cream focus:outline-none focus:border-terracotta resize-none"
                 />
+                {errorsBanner.description && <FormError error={errorsBanner.description.message} />}
               </div>
               </div>
 
@@ -1322,7 +1429,7 @@ export default function SettingsTab({
                 type="submit"
                 variant="secondary"
                 size="md"
-                disabled={isUploadingBanner || !bannerName.trim() || !uploadedBannerUrl}
+                disabled={isUploadingBanner}
               >
                 {isUploadingBanner ? "Creating Template..." : "+ Create Template"}
               </Button>
@@ -1456,7 +1563,7 @@ export default function SettingsTab({
                 </div>
 
                 {/* Add Grouping Form */}
-                <form onSubmit={handleAddCategoryGroup} className="border-t border-terracotta/10 pt-6 space-y-4">
+                <form onSubmit={onSubmitGroupForm} className="border-t border-terracotta/10 pt-6 space-y-4">
                   <h4 className="font-serif text-sm font-bold">Add New Visual Grouping</h4>
                   <div className="flex flex-col sm:flex-row gap-3 max-w-xl items-end">
                     <div className="flex-1 space-y-1 text-xs font-semibold w-full">
@@ -1464,17 +1571,16 @@ export default function SettingsTab({
                       <input
                         type="text"
                         placeholder="e.g. Theatre & Drama"
-                        value={newGroupName}
-                        onChange={(e) => setNewGroupName(e.target.value)}
+                        {...registerGroup("name")}
                         className="w-full bg-charcoal border border-terracotta/30 rounded px-3 py-2 text-cream text-xs focus:outline-none focus:border-terracotta"
-                        required
                       />
+                      {errorsGroup.name && <FormError error={errorsGroup.name.message} />}
                     </div>
                     <Button
                       type="submit"
                       variant="secondary"
                       size="md"
-                      disabled={isSavingRubrics || !newGroupName.trim()}
+                      disabled={isSavingRubrics}
                       className="whitespace-nowrap w-full sm:w-auto"
                     >
                       + Add Grouping

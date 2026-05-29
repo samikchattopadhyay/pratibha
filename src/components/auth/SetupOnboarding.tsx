@@ -5,6 +5,19 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, Lock, Phone, Mail, MapPin } from "lucide-react";
 import Loading from "@/components/Loading";
 import SearchableSelect, { SelectOption } from "@/components/admin/SearchableSelect";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  setupPasswordSchema,
+  setupPhoneSchema,
+  verifyEmailSchema,
+  setupAddressSchema,
+  SetupPasswordFormData,
+  SetupPhoneFormData,
+  VerifyEmailFormData,
+  SetupAddressFormData,
+} from "@/schemas/auth";
+import FormError from "@/components/forms/FormError";
 
 interface Step {
   id: "password" | "phone" | "email" | "address";
@@ -76,16 +89,33 @@ export default function SetupOnboarding() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Step form states
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [phone, setPhone] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [preferredState, setPreferredState] = useState("");
+  // Initialize React Hook Forms
+  const passwordForm = useForm<SetupPasswordFormData>({
+    resolver: zodResolver(setupPasswordSchema),
+    mode: "onBlur",
+  });
+
+  const phoneForm = useForm<SetupPhoneFormData>({
+    resolver: zodResolver(setupPhoneSchema),
+    mode: "onBlur",
+  });
+
+  const emailForm = useForm<VerifyEmailFormData>({
+    resolver: zodResolver(verifyEmailSchema),
+    mode: "onBlur",
+  });
+
+  const addressForm = useForm<SetupAddressFormData>({
+    resolver: zodResolver(setupAddressSchema),
+    mode: "onBlur",
+    defaultValues: {
+      address: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      preferredState: "",
+    },
+  });
 
   // Load onboarding status on mount
   useEffect(() => {
@@ -154,7 +184,8 @@ export default function SetupOnboarding() {
     return null;
   }
 
-  const currentStep = visibleSteps[currentStepIndex];
+  const safeCurrentStepIndex = Math.min(currentStepIndex, visibleSteps.length - 1);
+  const currentStep = visibleSteps[safeCurrentStepIndex];
   const completedCount = STEPS.filter((step) => {
     if (step.id === "password") return status.passwordSet;
     if (step.id === "phone") return status.phoneSet;
@@ -163,51 +194,37 @@ export default function SetupOnboarding() {
     return false;
   }).length;
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePasswordSubmit = async (data: SetupPasswordFormData) => {
     setError(null);
     setIsSubmitting(true);
 
     try {
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (password !== passwordConfirm) {
-        setError("Passwords do not match");
-        setIsSubmitting(false);
-        return;
-      }
-
       const response = await fetch("/api/auth/setup/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setupToken: status.setupToken, password }),
+        body: JSON.stringify({ setupToken: status.setupToken, password: data.password }),
       });
 
-      const data = await response.json();
+      const resData = await response.json();
 
-      if (!data.success) {
-        setError(data.message || "Failed to set password");
+      if (!resData.success) {
+        setError(resData.message || "Failed to set password");
         return;
       }
 
       // Refresh status and move to next step
       setStatus({ ...status, passwordSet: true });
       setCurrentStepIndex(currentStepIndex + 1);
-      setPassword("");
-      setPasswordConfirm("");
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+      passwordForm.reset();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handlePhoneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePhoneSubmit = async (data: SetupPhoneFormData) => {
     setError(null);
     setIsSubmitting(true);
 
@@ -215,13 +232,13 @@ export default function SetupOnboarding() {
       const response = await fetch("/api/auth/setup/add-phone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setupToken: status.setupToken, phone }),
+        body: JSON.stringify({ setupToken: status.setupToken, phone: data.phone }),
       });
 
-      const data = await response.json();
+      const resData = await response.json();
 
-      if (!data.success) {
-        const errorMsg = data.message || data.error || "Failed to add phone number";
+      if (!resData.success) {
+        const errorMsg = resData.message || resData.error || "Failed to add phone number";
         setError(errorMsg);
         return;
       }
@@ -229,16 +246,16 @@ export default function SetupOnboarding() {
       // Refresh status and move to next step
       setStatus({ ...status, phoneSet: true });
       setCurrentStepIndex(currentStepIndex + 1);
-      setPhone("");
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+      phoneForm.reset();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEmailSubmit = async (data: VerifyEmailFormData) => {
     setError(null);
     setIsSubmitting(true);
 
@@ -246,73 +263,63 @@ export default function SetupOnboarding() {
       const response = await fetch("/api/auth/setup/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setupToken: status.setupToken, code: verificationCode }),
+        body: JSON.stringify({ setupToken: status.setupToken, code: data.code }),
       });
 
-      const data = await response.json();
+      const resData = await response.json();
 
-      if (!data.success) {
-        setError(data.message || "Failed to verify email");
+      if (!resData.success) {
+        setError(resData.message || "Failed to verify email");
         return;
       }
 
       // Refresh status and move to next step
       setStatus({ ...status, emailVerified: true });
       setCurrentStepIndex(currentStepIndex + 1);
-      setVerificationCode("");
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+      emailForm.reset();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleAddressSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddressSubmit = async (data: SetupAddressFormData) => {
     setError(null);
     setIsSubmitting(true);
 
     try {
-      if (!address.trim() || !city.trim() || !state.trim() || !postalCode.trim()) {
-        setError("All address fields are required");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!/^\d{6}$/.test(postalCode)) {
-        setError("PIN Code must be exactly 6 digits");
-        setIsSubmitting(false);
-        return;
-      }
-
       const response = await fetch("/api/auth/setup/save-address", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          address,
-          city,
-          state,
-          postalCode,
-          preferredState: preferredState || undefined,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          postalCode: data.postalCode,
+          preferredState: data.preferredState || undefined,
         }),
       });
 
-      const data = await response.json();
+      const resData = await response.json();
 
-      if (!data.success) {
-        setError(data.error || "Failed to save address");
+      if (!resData.success) {
+        setError(resData.error || "Failed to save address");
         return;
       }
 
       // All steps complete, redirect to dashboard
       router.push("/account/dashboard");
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-cream dark:bg-charcoal px-4 py-12">
@@ -407,7 +414,7 @@ export default function SetupOnboarding() {
 
             {/* Password Step */}
             {currentStep.id === "password" && (
-              <form onSubmit={handlePasswordSubmit} className="space-y-6">
+              <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-6">
                 <div>
                   <h3 className="font-serif text-2xl font-bold text-charcoal dark:text-cream mb-2">
                     Create a Password
@@ -423,12 +430,14 @@ export default function SetupOnboarding() {
                   </label>
                   <input
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...passwordForm.register("password")}
                     disabled={isSubmitting}
                     className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream"
                     placeholder="Enter password (min. 8 characters)"
                   />
+                  {passwordForm.formState.errors.password && (
+                    <FormError error={passwordForm.formState.errors.password.message} />
+                  )}
                   <p className="text-xs text-charcoal/50 dark:text-cream/50 mt-1">
                     Must be at least 8 characters
                   </p>
@@ -440,12 +449,14 @@ export default function SetupOnboarding() {
                   </label>
                   <input
                     type="password"
-                    value={passwordConfirm}
-                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    {...passwordForm.register("confirmPassword")}
                     disabled={isSubmitting}
                     className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream"
                     placeholder="Confirm your password"
                   />
+                  {passwordForm.formState.errors.confirmPassword && (
+                    <FormError error={passwordForm.formState.errors.confirmPassword.message} />
+                  )}
                 </div>
 
                 <button
@@ -464,13 +475,13 @@ export default function SetupOnboarding() {
 
             {/* Phone Step */}
             {currentStep.id === "phone" && (
-              <form onSubmit={handlePhoneSubmit} className="space-y-6">
+              <form onSubmit={phoneForm.handleSubmit(handlePhoneSubmit)} className="space-y-6">
                 <div>
                   <h3 className="font-serif text-2xl font-bold text-charcoal dark:text-cream mb-2">
                     Add Phone Number
                   </h3>
                   <p className="text-charcoal/60 dark:text-cream/60">
-                    We'll use this to contact you about competition updates
+                    We&apos;ll use this to contact you about competition updates
                   </p>
                 </div>
 
@@ -480,12 +491,14 @@ export default function SetupOnboarding() {
                   </label>
                   <input
                     type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    {...phoneForm.register("phone")}
                     disabled={isSubmitting}
                     className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream"
                     placeholder="+91-9876543210"
                   />
+                  {phoneForm.formState.errors.phone && (
+                    <FormError error={phoneForm.formState.errors.phone.message} />
+                  )}
                   <p className="text-xs text-charcoal/50 dark:text-cream/50 mt-1">
                     Format: +91-XXXXXXXXXX or 10-digit number
                   </p>
@@ -507,7 +520,7 @@ export default function SetupOnboarding() {
 
             {/* Email Step */}
             {currentStep.id === "email" && (
-              <form onSubmit={handleEmailSubmit} className="space-y-6">
+              <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-6">
                 <div>
                   <h3 className="font-serif text-2xl font-bold text-charcoal dark:text-cream mb-2">
                     Verify Your Email
@@ -523,13 +536,18 @@ export default function SetupOnboarding() {
                   </label>
                   <input
                     type="text"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
+                    {...emailForm.register("code")}
+                    onChange={(e) => {
+                      emailForm.setValue("code", e.target.value.toUpperCase());
+                    }}
                     disabled={isSubmitting}
                     className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream text-center font-mono tracking-wider"
                     placeholder="Enter 6-digit code"
                     maxLength={6}
                   />
+                  {emailForm.formState.errors.code && (
+                    <FormError error={emailForm.formState.errors.code.message} />
+                  )}
                   <p className="text-xs text-charcoal/50 dark:text-cream/50 mt-1">
                     Check your email for the verification code
                   </p>
@@ -537,7 +555,7 @@ export default function SetupOnboarding() {
 
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
-                    💡 Can't find the email? Check your spam folder or request a new code.
+                    💡 Can&apos;t find the email? Check your spam folder or request a new code.
                   </p>
                 </div>
 
@@ -557,7 +575,7 @@ export default function SetupOnboarding() {
 
             {/* Address Step */}
             {currentStep.id === "address" && (
-              <form onSubmit={handleAddressSubmit} className="space-y-6">
+              <form onSubmit={addressForm.handleSubmit(handleAddressSubmit)} className="space-y-6">
                 <div>
                   <h3 className="font-serif text-2xl font-bold text-charcoal dark:text-cream mb-2">
                     Complete Your Address
@@ -573,12 +591,14 @@ export default function SetupOnboarding() {
                   </label>
                   <input
                     type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    {...addressForm.register("address")}
                     disabled={isSubmitting}
                     className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream"
                     placeholder="Enter street address"
                   />
+                  {addressForm.formState.errors.address && (
+                    <FormError error={addressForm.formState.errors.address.message} />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -588,12 +608,14 @@ export default function SetupOnboarding() {
                     </label>
                     <input
                       type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
+                      {...addressForm.register("city")}
                       disabled={isSubmitting}
                       className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream"
                       placeholder="Enter city"
                     />
+                    {addressForm.formState.errors.city && (
+                      <FormError error={addressForm.formState.errors.city.message} />
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-charcoal dark:text-cream mb-2">
@@ -601,13 +623,18 @@ export default function SetupOnboarding() {
                     </label>
                     <input
                       type="text"
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      {...addressForm.register("postalCode")}
+                      onChange={(e) => {
+                        addressForm.setValue("postalCode", e.target.value.replace(/\D/g, "").slice(0, 6));
+                      }}
                       disabled={isSubmitting}
                       className="w-full px-4 py-2 border border-terracotta/20 dark:border-terracotta/30 rounded-lg bg-white dark:bg-charcoal focus:ring-2 focus:ring-terracotta focus:border-transparent dark:text-cream"
                       placeholder="6-digit PIN"
                       maxLength={6}
                     />
+                    {addressForm.formState.errors.postalCode && (
+                      <FormError error={addressForm.formState.errors.postalCode.message} />
+                    )}
                   </div>
                 </div>
 
@@ -615,30 +642,48 @@ export default function SetupOnboarding() {
                   <label className="block text-sm font-medium text-charcoal dark:text-cream mb-2">
                     State
                   </label>
-                  <SearchableSelect
-                    options={INDIAN_STATES}
-                    value={state}
-                    onChange={setState}
-                    placeholder="Select state"
-                    disabled={isSubmitting}
-                    searchPlaceholder="Search states..."
-                    light
+                  <Controller
+                    control={addressForm.control}
+                    name="state"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={INDIAN_STATES}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select state"
+                        disabled={isSubmitting}
+                        searchPlaceholder="Search states..."
+                        light
+                      />
+                    )}
                   />
+                  {addressForm.formState.errors.state && (
+                    <FormError error={addressForm.formState.errors.state.message} />
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-charcoal dark:text-cream mb-2">
                     Preferred State (Optional)
                   </label>
-                  <SearchableSelect
-                    options={INDIAN_STATES}
-                    value={preferredState}
-                    onChange={setPreferredState}
-                    placeholder="Skip for now"
-                    disabled={isSubmitting}
-                    searchPlaceholder="Search states..."
-                    light
+                  <Controller
+                    control={addressForm.control}
+                    name="preferredState"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={INDIAN_STATES}
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Skip for now"
+                        disabled={isSubmitting}
+                        searchPlaceholder="Search states..."
+                        light
+                      />
+                    )}
                   />
+                  {addressForm.formState.errors.preferredState && (
+                    <FormError error={addressForm.formState.errors.preferredState.message} />
+                  )}
                   <p className="text-xs text-charcoal/50 dark:text-cream/50 mt-1">
                     You can update this later from your profile
                   </p>

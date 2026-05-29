@@ -40,18 +40,22 @@ export const studentFormSchema = z.object({
     .min(1, "Please select a gender"),
   slug: z
     .string()
-    .min(1, "Profile slug is required")
-    .min(3, "Slug must be at least 3 characters")
-    .max(50, "Slug is too long")
-    .regex(/^[a-z0-9-]+$/, "Slug can only contain lowercase letters, numbers, and hyphens"),
+    .or(z.literal(""))
+    .optional()
+    .refine((val) => !val || (val.length >= 3 && val.length <= 50 && /^[a-z0-9-]+$/.test(val)), {
+      message: "Slug must be between 3 and 50 characters and contain only lowercase letters, numbers, and hyphens",
+    }),
   schoolClass: z
     .string()
-    .min(1, "School class is required"),
+    .or(z.literal(""))
+    .optional(),
   schoolName: z
     .string()
-    .min(1, "School name is required")
-    .min(2, "School name must be at least 2 characters")
-    .max(255, "School name is too long"),
+    .or(z.literal(""))
+    .optional()
+    .refine((val) => !val || val.length >= 2, {
+      message: "School name must be at least 2 characters",
+    }),
   city: z
     .string()
     .min(1, "City is required")

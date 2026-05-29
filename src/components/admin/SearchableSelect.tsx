@@ -119,9 +119,9 @@ export default function SearchableSelect({
         disabled={disabled}
         className={`w-full flex items-center justify-between gap-2 border rounded p-2.5 text-sm font-semibold transition-all ${
           light
-            ? "bg-cream border-terracotta/20 text-charcoal hover:border-terracotta/40 focus:outline-none focus:border-terracotta"
+            ? "bg-white border-charcoal/10 text-charcoal hover:border-charcoal/20 focus:outline-none focus:border-terracotta"
             : "bg-charcoal border-terracotta/30 text-cream hover:border-terracotta/50 focus:outline-none focus:border-terracotta"
-        } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${isOpen ? (light ? "border-terracotta/50" : "border-terracotta") : ""}`}
+        } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${isOpen ? (light ? "border-terracotta" : "border-terracotta") : ""}`}
       >
         <span className="truncate">
           {selectedOption ? selectedOption.label : placeholder}
@@ -137,7 +137,7 @@ export default function SearchableSelect({
           ref={panelRef}
           className={`fixed border rounded shadow-lg z-[9999] overflow-hidden ${
             light
-              ? "bg-white border-terracotta/20"
+              ? "bg-white border-charcoal/10"
               : "bg-charcoal border-terracotta/30"
           }`}
           style={{
@@ -149,7 +149,7 @@ export default function SearchableSelect({
           {/* Search Input */}
           <div className={`p-2 border-b ${
             light
-              ? "border-terracotta/10 bg-cream"
+              ? "border-charcoal/10 bg-white"
               : "border-terracotta/10 bg-charcoal-light"
           }`}>
             <input
@@ -171,7 +171,7 @@ export default function SearchableSelect({
               data-bitwarden-ignore="true"
               className={`w-full border rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-terracotta ${
                 light
-                  ? "bg-cream border-terracotta/20 text-charcoal"
+                  ? "bg-white border-charcoal/10 text-charcoal"
                   : "bg-charcoal border-terracotta/20 text-cream"
               }`}
             />

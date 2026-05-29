@@ -7,20 +7,54 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import FormError from "@/components/forms/FormError";
+
+const JudgeSetupSchema = z
+  .object({
+    password: z
+      .string()
+      .min(1, "Password is required")
+      .min(12, "Password must be at least 12 characters long")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number"),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+type JudgeSetupFormData = z.infer<typeof JudgeSetupSchema>;
 
 function SetPasswordForm() {
   const router = useRouter();
   const params = useParams();
   const token = params.token as string;
 
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(true);
   const [judgeName, setJudgeName] = useState("");
   const [tokenValid, setTokenValid] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<JudgeSetupFormData>({
+    resolver: zodResolver(JudgeSetupSchema),
+    mode: "onChange",
+  });
+
+  const passwordVal = watch("password", "");
+  const confirmPasswordVal = watch("confirmPassword", "");
+  const passwordStrength = passwordVal.length;
+  const passwordsMatch = passwordVal === confirmPasswordVal && passwordVal.length > 0;
 
   useEffect(() => {
     const validateToken = async () => {
@@ -48,36 +82,21 @@ function SetPasswordForm() {
     }
   }, [token]);
 
-  const passwordStrength = password.length;
-  const passwordsMatch = password === confirmPassword && password.length > 0;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: JudgeSetupFormData) => {
     setError("");
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (password.length < 12) {
-      setError("Password must be at least 12 characters long");
-      return;
-    }
-
     setLoading(true);
 
     try {
       const response = await fetch("/api/auth/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password, confirmPassword }),
+        body: JSON.stringify({ token, password: data.password, confirmPassword: data.confirmPassword }),
       });
 
-      const data = await response.json();
+      const resData = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to set password");
+        setError(resData.error || "Failed to set password");
         return;
       }
 
@@ -149,19 +168,20 @@ function SetPasswordForm() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 relative z-10">
                 <div className="space-y-1.5">
                   <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">New Password *</label>
                   <input
                     type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register("password")}
                     className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
                     placeholder="Enter a strong password"
                     disabled={loading}
                     autoComplete="new-password"
                   />
+                  {errors.password && (
+                    <FormError error={errors.password.message} />
+                  )}
                   <div className="flex items-center gap-2 mt-2">
                     <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div
@@ -183,19 +203,17 @@ function SetPasswordForm() {
                   <label className="font-sans text-sm font-bold text-charcoal/80 uppercase">Confirm Password *</label>
                   <input
                     type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    {...register("confirmPassword")}
                     className="w-full font-sans text-base bg-cream border border-terracotta/20 rounded-lg px-4 py-3.5 text-charcoal focus:outline-none focus:border-terracotta transition-colors"
                     placeholder="Re-enter your password"
                     disabled={loading}
                     autoComplete="new-password"
                   />
-                  {confirmPassword && passwordsMatch && (
-                    <p className="text-xs text-green-600 font-semibold">✓ Passwords match</p>
+                  {errors.confirmPassword && (
+                    <FormError error={errors.confirmPassword.message} />
                   )}
-                  {confirmPassword && !passwordsMatch && (
-                    <p className="text-xs text-red-600 font-semibold">✗ Passwords do not match</p>
+                  {confirmPasswordVal && passwordsMatch && (
+                    <p className="text-xs text-green-600 font-semibold">✓ Passwords match</p>
                   )}
                 </div>
 
@@ -203,7 +221,7 @@ function SetPasswordForm() {
                   <p className="text-xs font-semibold text-blue-900">🔒 Password Tips</p>
                   <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
                     <li>Mix uppercase, lowercase, numbers, and symbols</li>
-                    <li>Use a unique password you haven't used elsewhere</li>
+                    <li>Use a unique password you haven&apos;t used elsewhere</li>
                     <li>Consider using a password manager to store it</li>
                   </ul>
                 </div>
@@ -213,7 +231,7 @@ function SetPasswordForm() {
                   variant="primary"
                   size="lg"
                   isLoading={loading}
-                  disabled={!tokenValid || loading || !passwordsMatch}
+                  disabled={!tokenValid || loading}
                   className="w-full flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4" />

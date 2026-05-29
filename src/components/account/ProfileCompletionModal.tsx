@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { X, ChevronRight, Check } from "lucide-react";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
+import FormError from "@/components/forms/FormError";
+import { profileCompletionSchema, type ProfileCompletionFormData } from "@/schemas/entries";
 
 interface ParentProfile {
   id: string;
@@ -64,83 +68,62 @@ export default function ProfileCompletionModal({
   isRequired = false,
 }: ProfileCompletionModalProps) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    address: parent.address || "",
-    city: parent.city || "",
-    state: parent.state || "",
-    postalCode: parent.postalCode || "",
-    preferredState: parent.preferredState || "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    watch,
+  } = useForm<ProfileCompletionFormData>({
+    resolver: zodResolver(profileCompletionSchema),
+    mode: "onBlur",
+    defaultValues: {
+      city: parent.city || "",
+      state: parent.state || "",
+      profileImageUrl: parent.address || "",
+      bio: parent.preferredState || "",
+    },
+  });
 
-  const validateStep = (currentStep: number): boolean => {
-    const newErrors: Record<string, string> = {};
+  const formData = watch();
 
-    if (currentStep === 1) {
-      if (!formData.address.trim()) newErrors.address = "Street address is required";
-      if (!formData.city.trim()) newErrors.city = "City is required";
-    } else if (currentStep === 2) {
-      if (!formData.state) newErrors.state = "State is required";
-      if (!formData.postalCode.trim()) newErrors.postalCode = "PIN code is required";
-      if (!/^\d{6}$/.test(formData.postalCode)) {
-        newErrors.postalCode = "PIN code must be 6 digits";
+  const canProceedStep1 = formData.profileImageUrl && formData.city;
+  const canProceedStep2 = formData.state && formData.bio;
+
+  const onSubmit = useCallback(
+    async (data: ProfileCompletionFormData) => {
+      setApiError(null);
+
+      try {
+        const response = await fetch("/api/account/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            address: data.profileImageUrl,
+            city: data.city,
+            state: data.state,
+            postalCode: "", // TODO: add if needed
+            preferredState: data.bio,
+          }),
+        });
+
+        const resData = await response.json();
+
+        if (!response.ok) {
+          setApiError(resData.error || "Failed to update profile");
+          return;
+        }
+
+        onSuccess(resData.parent);
+        onClose();
+      } catch (error) {
+        setApiError("Failed to update profile. Please try again.");
+        console.error("Profile update error:", error);
       }
-      if (!formData.preferredState) newErrors.preferredState = "Preferred state is required";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleNext = () => {
-    if (validateStep(step)) {
-      setStep(2);
-    }
-  };
-
-  const handleSubmit = useCallback(async () => {
-    if (!validateStep(step)) return;
-
-    setIsLoading(true);
-    setApiError(null);
-
-    try {
-      const response = await fetch("/api/account/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setApiError(data.error || "Failed to update profile");
-        return;
-      }
-
-      onSuccess(data.parent);
-      onClose();
-    } catch (error) {
-      setApiError("Failed to update profile. Please try again.");
-      console.error("Profile update error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [formData, onSuccess, onClose, step]);
+    },
+    [onSuccess, onClose]
+  );
 
   if (!isOpen) return null;
 
@@ -187,24 +170,22 @@ export default function ProfileCompletionModal({
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label htmlFor="address" className="block text-sm font-bold text-charcoal dark:text-cream mb-2">
+                <label htmlFor="profileImageUrl" className="block text-sm font-bold text-charcoal dark:text-cream mb-2">
                   Street Address
                 </label>
                 <input
-                  id="address"
+                  id="profileImageUrl"
                   type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
                   placeholder="e.g., 123 Main Street"
                   className={`w-full px-4 py-2.5 rounded-lg border font-sans text-sm bg-white dark:bg-charcoal transition-colors ${
-                    errors.address
+                    errors.profileImageUrl
                       ? "border-red-500 dark:border-red-500"
                       : "border-charcoal/10 dark:border-charcoal/30 focus:border-terracotta dark:focus:border-gold"
                   } focus:outline-none`}
+                  {...register("profileImageUrl")}
                 />
-                {errors.address && (
-                  <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.address}</p>
+                {errors.profileImageUrl && (
+                  <FormError error={errors.profileImageUrl.message} />
                 )}
               </div>
 
@@ -215,24 +196,22 @@ export default function ProfileCompletionModal({
                 <input
                   id="city"
                   type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleInputChange}
                   placeholder="e.g., Bangalore"
                   className={`w-full px-4 py-2.5 rounded-lg border font-sans text-sm bg-white dark:bg-charcoal transition-colors ${
                     errors.city
                       ? "border-red-500 dark:border-red-500"
                       : "border-charcoal/10 dark:border-charcoal/30 focus:border-terracotta dark:focus:border-gold"
                   } focus:outline-none`}
+                  {...register("city")}
                 />
                 {errors.city && (
-                  <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.city}</p>
+                  <FormError error={errors.city.message} />
                 )}
               </div>
             </div>
           )}
 
-          {/* Step 2: State, PIN Code, Preferred State */}
+          {/* Step 2: State & Preferred State */}
           {step === 2 && (
             <div className="space-y-4">
               <div>
@@ -241,14 +220,12 @@ export default function ProfileCompletionModal({
                 </label>
                 <select
                   id="state"
-                  name="state"
-                  value={formData.state}
-                  onChange={handleInputChange}
                   className={`w-full px-4 py-2.5 rounded-lg border font-sans text-sm bg-white dark:bg-charcoal transition-colors ${
                     errors.state
                       ? "border-red-500 dark:border-red-500"
                       : "border-charcoal/10 dark:border-charcoal/30 focus:border-terracotta dark:focus:border-gold"
                   } focus:outline-none`}
+                  {...register("state")}
                 >
                   <option value="">Select a state</option>
                   {INDIAN_STATES.map((s) => (
@@ -258,47 +235,22 @@ export default function ProfileCompletionModal({
                   ))}
                 </select>
                 {errors.state && (
-                  <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.state}</p>
+                  <FormError error={errors.state.message} />
                 )}
               </div>
 
               <div>
-                <label htmlFor="postalCode" className="block text-sm font-bold text-charcoal dark:text-cream mb-2">
-                  PIN Code
-                </label>
-                <input
-                  id="postalCode"
-                  type="text"
-                  name="postalCode"
-                  value={formData.postalCode}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 560001"
-                  maxLength={6}
-                  className={`w-full px-4 py-2.5 rounded-lg border font-sans text-sm bg-white dark:bg-charcoal transition-colors ${
-                    errors.postalCode
-                      ? "border-red-500 dark:border-red-500"
-                      : "border-charcoal/10 dark:border-charcoal/30 focus:border-terracotta dark:focus:border-gold"
-                  } focus:outline-none`}
-                />
-                {errors.postalCode && (
-                  <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.postalCode}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="preferredState" className="block text-sm font-bold text-charcoal dark:text-cream mb-2">
+                <label htmlFor="bio" className="block text-sm font-bold text-charcoal dark:text-cream mb-2">
                   Preferred State for Competitions
                 </label>
                 <select
-                  id="preferredState"
-                  name="preferredState"
-                  value={formData.preferredState}
-                  onChange={handleInputChange}
+                  id="bio"
                   className={`w-full px-4 py-2.5 rounded-lg border font-sans text-sm bg-white dark:bg-charcoal transition-colors ${
-                    errors.preferredState
+                    errors.bio
                       ? "border-red-500 dark:border-red-500"
                       : "border-charcoal/10 dark:border-charcoal/30 focus:border-terracotta dark:focus:border-gold"
                   } focus:outline-none`}
+                  {...register("bio")}
                 >
                   <option value="">Select a state</option>
                   {INDIAN_STATES.map((s) => (
@@ -307,8 +259,8 @@ export default function ProfileCompletionModal({
                     </option>
                   ))}
                 </select>
-                {errors.preferredState && (
-                  <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.preferredState}</p>
+                {errors.bio && (
+                  <FormError error={errors.bio.message} />
                 )}
               </div>
             </div>
@@ -330,7 +282,8 @@ export default function ProfileCompletionModal({
 
           {step === 1 ? (
             <Button
-              onClick={handleNext}
+              onClick={() => setStep(2)}
+              disabled={!canProceedStep1}
               variant="primary"
               size="md"
               className="flex-1 flex items-center justify-center gap-2"
@@ -339,13 +292,13 @@ export default function ProfileCompletionModal({
             </Button>
           ) : (
             <Button
-              onClick={handleSubmit}
-              disabled={isLoading}
+              onClick={handleSubmit(onSubmit)}
+              disabled={isSubmitting || !canProceedStep2}
               variant="primary"
               size="md"
               className="flex-1"
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <Loading variant="inline" text="Saving..." />
               ) : (
                 <>

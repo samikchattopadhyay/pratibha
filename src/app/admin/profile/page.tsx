@@ -7,6 +7,28 @@ import Header from "@/components/Header";
 import Button from "@/components/Button";
 import Loading from "@/components/Loading";
 import SettingsLayout, { SettingsSection } from "@/components/SettingsLayout";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import FormError from "@/components/forms/FormError";
+
+const ChangePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z
+      .string()
+      .min(1, "New password is required")
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number"),
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+type ChangePasswordFormData = z.infer<typeof ChangePasswordSchema>;
 
 export default function AdminProfilePage() {
   const { status } = useSession();
@@ -22,10 +44,18 @@ export default function AdminProfilePage() {
     profileImageUrl: "",
   });
 
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ChangePasswordFormData>({
+    resolver: zodResolver(ChangePasswordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
   });
 
   const fetchProfile = useCallback(async () => {
@@ -73,16 +103,7 @@ export default function AdminProfilePage() {
     }
   };
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setPasswordForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: ChangePasswordFormData) => {
     setSubmitting(true);
     setSuccessMessage("");
     setErrorMessage("");
@@ -92,22 +113,20 @@ export default function AdminProfilePage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...passwordForm,
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+          confirmPassword: data.confirmPassword,
           profileImage: profileData.profileImageUrl.startsWith("data:") ? profileData.profileImageUrl : null,
         }),
       });
 
       if (response.ok) {
         setSuccessMessage("Password changed successfully");
-        setPasswordForm({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
+        reset();
         setTimeout(() => setSuccessMessage(""), 3000);
       } else {
-        const data = await response.json();
-        setErrorMessage(data.error || "Failed to change password");
+        const resData = await response.json();
+        setErrorMessage(resData.error || "Failed to change password");
       }
     } catch (error) {
       console.error("Password update error:", error);
@@ -195,18 +214,19 @@ export default function AdminProfilePage() {
         </svg>
       ),
       content: (
-        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-charcoal dark:text-cream mb-2">
               Current Password
             </label>
             <input
               type="password"
-              name="currentPassword"
-              value={passwordForm.currentPassword}
-              onChange={handlePasswordChange}
+              {...register("currentPassword")}
               className="w-full px-4 py-3 rounded-xl border border-terracotta/20 dark:border-terracotta/40 bg-white dark:bg-charcoal/50 text-charcoal dark:text-cream placeholder:text-charcoal/40 dark:placeholder:text-cream/40 focus:outline-none focus:border-terracotta dark:focus:border-gold transition-colors"
             />
+            {errors.currentPassword && (
+              <FormError error={errors.currentPassword.message} />
+            )}
           </div>
 
           <div>
@@ -215,11 +235,12 @@ export default function AdminProfilePage() {
             </label>
             <input
               type="password"
-              name="newPassword"
-              value={passwordForm.newPassword}
-              onChange={handlePasswordChange}
+              {...register("newPassword")}
               className="w-full px-4 py-3 rounded-xl border border-terracotta/20 dark:border-terracotta/40 bg-white dark:bg-charcoal/50 text-charcoal dark:text-cream placeholder:text-charcoal/40 dark:placeholder:text-cream/40 focus:outline-none focus:border-terracotta dark:focus:border-gold transition-colors"
             />
+            {errors.newPassword && (
+              <FormError error={errors.newPassword.message} />
+            )}
           </div>
 
           <div>
@@ -228,11 +249,12 @@ export default function AdminProfilePage() {
             </label>
             <input
               type="password"
-              name="confirmPassword"
-              value={passwordForm.confirmPassword}
-              onChange={handlePasswordChange}
+              {...register("confirmPassword")}
               className="w-full px-4 py-3 rounded-xl border border-terracotta/20 dark:border-terracotta/40 bg-white dark:bg-charcoal/50 text-charcoal dark:text-cream placeholder:text-charcoal/40 dark:placeholder:text-cream/40 focus:outline-none focus:border-terracotta dark:focus:border-gold transition-colors"
             />
+            {errors.confirmPassword && (
+              <FormError error={errors.confirmPassword.message} />
+            )}
           </div>
 
           <Button

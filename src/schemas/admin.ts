@@ -154,6 +154,28 @@ export const competitionSchema = z.object({
     .optional()
     .default([]),
   isActive: z.boolean().default(true),
+  difficultyLevel: z
+    .number()
+    .min(1, "Difficulty level must be at least 1")
+    .max(5, "Difficulty level cannot exceed 5")
+    .default(1),
+  capacity: z
+    .number()
+    .min(1, "Capacity must be at least 1")
+    .nullable()
+    .optional(),
+  facebookGroupUrl: z
+    .string()
+    .url("Invalid Facebook Group URL")
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+  rules: z
+    .string()
+    .min(10, "Rules must be at least 10 characters")
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
 });
 
 export type CompetitionFormData = z.infer<typeof competitionSchema>;

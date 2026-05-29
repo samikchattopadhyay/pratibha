@@ -616,21 +616,23 @@ function AdminDashboardContent() {
     }
   };
 
-  const handleSaveSettings = async () => {
+  const handleSaveSettings = async (customUrl?: string, customInterval?: string) => {
     setStatusMessage("Saving configurations...");
     try {
       const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          whatsAppApiUrl: whatsappUrl,
-          fbScrapeIntervalMinutes: fbInterval,
+          whatsAppApiUrl: customUrl ?? whatsappUrl,
+          fbScrapeIntervalMinutes: customInterval ?? fbInterval,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.config);
 
       triggerToast("Configuration parameters persisted successfully.");
+      if (customUrl) setWhatsappUrl(customUrl);
+      if (customInterval) setFbInterval(customInterval);
       loadSettings();
     } catch (err) {
       console.error(err);
