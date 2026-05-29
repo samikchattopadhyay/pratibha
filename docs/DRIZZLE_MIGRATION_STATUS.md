@@ -141,12 +141,33 @@ Routes for parent/student dashboard, profile, entries, qualifications
 
 **Effort:** 3-4 hours (completed in 1 session)
 
-### Batch 3: Admin Routes (35 total, 0 done)
-**Status:** ⏳ Pending
+### Batch 3: Admin Routes (52 total, 10 done, 19% complete)
+**Status:** 🔄 In Progress
 
 Routes for competition, judge, certificate, prize, registration management
 
-**Estimated:** 12-15 hours
+**Completed (10/52):**
+- ✅ admin/profile/route.ts (GET/PUT - admin password, profile image)
+- ✅ admin/rubrics/route.ts (GET/POST - manage rubric defaults)
+- ✅ admin/categories/route.ts (GET/POST/PATCH/DELETE - CRUD categories)
+- ✅ admin/competitions/route.ts (GET/POST - paginated list + create)
+- ✅ admin/judges/route.ts (GET/POST/PATCH - list + create + update)
+- ✅ admin/competitions/[id]/route.ts (GET - competition metadata)
+- ✅ admin/judges/[id]/route.ts (GET/PATCH - judge metadata + update)
+- ✅ admin/students/[id]/route.ts (GET - student metadata)
+- ✅ admin/qualifications/route.ts (GET/POST - rules + creation)
+- ✅ admin/certificates/route.ts (GET/POST - metrics + bulk generation)
+
+**Pending (42/52) routes with varying complexity:**
+- Registrations (complex filtering & search)
+- Students (complex filtering)
+- Prizes (nested creates)
+- Courier (groupBy operations)
+- Judge sub-routes (payments, revenue, settings)
+- Competition sub-routes (voting, shipping, judges, participants)
+- Metrics, kanban, finance routes
+
+**Estimated remaining:** 8-10 hours
 
 ### Batch 4: Judge Routes (10 total, 0 done)
 **Status:** ⏳ Pending

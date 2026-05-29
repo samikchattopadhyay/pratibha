@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import {
+  getAllJudgesWithUserAndAssignments,
+  getAllScores,
+  getUserByEmail,
+  getJudgeById,
+  getJudgeWithUserAndAssignments,
+} from "@/lib/db/queries";
+import * as schema from "@/lib/db/schema";
 import bcrypt from "bcryptjs";
-import { JudgeTier } from "@prisma/client";
 import { sendEmailJudgeWelcome } from "@/lib/notifications";
 import { generateSecurePassword } from "@/lib/passwordGenerator";
 import { randomBytes } from "crypto";
+import { eq } from "drizzle-orm";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
+const JUDGE_TIERS = ["LOCAL", "REGIONAL", "NATIONAL", "EXPERT"];
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,69 +29,60 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const emailToCheck = searchParams.get("email");
 
-    // Check if email exists
     if (emailToCheck) {
-      const existingUser = await prisma.user.findUnique({
-        where: { email: emailToCheck },
-      });
+      const existingUser = await getUserByEmail(emailToCheck);
       return NextResponse.json({ exists: !!existingUser });
     }
 
-    const tierFilter = searchParams.get("tier"); // LOCAL | REGIONAL | NATIONAL | EXPERT
-    const competitionId = searchParams.get("competitionId"); // returns eligible judges only
+    const tierFilter = searchParams.get("tier");
+    const competitionId = searchParams.get("competitionId");
     const verifiedOnly = searchParams.get("verified") === "true";
 
-    // If competitionId given, find competition scope to determine eligible tiers
     let eligibleTiers: string[] | undefined;
     let competitionScope: string | null = null;
     let competitionStateList: string[] = [];
 
     if (competitionId) {
-      const comp = await prisma.competition.findUnique({
-        where: { id: competitionId },
-        select: { scope: true, eligibleStates: true },
+      const comp = await db.query.competitions.findFirst({
+        where: eq(schema.competitions.id, competitionId),
+        columns: { scope: true, eligibleStates: true },
       });
       if (comp) {
         competitionScope = comp.scope;
         competitionStateList = comp.eligibleStates;
-        // Plan 03: NATIONAL competitions require REGIONAL, NATIONAL, or EXPERT
         if (comp.scope === "NATIONAL") {
           eligibleTiers = ["REGIONAL", "NATIONAL", "EXPERT"];
         }
       }
     }
 
-    const judges = await prisma.judge.findMany({
-      where: {
-        ...(tierFilter ? { tier: tierFilter as JudgeTier } : {}),
-        ...(eligibleTiers ? { tier: { in: eligibleTiers as JudgeTier[] } } : {}),
-        ...(verifiedOnly ? { isVerified: true } : {}),
-        isAvailable: true,
-      },
-      include: {
-        user: true,
-        assignments: {
-          include: { score: true },
-        },
-      },
-      orderBy: [{ tier: "asc" }, { name: "asc" }],
+    let judges = await getAllJudgesWithUserAndAssignments();
+
+    judges = judges.filter((j) => {
+      if (tierFilter && j.tier !== tierFilter) return false;
+      if (eligibleTiers && !eligibleTiers.includes(j.tier)) return false;
+      if (verifiedOnly && !j.isVerified) return false;
+      if (!j.isAvailable) return false;
+      return true;
     });
 
-    const allSubmittedScores = await prisma.score.findMany({ select: { totalScore: true } });
+    const allScores = await getAllScores();
     const globalAvg =
-      allSubmittedScores.length > 0
-        ? allSubmittedScores.reduce((acc, curr) => acc + curr.totalScore, 0) / allSubmittedScores.length
+      allScores.length > 0
+        ? allScores.reduce((acc, curr) => acc + parseFloat(curr.totalScore.toString()), 0) / allScores.length
         : 75;
 
     const enriched = judges.map((j) => {
       const submitted = j.assignments.filter((a) => a.isSubmitted);
       const pending = j.assignments.length - submitted.length;
-      const scores = submitted.map((a) => a.score?.totalScore).filter((s): s is number => s != null);
-      const avgScoreVal = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      const scoreValues = submitted
+        .map((a) => a.score?.totalScore)
+        .filter((s) => s != null)
+        .map(s => parseFloat(s!.toString()));
+      const avgScoreVal = scoreValues.length > 0 ? scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length : 0;
       const deviationPct = globalAvg > 0 ? ((avgScoreVal - globalAvg) / globalAvg) * 100 : 0;
-      const isOutlier = Math.abs(deviationPct) > 15 && scores.length >= 3;
+      const isOutlier = Math.abs(deviationPct) > 15 && scoreValues.length >= 3;
 
-      // Plan 03 — conflict of interest detection for state competitions
       let hasConflict = false;
       let conflictReason = "";
       if (competitionScope === "STATE" && j.stateOfResidence && competitionStateList.includes(j.stateOfResidence)) {
@@ -96,7 +96,6 @@ export async function GET(request: NextRequest) {
         email: j.user.email,
         specializations: j.specializations,
         profileImageUrl: j.profileImageUrl,
-        // Plan 03 — new fields
         tier: j.tier,
         bio: j.bio,
         credentials: j.credentials,
@@ -106,13 +105,11 @@ export async function GET(request: NextRequest) {
         yearsOfExperience: j.yearsOfExperience,
         isVerified: j.isVerified,
         isAvailable: j.isAvailable,
-        // Stats
         evaluationCount: submitted.length,
         pendingCount: pending,
         averageScore: avgScoreVal > 0 ? avgScoreVal.toFixed(1) : "N/A",
         isOutlier,
         deviationPercentage: deviationPct.toFixed(1),
-        // Conflict
         hasConflict,
         conflictReason,
       };
@@ -153,29 +150,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await getUserByEmail(email);
     if (existingUser) {
       return NextResponse.json({ error: "A user with this email already exists" }, { status: 400 });
+    }
+
+    if (!JUDGE_TIERS.includes(tier)) {
+      return NextResponse.json({ error: "Invalid judge tier" }, { status: 400 });
     }
 
     const internalPassword = generateSecurePassword();
     const passwordHash = await bcrypt.hash(internalPassword, 10);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
 
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
+    const result = await db.transaction(async (tx) => {
+      const userResult = await tx
+        .insert(schema.users)
+        .values({
           email,
           passwordHash,
           role: "JUDGE",
-        },
-      });
+        })
+        .returning();
 
-      const judge = await tx.judge.create({
-        data: {
+      const user = userResult[0];
+
+      const judgeResult = await tx
+        .insert(schema.judges)
+        .values({
           userId: user.id,
           name,
-          tier: tier as JudgeTier,
+          tier,
           specializations,
           bio,
           credentials,
@@ -185,18 +190,18 @@ export async function POST(request: NextRequest) {
           yearsOfExperience: yearsOfExperience ? parseInt(yearsOfExperience.toString(), 10) : null,
           isVerified,
           isAvailable,
-        },
-      });
+        })
+        .returning();
+
+      const judge = judgeResult[0];
 
       const setupToken = randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-      await tx.passwordSetupToken.create({
-        data: {
-          userId: user.id,
-          token: setupToken,
-          expiresAt,
-        },
+      await tx.insert(schema.passwordSetupTokens).values({
+        userId: user.id,
+        token: setupToken,
+        expiresAt,
       });
 
       const setupUrl = `${appUrl}/judge-setup/${setupToken}`;
@@ -247,54 +252,40 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Judge ID is required" }, { status: 400 });
     }
 
-    const judge = await prisma.judge.findUnique({
-      where: { id },
-      include: { user: true },
-    });
+    const judge = await getJudgeWithUserAndAssignments(id);
 
     if (!judge) {
       return NextResponse.json({ error: "Judge not found" }, { status: 404 });
     }
 
-    // Check email uniqueness if modified
     if (email && email !== judge.user.email) {
-      const existingUser = await prisma.user.findUnique({ where: { email } });
+      const existingUser = await getUserByEmail(email);
       if (existingUser) {
         return NextResponse.json({ error: "A user with this email already exists" }, { status: 400 });
       }
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      // Update User details if email or password is provided
-      const userUpdateData: { email?: string; passwordHash?: string } = {};
+    if (tier && !JUDGE_TIERS.includes(tier)) {
+      return NextResponse.json({ error: "Invalid judge tier" }, { status: 400 });
+    }
+
+    const updated = await db.transaction(async (tx) => {
+      const userUpdateData: any = {};
       if (email) userUpdateData.email = email;
       if (password) {
         userUpdateData.passwordHash = await bcrypt.hash(password, 10);
       }
 
       if (Object.keys(userUpdateData).length > 0) {
-        await tx.user.update({
-          where: { id: judge.userId },
-          data: userUpdateData,
-        });
+        await tx
+          .update(schema.users)
+          .set(userUpdateData)
+          .where(eq(schema.users.id, judge.userId));
       }
 
-      // Update Judge details
-      const judgeUpdateData: {
-        name?: string;
-        tier?: JudgeTier;
-        specializations?: string[];
-        bio?: string;
-        credentials?: string;
-        stateOfResidence?: string;
-        states?: string[];
-        languages?: string[];
-        yearsOfExperience?: number | null;
-        isVerified?: boolean;
-        isAvailable?: boolean;
-      } = {};
+      const judgeUpdateData: any = {};
       if (name !== undefined) judgeUpdateData.name = name;
-      if (tier !== undefined) judgeUpdateData.tier = tier as JudgeTier;
+      if (tier !== undefined) judgeUpdateData.tier = tier;
       if (specializations !== undefined) judgeUpdateData.specializations = specializations;
       if (bio !== undefined) judgeUpdateData.bio = bio;
       if (credentials !== undefined) judgeUpdateData.credentials = credentials;
@@ -307,12 +298,13 @@ export async function PATCH(request: NextRequest) {
       if (isVerified !== undefined) judgeUpdateData.isVerified = isVerified;
       if (isAvailable !== undefined) judgeUpdateData.isAvailable = isAvailable;
 
-      const updatedJudge = await tx.judge.update({
-        where: { id },
-        data: judgeUpdateData,
-      });
+      const updatedResult = await tx
+        .update(schema.judges)
+        .set(judgeUpdateData)
+        .where(eq(schema.judges.id, id))
+        .returning();
 
-      return updatedJudge;
+      return updatedResult[0];
     });
 
     return NextResponse.json({ message: "Judge updated successfully", judge: updated });

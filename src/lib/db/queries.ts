@@ -131,6 +131,98 @@ export async function updateJudge(
     .returning();
 }
 
+export async function getJudgeWithUserAndAssignments(id: string) {
+  return db.query.judges.findFirst({
+    where: eq(schema.judges.id, id),
+    with: {
+      user: true,
+      assignments: {
+        with: {
+          score: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getAllJudgesWithUserAndAssignments() {
+  return db.query.judges.findMany({
+    with: {
+      user: true,
+      assignments: {
+        with: {
+          score: true,
+        },
+      },
+    },
+    orderBy: (judges, { asc }) => [asc(judges.tier), asc(judges.name)],
+  });
+}
+
+export async function getAllScores() {
+  return db.query.scores.findMany({
+    columns: { totalScore: true },
+  });
+}
+
+// ─── QUALIFICATION QUERIES ────────────────────────────────────────────────────
+
+export async function getAllQualificationRules() {
+  return db.query.qualificationRules.findMany({
+    with: {
+      stateCompetition: {
+        columns: { id: true, title: true, scope: true },
+      },
+      nationalCompetition: {
+        columns: { id: true, title: true, scope: true, registrationDeadline: true },
+      },
+      slots: true,
+    },
+    orderBy: (rules, { desc }) => [desc(rules.createdAt)],
+  });
+}
+
+export async function createQualificationRule(data: typeof schema.qualificationRules.$inferInsert) {
+  return db.insert(schema.qualificationRules).values(data).returning();
+}
+
+// ─── CERTIFICATE QUERIES ──────────────────────────────────────────────────────
+
+export async function getCertificateCount() {
+  const result = await db
+    .select({ count: schema.certificates.id })
+    .from(schema.certificates);
+  return result.length;
+}
+
+export async function getRegistrationsNeedingCertificates() {
+  return db.query.registrations.findMany({
+    where: and(
+      eq(schema.registrations.status, "VERIFIED"),
+      eq(schema.registrations.scoringFinalized, true)
+    ),
+    columns: { id: true, registrationId: true },
+  });
+}
+
+export async function getRegistrationForCertificateNotification(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          category: true,
+        },
+      },
+    },
+  });
+}
+
+export async function createCertificateBulk(data: (typeof schema.certificates.$inferInsert)[]) {
+  return db.insert(schema.certificates).values(data).returning();
+}
+
 // ─── REGISTRATION QUERIES ────────────────────────────────────────────────────
 
 export async function getRegistrationById(id: string) {
@@ -174,6 +266,34 @@ export async function getCompetitions(limit?: number, offset?: number) {
   return db.query.competitions.findMany({
     limit,
     offset,
+  });
+}
+
+export async function getCompetitionCount() {
+  const result = await db
+    .select({ count: schema.competitions.id })
+    .from(schema.competitions);
+  return result.length;
+}
+
+export async function getCompetitionsPaginated(limit: number, offset: number) {
+  return db.query.competitions.findMany({
+    limit,
+    offset,
+    with: {
+      categories: {
+        with: {
+          category: true,
+        },
+      },
+      prizePool: {
+        with: {
+          items: true,
+        },
+      },
+      panelRequirement: true,
+    },
+    orderBy: (competitions, { desc }) => [desc(competitions.createdAt)],
   });
 }
 
@@ -652,6 +772,56 @@ export async function upsertSystemSetting(key: string, value: any) {
   }
 }
 
+// ─── CATEGORY QUERIES ────────────────────────────────────────────────
+
+export async function getAllCategories() {
+  return db.query.categories.findMany({
+    orderBy: (categories, { asc }) => [asc(categories.name)],
+  });
+}
+
+export async function getCategoryByNameOrSlug(name: string, slug: string) {
+  return db.query.categories.findFirst({
+    where: (categories, { eq, or }) => or(
+      eq(categories.name, name),
+      eq(categories.slug, slug)
+    ),
+  });
+}
+
+export async function getCategoryById(id: string) {
+  return db.query.categories.findFirst({
+    where: eq(schema.categories.id, id),
+  });
+}
+
+export async function createCategory(data: typeof schema.categories.$inferInsert) {
+  return db.insert(schema.categories).values(data).returning();
+}
+
+export async function updateCategory(
+  id: string,
+  data: Partial<typeof schema.categories.$inferInsert>
+) {
+  return db
+    .update(schema.categories)
+    .set(data)
+    .where(eq(schema.categories.id, id))
+    .returning();
+}
+
+export async function deleteCategory(id: string) {
+  return db.delete(schema.categories).where(eq(schema.categories.id, id));
+}
+
+export async function countCompetitionCategoriesForCategory(categoryId: string) {
+  const result = await db
+    .select({ count: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.categoryId, categoryId));
+  return result.length;
+}
+
 // ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────
 
 export async function getEmailVerificationTokenByTokenWithUser(token: string) {
@@ -675,12 +845,6 @@ export async function getStudentByIdWithAchievements(studentId: string) {
     with: {
       externalAchievements: true,
     },
-  });
-}
-
-export async function getAllCategories() {
-  return db.query.categories.findMany({
-    orderBy: (categories, { asc }) => [asc(categories.name)],
   });
 }
 

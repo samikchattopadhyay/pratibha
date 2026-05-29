@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
 import { z } from "zod";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import * as schema from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type { JudgeMetadata } from "@/types/judges-details";
 
-// ✅ Pattern: Zod schema for request validation
 const JudgeIdParamSchema = z.object({
   id: z.string().uuid("Invalid judge ID"),
 });
 
-// ✅ Pattern: Type guard for auth
 async function checkAdminAuth(): Promise<boolean> {
   const session = await getEdgeSession();
   if (!session?.user) return false;
@@ -18,14 +18,13 @@ async function checkAdminAuth(): Promise<boolean> {
   return role === "SUPER_ADMIN" || role === "MODERATOR";
 }
 
-// ✅ Pattern: Service function (business logic separated)
 async function fetchJudgeMetadata(judgeId: string): Promise<JudgeMetadata | null> {
-  const judge = await prisma.judge.findUnique({
-    where: { id: judgeId },
-    select: {
+  const judge = await db.query.judges.findFirst({
+    where: eq(schema.judges.id, judgeId),
+    columns: {
       id: true,
       name: true,
-      user: { select: { email: true } },
+      phone: true,
       specializations: true,
       tier: true,
       isAvailable: true,
@@ -33,30 +32,32 @@ async function fetchJudgeMetadata(judgeId: string): Promise<JudgeMetadata | null
       totalEvaluations: true,
       averageScoreGiven: true,
     },
+    with: {
+      user: {
+        columns: { email: true },
+      },
+    },
   });
 
   if (!judge) return null;
 
-  // Calculate deviation percentage if we have average score
   let deviationPercentage: number | null = null;
-  const avgScore = judge.averageScoreGiven?.toNumber() ?? null;
+  const avgScore = judge.averageScoreGiven ? parseFloat(judge.averageScoreGiven.toString()) : null;
   if (avgScore !== null && avgScore > 0) {
-    // Simple deviation: (100 - avg_score) as percentage
     deviationPercentage = Math.max(0, 100 - avgScore);
   }
 
-  // ✅ Pattern: Return DTO (not Prisma model directly)
   return {
     id: judge.id,
     name: judge.name,
     email: judge.user.email,
-    phone: (judge as any).phone || "",
+    phone: judge.phone || "",
     specializations: judge.specializations,
     tier: judge.tier as "LOCAL" | "REGIONAL" | "NATIONAL" | "EXPERT",
     isActive: judge.isAvailable,
     joinedDate: judge.createdAt.toISOString(),
     totalEvaluations: judge.totalEvaluations,
-    averageScore: judge.averageScoreGiven?.toNumber() ?? 0,
+    averageScore: avgScore ?? 0,
     deviationPercentage,
   };
 }
@@ -128,7 +129,6 @@ export async function PATCH(
     const { id: judgeId } = await params;
     const body = await request.json();
 
-    // Validate input
     const validated = UpdateJudgeSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
@@ -137,7 +137,6 @@ export async function PATCH(
       );
     }
 
-    // Check authorization
     const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
@@ -146,20 +145,28 @@ export async function PATCH(
       );
     }
 
-    // Update in database
-    const updated = await prisma.judge.update({
-      where: { id: judgeId },
-      data: validated.data,
-    });
+    const updateData: any = { ...validated.data };
+    // Map isAvailable to the schema field
+    if (updateData.isAvailable !== undefined) {
+      delete updateData.isAvailable;
+      updateData.isAvailable = validated.data.isAvailable;
+    }
 
-    return NextResponse.json(updated, { status: 200 });
-  } catch (err) {
-    if ((err as any)?.code === "P2025") {
+    const result = await db
+      .update(schema.judges)
+      .set(updateData)
+      .where(eq(schema.judges.id, judgeId))
+      .returning();
+
+    if (result.length === 0) {
       return NextResponse.json(
         { code: "NOT_FOUND", message: "Judge not found" },
         { status: 404 }
       );
     }
+
+    return NextResponse.json(result[0], { status: 200 });
+  } catch (err) {
     console.error("[PATCH /api/admin/judges/[id]]", err);
     return NextResponse.json(
       { code: "INTERNAL_ERROR", message: "Server error" },

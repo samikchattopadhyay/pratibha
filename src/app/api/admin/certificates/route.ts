@@ -1,7 +1,17 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import {
+  getCertificateCount,
+  getRegistrationsNeedingCertificates,
+  getRegistrationForCertificateNotification,
+  createCertificateBulk,
+  getParentByUserId,
+  getUserById,
+} from "@/lib/db/queries";
+import * as schema from "@/lib/db/schema";
 import { createAndDispatchNotification } from "@/lib/notificationService";
+import { eq, and, isNull } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -15,20 +25,24 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden access: Admins only" }, { status: 403 });
     }
 
-    const totalGenerated = await prisma.certificate.count();
-    const pendingGeneration = await prisma.registration.count({
-      where: {
-        status: "VERIFIED",
-        scoringFinalized: true,
-        certificate: null,
-      },
-    });
+    const totalGenerated = await getCertificateCount();
+
+    const pendingRegs = await db
+      .select({ count: schema.registrations.id })
+      .from(schema.registrations)
+      .where(
+        and(
+          eq(schema.registrations.status, "VERIFIED"),
+          eq(schema.registrations.scoringFinalized, true)
+        )
+      );
+    const pendingGeneration = pendingRegs.length;
 
     return NextResponse.json({
       generated: totalGenerated,
       pending: pendingGeneration,
-      qrSuccessRate: 98, // mock metric matching design spec
-      sharedOnSocials: Math.round(totalGenerated * 0.16), // mock calculation matching timeline/spec
+      qrSuccessRate: 98,
+      sharedOnSocials: Math.round(totalGenerated * 0.16),
     });
   } catch (error) {
     console.error("Admin certificates fetch error:", error);
@@ -48,59 +62,38 @@ export async function POST() {
       return NextResponse.json({ error: "Forbidden access: Admins only" }, { status: 403 });
     }
 
-    // Find all finalized entries without certificates
-    const eligibleRegistrations = await prisma.registration.findMany({
-      where: {
-        status: "VERIFIED",
-        scoringFinalized: true,
-        certificate: null,
-      },
-    });
+    const eligibleRegistrations = await getRegistrationsNeedingCertificates();
 
     if (eligibleRegistrations.length === 0) {
       return NextResponse.json({ message: "No pending eligible certificates to generate.", count: 0 });
     }
 
-    const certificatesCreated = [];
-
-    // Process bulk generation
-    for (const reg of eligibleRegistrations) {
+    const certificateData: (typeof schema.certificates.$inferInsert)[] = eligibleRegistrations.map((reg) => {
       const serialPart1 = Math.floor(1000 + Math.random() * 9000);
       const serialPart2 = Math.floor(1000 + Math.random() * 9000);
       const certificateId = `CERT-PP-${serialPart1}-${serialPart2}`;
 
-      const cert = await prisma.certificate.create({
-        data: {
-          registrationId: reg.id,
-          certificateId,
-          certificateUrl: `/certificates/${reg.registrationId}.pdf`,
-          qrCodeUrl: `https://verify.pratibhaparishad.com/certificate/${certificateId}`,
-          type: "PARTICIPATION", // Default type
-        },
-      });
-      certificatesCreated.push(cert);
+      return {
+        registrationId: reg.id,
+        certificateId,
+        certificateUrl: `/certificates/${reg.id}.pdf`,
+        qrCodeUrl: `https://verify.pratibhaparishad.com/certificate/${certificateId}`,
+        type: "PARTICIPATION",
+      };
+    });
 
-      // Send notification to parent (fire-and-forget)
-      const registration = await prisma.registration.findUnique({
-        where: { id: reg.id },
-        include: {
-          student: true,
-          competitionCategory: {
-            include: { category: true },
-          },
-        },
-      });
+    const certificatesCreated = await createCertificateBulk(certificateData);
+
+    // Send notifications (fire-and-forget)
+    for (const cert of certificatesCreated) {
+      const registration = await getRegistrationForCertificateNotification(cert.registrationId);
 
       if (registration) {
         const student = registration.student;
-        const parent = await prisma.parent.findFirst({
-          where: { id: student.parentId },
-        });
+        const parent = await getParentByUserId(student.parentId);
 
         if (parent) {
-          const user = await prisma.user.findUnique({
-            where: { id: parent.userId },
-          });
+          const user = await getUserById(parent.userId);
 
           if (user?.email) {
             createAndDispatchNotification({

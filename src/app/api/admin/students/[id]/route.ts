@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import * as schema from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type { StudentMetadata } from "@/types/student-details";
 
 export async function GET(
@@ -20,11 +22,11 @@ export async function GET(
 
     const { id } = await params;
 
-    const student = await prisma.student.findUnique({
-      where: { id },
-      include: {
+    const student = await db.query.students.findFirst({
+      where: eq(schema.students.id, id),
+      with: {
         parent: {
-          include: {
+          with: {
             user: true,
           },
         },

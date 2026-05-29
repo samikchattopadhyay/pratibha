@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getAllCategories,
+  getCategoryByNameOrSlug,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  countCompetitionCategoriesForCategory,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
@@ -16,9 +23,7 @@ export async function GET() {
     const role = (session.user as { role?: string }).role;
     if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const categories = await prisma.category.findMany({
-      orderBy: { name: "asc" },
-    });
+    const categories = await getAllCategories();
 
     return NextResponse.json({ categories });
   } catch (error) {
@@ -51,26 +56,20 @@ export async function POST(request: NextRequest) {
       .replace(/^-+|-+$/g, "");
 
     // Check if slug or name already exists
-    const existing = await prisma.category.findFirst({
-      where: {
-        OR: [{ name }, { slug }],
-      },
-    });
+    const existing = await getCategoryByNameOrSlug(name, slug);
 
     if (existing) {
       return NextResponse.json({ error: "A category with this name or slug already exists" }, { status: 400 });
     }
 
-    const category = await prisma.category.create({
-      data: {
-        name,
-        slug,
-        icon: icon || null,
-        grouping: grouping || null,
-      },
+    const result = await createCategory({
+      name,
+      slug,
+      icon: icon || null,
+      grouping: grouping || null,
     });
 
-    return NextResponse.json({ category });
+    return NextResponse.json({ category: result[0] });
   } catch (error) {
     console.error("POST /api/admin/categories error:", error);
     return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
@@ -106,12 +105,9 @@ export async function PATCH(request: NextRequest) {
       updateData.grouping = grouping;
     }
 
-    const updated = await prisma.category.update({
-      where: { id },
-      data: updateData,
-    });
+    const result = await updateCategory(id, updateData);
 
-    return NextResponse.json({ category: updated });
+    return NextResponse.json({ category: result[0] });
   } catch (error) {
     console.error("PATCH /api/admin/categories error:", error);
     return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
@@ -134,9 +130,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Check if category is used in any competition categories
-    const usage = await prisma.competitionCategory.count({
-      where: { categoryId: id },
-    });
+    const usage = await countCompetitionCategoriesForCategory(id);
 
     if (usage > 0) {
       return NextResponse.json({
@@ -144,9 +138,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    await prisma.category.delete({
-      where: { id },
-    });
+    await deleteCategory(id);
 
     return NextResponse.json({ success: true, message: "Category deleted successfully" });
   } catch (error) {

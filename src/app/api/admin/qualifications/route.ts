@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import {
+  getAllQualificationRules,
+  createQualificationRule,
+  getCompetitionById,
+} from "@/lib/db/queries";
+import * as schema from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// GET /api/admin/qualifications — all rules + slot stats
 export async function GET() {
   try {
     const session = await getEdgeSession();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!ADMIN_ROLES.includes((session.user as { role?: string }).role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const rules = await prisma.qualificationRule.findMany({
-      include: {
-        stateCompetition: { select: { id: true, title: true, scope: true } },
-        nationalCompetition: { select: { id: true, title: true, scope: true, registrationDeadline: true } },
-        slots: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const rules = await getAllQualificationRules();
 
     const formatted = rules.map((rule) => ({
       id: rule.id,
@@ -29,7 +28,7 @@ export async function GET() {
       nationalRegistrationDeadline: rule.nationalCompetition.registrationDeadline,
       slotsPerCategory: rule.slotsPerCategory,
       wildCardSlots: rule.wildCardSlots,
-      minScoreThreshold: rule.minScoreThreshold ? Number(rule.minScoreThreshold) : null,
+      minScoreThreshold: rule.minScoreThreshold ? parseFloat(rule.minScoreThreshold.toString()) : null,
       discountPercent: rule.discountPercent,
       slotExpiryDays: rule.slotExpiryDays,
       isActive: rule.isActive,
@@ -53,7 +52,6 @@ export async function GET() {
   }
 }
 
-// POST /api/admin/qualifications — create a qualification rule
 export async function POST(request: NextRequest) {
   try {
     const session = await getEdgeSession(request);
@@ -76,8 +74,8 @@ export async function POST(request: NextRequest) {
     }
 
     const [stateComp, nationalComp] = await Promise.all([
-      prisma.competition.findUnique({ where: { id: stateCompetitionId }, select: { scope: true, resultDate: true } }),
-      prisma.competition.findUnique({ where: { id: nationalCompetitionId }, select: { scope: true, registrationDeadline: true } }),
+      getCompetitionById(stateCompetitionId),
+      getCompetitionById(nationalCompetitionId),
     ]);
 
     if (!stateComp || stateComp.scope !== "STATE") {
@@ -92,20 +90,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const rule = await prisma.qualificationRule.create({
-      data: {
-        stateCompetitionId,
-        nationalCompetitionId,
-        slotsPerCategory,
-        wildCardSlots,
-        minScoreThreshold: minScoreThreshold ? parseFloat(minScoreThreshold) : null,
-        discountPercent,
-        slotExpiryDays,
-        isActive: true,
-      },
+    const result = await createQualificationRule({
+      stateCompetitionId,
+      nationalCompetitionId,
+      slotsPerCategory,
+      wildCardSlots,
+      minScoreThreshold: minScoreThreshold ? minScoreThreshold.toString() : null,
+      discountPercent,
+      slotExpiryDays,
+      isActive: true,
     });
 
-    return NextResponse.json({ message: "Qualification rule created", rule: { id: rule.id } });
+    return NextResponse.json({ message: "Qualification rule created", rule: { id: result[0].id } });
   } catch (error) {
     console.error("Qualifications POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

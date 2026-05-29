@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import {
+  getCompetitionCount,
+  getCompetitionsPaginated,
+  getCategoryById,
+} from "@/lib/db/queries";
+import * as schema from "@/lib/db/schema";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
@@ -20,19 +26,8 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
 
-    const [totalCount, competitions] = await prisma.$transaction([
-      prisma.competition.count(),
-      prisma.competition.findMany({
-        include: {
-          categories: { include: { category: true } },
-          prizePool: { select: { id: true, isPublished: true, items: { select: { rank: true, type: true, title: true } } } },
-          panelRequirement: true,
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    const totalCount = await getCompetitionCount();
+    const competitions = await getCompetitionsPaginated(limit, (page - 1) * limit);
 
     const formatted = competitions.map((comp) => ({
       id: comp.id,
@@ -89,7 +84,6 @@ export async function POST(request: NextRequest) {
       categoryId,
       categoryName,
       bannerUrl,
-      // Plan 01 — geographic scope
       scope = "STATE",
       eligibleStates = [],
       hostState,
@@ -99,7 +93,6 @@ export async function POST(request: NextRequest) {
       endDate: endDateInput,
       registrationDeadline: regDeadlineInput,
       resultDate: resultDateInput,
-      // Wizard fields
       rules,
       facebookGroupUrl,
       capacity,
@@ -114,7 +107,6 @@ export async function POST(request: NextRequest) {
     if (!title) return NextResponse.json({ error: "Competition title is required" }, { status: 400 });
     if (!minAge || !maxAge) return NextResponse.json({ error: "Age group is required" }, { status: 400 });
 
-    // Plan 01 — scope-based validation
     if (scope === "STATE" && (!eligibleStates || eligibleStates.length === 0)) {
       return NextResponse.json({ error: "State-level competitions must specify eligible states" }, { status: 400 });
     }
@@ -123,20 +115,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "National competitions are open to all states — do not restrict eligibleStates" }, { status: 400 });
     }
 
-    // Plan 01 — auto-set difficulty + min judges by scope
     const resolvedDifficulty = difficultyLevel ?? (scope === "NATIONAL" ? 3 : 1);
     const resolvedMinJudges = minJudgesRequired ?? (scope === "NATIONAL" ? 5 : 2);
 
-    // Resolve category by ID or name
     let dbCategory;
     if (categoryId) {
-      dbCategory = await prisma.category.findUnique({
-        where: { id: categoryId },
-      });
+      dbCategory = await getCategoryById(categoryId);
     } else if (categoryName) {
-      dbCategory = await prisma.category.findFirst({
-        where: { name: { equals: categoryName, mode: "insensitive" } },
-      });
+      // Find by name with case-insensitive search
+      const allCategories = await db.query.categories.findMany();
+      dbCategory = allCategories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
     }
 
     if (!dbCategory) {
@@ -149,71 +137,72 @@ export async function POST(request: NextRequest) {
     const registrationDeadline = regDeadlineInput ? new Date(regDeadlineInput) : new Date(now.getTime() + 20 * 86400000);
     const resultDate = resultDateInput ? new Date(resultDateInput) : new Date(now.getTime() + 45 * 86400000);
 
-    const competition = await prisma.$transaction(async (tx) => {
-      // Create competition with all wizard fields
-      const comp = await tx.competition.create({
-        data: {
+    const competition = await db.transaction(async (tx) => {
+      const compResult = await tx
+        .insert(schema.competitions)
+        .values({
           title,
           description: description || `Pratibha Parishad Fine Arts Competition: ${title}`,
           bannerUrl: bannerUrl || null,
-          entryFeeINR: parseFloat(entryFeeINR || "50"),
+          entryFeeINR: (entryFeeINR || "50").toString(),
           startDate,
           endDate,
           registrationDeadline,
           resultDate,
           isActive: true,
-          // Plan 01
           scope,
           eligibleStates: scope === "NATIONAL" ? [] : eligibleStates,
           hostState: scope === "STATE" ? (hostState || null) : null,
           difficultyLevel: resolvedDifficulty,
           minJudgesRequired: resolvedMinJudges,
-          // Wizard fields
           rules: rules || null,
           facebookGroupUrl: facebookGroupUrl || null,
           capacity: capacity || null,
           criteriaConfig: criteriaConfig || null,
-          categories: {
-            create: { categoryId: dbCategory.id, minAge, maxAge, language: language || null },
-          },
-          // Plan 03 — auto-create panel requirement
-          panelRequirement: {
-            create: {
-              minJudges: resolvedMinJudges,
-              minNationalTierJudges: scope === "NATIONAL" ? 3 : 0,
-              requireCrossCategory: false,
-            },
-          },
-        },
-        include: {
-          categories: { include: { category: true } },
-        },
+        })
+        .returning();
+
+      const comp = compResult[0];
+
+      await tx.insert(schema.competitionCategories).values({
+        competitionId: comp.id,
+        categoryId: dbCategory!.id,
+        minAge,
+        maxAge,
+        language: language || null,
       });
 
-      // Assign judges if provided
+      await tx.insert(schema.judgePanelRequirements).values({
+        competitionId: comp.id,
+        minJudges: resolvedMinJudges,
+        minNationalTierJudges: scope === "NATIONAL" ? 3 : 0,
+        requireCrossCategory: false,
+      });
+
       if (judgeIds && judgeIds.length > 0) {
-        await tx.competitionJudge.createMany({
-          data: judgeIds.map((judgeId: string) => ({
+        await tx.insert(schema.competitionJudges).values(
+          judgeIds.map((judgeId: string) => ({
             competitionId: comp.id,
             judgeId,
-          })),
-          skipDuplicates: true,
-        });
+          }))
+        );
       }
 
-      // Create prize pool and items if provided
       if (prizes && prizes.length > 0) {
-        const pool = await tx.prizePool.create({
-          data: {
+        const poolResult = await tx
+          .insert(schema.prizePools)
+          .values({
             competitionId: comp.id,
             title: `${comp.title} - Prize Pool`,
             description: "Prize pool for competition winners",
             isPublished: false,
-          },
-        });
+          })
+          .returning();
 
-        await tx.prizeItem.createMany({
-          data: prizes.map((prize: { rank: string; type: string; title?: string; description?: string; estimatedValue?: string }) => ({
+        const pool = poolResult[0];
+
+        await tx.insert(schema.prizeItems).values(
+          prizes.map((prize: { rank: string; type: string; title?: string; description?: string; estimatedValue?: string }) => ({
             prizePoolId: pool.id,
             rank: prize.rank,
             type: prize.type,
@@ -221,8 +210,8 @@ export async function POST(request: NextRequest) {
             description: prize.description || null,
             estimatedValue: prize.estimatedValue ? parseFloat(prize.estimatedValue) : null,
             isPhysical: prize.type === "PHYSICAL_MEDAL" || prize.type === "PHYSICAL_TROPHY",
-          })),
-        });
+          }))
+        );
       }
 
       return comp;
@@ -235,7 +224,6 @@ export async function POST(request: NextRequest) {
         title: competition.title,
         scope: competition.scope,
         isActive: competition.isActive,
-        categories: competition.categories.map((c) => c.category.name).join(", "),
       },
     });
   } catch (error) {
