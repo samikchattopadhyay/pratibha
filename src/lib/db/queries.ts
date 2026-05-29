@@ -472,6 +472,14 @@ export async function countRegistrationsByStudentId(studentId: string) {
   return result.length > 0 ? result[0] : { count: "0" };
 }
 
+export async function countRegistrationsByCategoryId(competitionCategoryId: string) {
+  const result = await db
+    .select({ count: schema.registrations.id })
+    .from(schema.registrations)
+    .where(eq(schema.registrations.competitionCategoryId, competitionCategoryId));
+  return result.length;
+}
+
 // ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────
 
 export async function getEmailVerificationTokenByTokenWithUser(token: string) {
@@ -578,5 +586,87 @@ export async function getUnusedProfileSetupToken(userId: string) {
       gt(schema.profileSetupTokens.expiresAt, new Date())
     ),
     orderBy: (tokens, { desc }) => [desc(tokens.createdAt)],
+  });
+}
+
+export async function getRegistrationWithFullDetails(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          competition: true,
+          category: true,
+        },
+      },
+      judgeAssignments: {
+        with: {
+          judge: true,
+          score: true,
+        },
+        orderBy: (assignments, { asc }) => [asc(assignments.assignedAt)],
+      },
+      certificate: true,
+      prizeAward: {
+        with: {
+          prizeItem: true,
+          physicalOrder: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getParentWithStudentsAndPrizes(userId: string) {
+  return db.query.parents.findFirst({
+    where: eq(schema.parents.userId, userId),
+    with: {
+      students: {
+        with: {
+          registrations: {
+            with: {
+              competitionCategory: {
+                with: {
+                  competition: {
+                    columns: {
+                      title: true,
+                      scope: true,
+                    },
+                  },
+                },
+              },
+              prizeAward: {
+                with: {
+                  prizeItem: {
+                    columns: {
+                      title: true,
+                      type: true,
+                      isPhysical: true,
+                    },
+                  },
+                  certificate: {
+                    columns: {
+                      certificateId: true,
+                      certificateUrl: true,
+                    },
+                  },
+                  physicalOrder: {
+                    columns: {
+                      status: true,
+                      awbNumber: true,
+                      courierName: true,
+                      estimatedDelivery: true,
+                      dispatchedAt: true,
+                      deliveredAt: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 }

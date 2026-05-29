@@ -2,7 +2,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { z } from "zod";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getStudentBySlug } from "@/lib/db/queries";
 
 const slugSchema = z.object({
   slug: z
@@ -54,9 +54,7 @@ export async function POST(req: Request) {
     }
 
     // Check database
-    const existing = await prisma.student.findUnique({
-      where: { slug },
-    });
+    const existing = await getStudentBySlug(slug);
 
     const available = !existing || existing.id === excludeStudentId;
 

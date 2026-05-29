@@ -1,6 +1,10 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getRegistrationWithFullDetails,
+  getParentByUserId,
+  countRegistrationsByCategoryId,
+} from "@/lib/db/queries";
 import { z } from "zod";
 import type { ParentEntryDetails, ParentJudgeScore } from "@/types/account-entry-details";
 
@@ -27,44 +31,17 @@ export async function GET(
       );
     }
 
-    const userId = (session.user as { id?: string }).id;
+    const userId = (session.user as { id?: string }).id!;
 
     // ─── 3. DATA FETCHING ──────────────────────────────────────────────────────
-    const registration = await prisma.registration.findUnique({
-      where: { id: validation.data },
-      include: {
-        student: true,
-        competitionCategory: {
-          include: {
-            competition: true,
-            category: true,
-          },
-        },
-        judgeAssignments: {
-          include: {
-            judge: true,
-            score: true,
-          },
-          orderBy: { assignedAt: "asc" },
-        },
-        certificate: true,
-        prizeAward: {
-          include: {
-            prizeItem: true,
-            physicalOrder: true,
-          },
-        },
-      },
-    });
+    const registration = await getRegistrationWithFullDetails(validation.data);
 
     if (!registration) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
 
     // ─── 4. AUTHORIZATION (OWNERSHIP CHECK) ─────────────────────────────────────
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent || registration.student.parentId !== parent.id) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
@@ -86,11 +63,9 @@ export async function GET(
     }
 
     // Count total entries in this category (for ranking context)
-    const totalInCategory = await prisma.registration.count({
-      where: {
-        competitionCategoryId: registration.competitionCategoryId,
-      },
-    });
+    const totalInCategory = await countRegistrationsByCategoryId(
+      registration.competitionCategoryId
+    );
 
     // Anonymize judge labels based on assignedAt order
     const judgeScores: ParentJudgeScore[] | null = registration.scoringFinalized
