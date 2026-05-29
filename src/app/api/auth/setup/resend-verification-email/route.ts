@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { emailVerificationTokens } from "@/lib/db/schema";
+import { eq, desc, isNull } from "drizzle-orm";
+import { getUserById, createEmailVerificationToken } from "@/lib/db/queries";
 import { getProfileSetupToken } from "@/lib/profile-setup-token";
 import crypto from "crypto";
 
@@ -24,29 +27,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create email verification token
-    let emailVerificationToken = await prisma.emailVerificationToken.findFirst(
-      {
-        where: { userId: token.userId },
-        orderBy: { createdAt: "desc" },
-      }
-    );
+    let emailVerificationToken = await db.query.emailVerificationTokens.findFirst({
+      where: eq(emailVerificationTokens.userId, token.userId),
+      orderBy: desc(emailVerificationTokens.createdAt),
+    });
 
     if (!emailVerificationToken || emailVerificationToken.verifiedAt) {
       // Create new token
       const emailToken = crypto.randomBytes(32).toString("hex");
-      emailVerificationToken = await prisma.emailVerificationToken.create({
-        data: {
-          userId: token.userId,
-          token: emailToken,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-        },
+      const result = await createEmailVerificationToken({
+        userId: token.userId,
+        token: emailToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
+      emailVerificationToken = result[0];
     }
 
     // Get user email
-    const user = await prisma.user.findUnique({
-      where: { id: token.userId },
-    });
+    const user = await getUserById(token.userId);
 
     if (!user) {
       return NextResponse.json(

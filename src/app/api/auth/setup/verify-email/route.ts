@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { emailVerificationTokens, users, notifications } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { getEmailVerificationTokenByTokenWithUser, updateUser, createNotification } from "@/lib/db/queries";
 import { markProfileSetupTokenAsUsed } from "@/lib/profile-setup-token";
 
 export async function POST(request: NextRequest) {
@@ -14,10 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate email verification token
-    const emailToken = await prisma.emailVerificationToken.findUnique({
-      where: { token },
-      include: { user: true },
-    });
+    const emailToken = await getEmailVerificationTokenByTokenWithUser(token);
 
     if (!emailToken) {
       return NextResponse.json(
@@ -43,16 +43,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark email as verified
-    const user = await prisma.user.update({
-      where: { id: emailToken.userId },
-      data: { emailVerified: new Date() },
-    });
+    await updateUser(emailToken.userId, { emailVerified: new Date() });
 
     // Mark token as verified
-    await prisma.emailVerificationToken.update({
-      where: { id: emailToken.id },
-      data: { verifiedAt: new Date() },
-    });
+    await db
+      .update(emailVerificationTokens)
+      .set({ verifiedAt: new Date() })
+      .where(eq(emailVerificationTokens.id, emailToken.id));
 
     // Mark setup token as used
     try {
@@ -62,14 +59,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create registration notification
-    await prisma.notification.create({
-      data: {
-        userId: user.id,
-        type: "REGISTRATION_CREATED",
-        title: "Welcome to Pratibha Parishad!",
-        body: "Your account has been successfully created. You can now start registering for competitions.",
-        actionUrl: "/account/dashboard",
-      },
+    await createNotification({
+      userId: emailToken.userId,
+      type: "REGISTRATION_CREATED",
+      title: "Welcome to Pratibha Parishad!",
+      body: "Your account has been successfully created. You can now start registering for competitions.",
+      actionUrl: "/account/dashboard",
     });
 
     return NextResponse.json(

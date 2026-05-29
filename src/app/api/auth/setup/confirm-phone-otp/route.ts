@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { createParent, createEmailVerificationToken } from "@/lib/db/queries";
 import {
   getProfileSetupToken,
   updateProfileSetupToken,
 } from "@/lib/profile-setup-token";
+import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,30 +64,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Parent profile with verified phone
-    const parent = await prisma.parent.create({
-      data: {
-        userId: token.userId,
-        name: tempData.name || "User", // Could be set from Facebook profile
-        phone: tempData.tempPhone,
-      },
+    await createParent({
+      userId: token.userId,
+      name: tempData.name || "User",
+      phone: tempData.tempPhone,
     });
 
     // Generate email verification token
-    import("crypto").then(async (crypto) => {
-      const emailToken = crypto.randomBytes(32).toString("hex");
-      const emailVerificationToken =
-        await prisma.emailVerificationToken.create({
-          data: {
-            userId: token.userId,
-            token: emailToken,
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-          },
-        });
-
-      // TODO: Send email verification link
-      // const verificationLink = `${baseUrl}/auth/verify-email?token=${emailToken}`;
-      // await sendVerificationEmail(user.email, verificationLink);
+    const emailToken = crypto.randomBytes(32).toString("hex");
+    await createEmailVerificationToken({
+      userId: token.userId,
+      token: emailToken,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
+
+    // TODO: Send email verification link
+    // const verificationLink = `${baseUrl}/auth/verify-email?token=${emailToken}`;
+    // await sendVerificationEmail(user.email, verificationLink);
 
     // Update token stage
     await updateProfileSetupToken(setupToken, "email_verify");

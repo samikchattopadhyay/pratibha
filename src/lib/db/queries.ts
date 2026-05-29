@@ -471,3 +471,12 @@ export async function countRegistrationsByStudentId(studentId: string) {
     .where(eq(schema.registrations.studentId, studentId));
   return result.length > 0 ? result[0] : { count: "0" };
 }
+
+// ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────
+
+export async function getEmailVerificationTokenByTokenWithUser(token: string) {
+  return db.query.emailVerificationTokens.findFirst({
+    where: eq(schema.emailVerificationTokens.token, token),
+    with: { user: true },
+  });
+}

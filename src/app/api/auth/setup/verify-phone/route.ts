@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getParentByPhone } from "@/lib/db/queries";
 import {
   getProfileSetupToken,
   updateProfileSetupToken,
@@ -50,9 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if phone is already registered
-    const existingParent = await prisma.parent.findUnique({
-      where: { phone: normalizedPhone },
-    });
+    const existingParent = await getParentByPhone(normalizedPhone);
 
     if (existingParent) {
       return NextResponse.json(

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import prisma from "@/lib/db";
+import { updateUser } from "@/lib/db/queries";
 import {
   getProfileSetupToken,
   updateProfileSetupToken,
+  markProfileSetupTokenAsUsed,
 } from "@/lib/profile-setup-token";
 
 export async function POST(request: NextRequest) {
@@ -42,10 +43,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 12);
 
     // Update user password
-    await prisma.user.update({
-      where: { id: token.userId },
-      data: { passwordHash },
-    });
+    await updateUser(token.userId, { passwordHash });
 
     // Update token stage
     await updateProfileSetupToken(setupToken, "phone");

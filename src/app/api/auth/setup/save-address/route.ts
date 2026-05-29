@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getUserById, getParentByUserId, updateParent } from "@/lib/db/queries";
 
 interface SaveAddressRequest {
   address: string;
@@ -24,9 +24,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<{ success
     }
 
     const userId = (session.user as SessionUser).id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await getUserById(userId);
 
     if (!user || user.role !== "PARENT") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -61,9 +59,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<{ success
     }
 
     // Get parent profile
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json(
@@ -73,15 +69,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<{ success
     }
 
     // Update parent with address
-    await prisma.parent.update({
-      where: { userId },
-      data: {
-        address: address.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        postalCode: postalCode.trim(),
-        preferredState: preferredState && preferredState.trim() ? preferredState.trim() : null,
-      },
+    await updateParent(parent.id, {
+      address: address.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      postalCode: postalCode.trim(),
+      preferredState: preferredState && preferredState.trim() ? preferredState.trim() : null,
     });
 
     return NextResponse.json({ success: true });

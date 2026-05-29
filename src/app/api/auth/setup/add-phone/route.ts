@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getParentByPhone, createParent } from "@/lib/db/queries";
 import {
   getProfileSetupToken,
   updateProfileSetupToken,
@@ -44,9 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if phone is already registered
-    const existingParent = await prisma.parent.findUnique({
-      where: { phone: normalizedPhone },
-    });
+    const existingParent = await getParentByPhone(normalizedPhone);
 
     if (existingParent) {
       return NextResponse.json(
@@ -60,13 +58,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Parent profile with phone
-    const tempData = token.data as Record<string, any> || {};
-    await prisma.parent.create({
-      data: {
-        userId: token.userId,
-        name: tempData.name || "User",
-        phone: normalizedPhone,
-      },
+    const tempData = (token.data as Record<string, any>) || {};
+    await createParent({
+      userId: token.userId,
+      name: tempData.name || "User",
+      phone: normalizedPhone,
     });
 
     // Update token stage to email verification
