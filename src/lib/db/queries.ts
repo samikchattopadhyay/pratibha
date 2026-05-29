@@ -534,6 +534,91 @@ export async function expireOverdueQualificationSlots(parentId: string) {
     );
 }
 
+// ─── EXTERNAL ACHIEVEMENT QUERIES ────────────────────────────────────────
+
+export async function getExternalAchievementById(id: string) {
+  return db.query.externalAchievements.findFirst({
+    where: eq(schema.externalAchievements.id, id),
+  });
+}
+
+export async function createExternalAchievement(data: typeof schema.externalAchievements.$inferInsert) {
+  return db.insert(schema.externalAchievements).values(data).returning();
+}
+
+export async function updateExternalAchievement(
+  id: string,
+  data: Partial<typeof schema.externalAchievements.$inferInsert>
+) {
+  return db
+    .update(schema.externalAchievements)
+    .set(data)
+    .where(eq(schema.externalAchievements.id, id))
+    .returning();
+}
+
+export async function deleteExternalAchievement(id: string) {
+  return db
+    .delete(schema.externalAchievements)
+    .where(eq(schema.externalAchievements.id, id));
+}
+
+export async function getStudentWithParentUser(studentId: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.id, studentId),
+    columns: {
+      id: true,
+      parentId: true,
+    },
+    with: {
+      parent: {
+        columns: {
+          userId: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getVerifiedRegistrationsByStudentId(studentId: string) {
+  return db.query.registrations.findMany({
+    where: and(
+      eq(schema.registrations.studentId, studentId),
+      eq(schema.registrations.status, "VERIFIED" as any)
+    ),
+    columns: {
+      id: true,
+      isFeatured: true,
+      isHidden: true,
+      createdAt: true,
+    },
+    with: {
+      competitionCategory: {
+        columns: {},
+        with: {
+          competition: {
+            columns: {
+              title: true,
+              startDate: true,
+            },
+          },
+          category: {
+            columns: {
+              name: true,
+            },
+          },
+        },
+      },
+      prizeAward: {
+        columns: {
+          rank: true,
+        },
+      },
+    },
+    orderBy: (registrations, { desc }) => [desc(registrations.createdAt)],
+  });
+}
+
 // ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────
 
 export async function getEmailVerificationTokenByTokenWithUser(token: string) {

@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentByUserId,
+  getStudentById,
+  createExternalAchievement,
+} from "@/lib/db/queries";
 import { z } from "zod";
 
 // ─── SECTION 1: VALIDATION SCHEMAS ────────────────────────────────────────
@@ -42,41 +46,35 @@ export async function POST(
     const data = parsed.data;
 
     // 3. Business logic
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
     }
 
     // Verify student ownership
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
+    const student = await getStudentById(studentId);
 
     if (!student || student.parentId !== parent.id) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
     // Create achievement
-    const achievement = await prisma.externalAchievement.create({
-      data: {
-        studentId,
-        title: data.title,
-        eventName: data.eventName,
-        category: data.category,
-        year: data.year,
-        rank: data.rank,
-        description: data.description,
-        proofUrl: data.proofUrl,
-        displayOrder: 0,
-      },
+    const result = await createExternalAchievement({
+      studentId,
+      title: data.title,
+      eventName: data.eventName,
+      category: data.category,
+      year: data.year,
+      rank: data.rank,
+      description: data.description,
+      proofUrl: data.proofUrl,
+      displayOrder: 0,
     });
 
     // 4. Response
     return NextResponse.json(
-      { message: "Achievement added successfully", achievementId: achievement.id },
+      { message: "Achievement added successfully", achievementId: result[0].id },
       { status: 201 }
     );
   } catch (error: any) {

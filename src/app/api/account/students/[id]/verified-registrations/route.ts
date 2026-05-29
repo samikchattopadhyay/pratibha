@@ -1,5 +1,8 @@
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getStudentWithParentUser,
+  getVerifiedRegistrationsByStudentId,
+} from "@/lib/db/queries";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
@@ -15,59 +18,15 @@ export async function GET(
   const { id: studentId } = await params;
 
   // Verify ownership: parent owns the student
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
-    select: {
-      parent: {
-        select: {
-          user: {
-            select: { id: true },
-          },
-        },
-      },
-    },
-  });
+  const student = await getStudentWithParentUser(studentId);
 
   const sessionUserId = (session.user as { id: string }).id;
-  if (!student || student.parent.user.id !== sessionUserId) {
+  if (!student || student.parent.userId !== sessionUserId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Get all verified registrations for this student
-  const registrations = await prisma.registration.findMany({
-    where: {
-      studentId,
-      status: "VERIFIED",
-    },
-    select: {
-      id: true,
-      competitionCategory: {
-        select: {
-          competition: {
-            select: {
-              title: true,
-              startDate: true,
-            },
-          },
-          category: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-      prizeAward: {
-        select: {
-          rank: true,
-        },
-      },
-      isFeatured: true,
-      isHidden: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const registrations = await getVerifiedRegistrationsByStudentId(studentId);
 
   const formattedRegistrations = registrations.map((reg) => ({
     id: reg.id,

@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentByUserId,
+  getStudentById,
+  getExternalAchievementById,
+  updateExternalAchievement,
+  deleteExternalAchievement,
+} from "@/lib/db/queries";
 import { z } from "zod";
 
 // ─── SECTION 1: VALIDATION SCHEMAS ────────────────────────────────────────
@@ -42,27 +48,21 @@ export async function PATCH(
     const data = parsed.data;
 
     // 3. Business logic
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
     }
 
     // Verify student ownership
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
+    const student = await getStudentById(studentId);
 
     if (!student || student.parentId !== parent.id) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
     // Verify achievement ownership
-    const achievement = await prisma.externalAchievement.findUnique({
-      where: { id: achievementId },
-    });
+    const achievement = await getExternalAchievementById(achievementId);
 
     if (!achievement || achievement.studentId !== studentId) {
       return NextResponse.json({ error: "Achievement not found" }, { status: 404 });
@@ -78,14 +78,11 @@ export async function PATCH(
     if (data.description !== undefined) updatePayload.description = data.description;
     if (data.proofUrl !== undefined) updatePayload.proofUrl = data.proofUrl;
 
-    const updatedAchievement = await prisma.externalAchievement.update({
-      where: { id: achievementId },
-      data: updatePayload,
-    });
+    const result = await updateExternalAchievement(achievementId, updatePayload);
 
     // 4. Response
     return NextResponse.json(
-      { message: "Achievement updated successfully", achievementId: updatedAchievement.id },
+      { message: "Achievement updated successfully", achievementId: result[0].id },
       { status: 200 }
     );
   } catch (error: any) {
@@ -109,36 +106,28 @@ export async function DELETE(
     const { id: studentId, eid: achievementId } = await params;
 
     // 2. Business logic
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
     }
 
     // Verify student ownership
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
+    const student = await getStudentById(studentId);
 
     if (!student || student.parentId !== parent.id) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
     // Verify achievement ownership
-    const achievement = await prisma.externalAchievement.findUnique({
-      where: { id: achievementId },
-    });
+    const achievement = await getExternalAchievementById(achievementId);
 
     if (!achievement || achievement.studentId !== studentId) {
       return NextResponse.json({ error: "Achievement not found" }, { status: 404 });
     }
 
     // Delete achievement
-    await prisma.externalAchievement.delete({
-      where: { id: achievementId },
-    });
+    await deleteExternalAchievement(achievementId);
 
     // 3. Response
     return NextResponse.json(
