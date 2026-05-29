@@ -2107,6 +2107,65 @@ export async function updateCertificateStatusOnly(certificateId: string, status:
   return updated[0];
 }
 
+export async function getVotingLeaderboard(competitionId: string) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const registrations = await db.query.registrations.findMany({
+    where: and(
+      inArray(schema.registrations.competitionCategoryId, categoryIds),
+      sql`(SELECT COUNT(*) FROM ${schema.judgeAssignments} WHERE "judgeAssignments"."registrationId" = ${schema.registrations.id} AND "judgeAssignments"."scoreId" IS NOT NULL) > 0`
+    ),
+    with: {
+      student: {
+        columns: { name: true },
+      },
+      competitionCategory: {
+        columns: {},
+        with: {
+          category: {
+            columns: { name: true },
+          },
+        },
+      },
+      judgeAssignments: {
+        columns: {},
+        where: sql`"judgeAssignments"."scoreId" IS NOT NULL`,
+        with: {
+          score: {
+            columns: { totalScore: true },
+          },
+        },
+      },
+    },
+  });
+
+  const leaderboardData = registrations
+    .map((reg) => {
+      const scores = reg.judgeAssignments
+        .map((ja) => ja.score?.totalScore ? parseFloat(ja.score.totalScore.toString()) : 0)
+        .filter((s) => s >= 0);
+      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+      return {
+        registrationId: reg.id,
+        participantName: reg.student.name,
+        categoryName: reg.competitionCategory.category.name,
+        scoresReceived: scores.length,
+        averageScore: Math.round(avgScore * 100) / 100,
+        totalScore: Math.round(scores.reduce((a, b) => a + b, 0)),
+      };
+    })
+    .sort((a, b) => b.averageScore - a.averageScore)
+    .slice(0, 10);
+
+  return leaderboardData;
+}
+
 export async function getRecentVotingActivity(competitionId: string, limit?: number) {
   const competitionCategories = await db
     .select({ id: schema.competitionCategories.id })
