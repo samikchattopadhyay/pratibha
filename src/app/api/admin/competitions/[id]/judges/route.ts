@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db/drizzle";
+import * as schema from "@/lib/db/schema";
+import {
+  getCompetitionJudges,
+  createCompetitionJudge,
+  deleteCompetitionJudge,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
-
-function requireAdmin(role: string) {
-  return ADMIN_ROLES.includes(role);
-}
 
 export async function GET(
   request: NextRequest,
@@ -17,47 +20,22 @@ export async function GET(
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;
-    if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const competitionId = params.id;
 
-    const competition = await prisma.competition.findUnique({
-      where: { id: competitionId },
-      select: { id: true },
+    const competition = await db.query.competitions.findFirst({
+      where: eq(schema.competitions.id, competitionId),
+      columns: { id: true },
     });
 
     if (!competition) {
       return NextResponse.json({ error: "Competition not found" }, { status: 404 });
     }
 
-    const assignedJudges = await prisma.competitionJudge.findMany({
-      where: { competitionId },
-      include: {
-        judge: {
-          select: {
-            id: true,
-            name: true,
-            tier: true,
-            specializations: true,
-            profileImageUrl: true,
-            isVerified: true,
-          },
-        },
-      },
-      orderBy: { assignedAt: "desc" },
-    });
+    const judges = await getCompetitionJudges(competitionId);
 
-    const formatted = assignedJudges.map((cj) => ({
-      id: cj.judge.id,
-      name: cj.judge.name,
-      tier: cj.judge.tier,
-      specializations: cj.judge.specializations,
-      profileImageUrl: cj.judge.profileImageUrl,
-      isVerified: cj.judge.isVerified,
-      assignedAt: cj.assignedAt,
-    }));
-
-    return NextResponse.json({ judges: formatted });
+    return NextResponse.json({ judges });
   } catch (error) {
     console.error("Get competition judges error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -73,7 +51,7 @@ export async function POST(
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;
-    if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const competitionId = params.id;
     const { judgeId } = await request.json();
@@ -82,61 +60,34 @@ export async function POST(
       return NextResponse.json({ error: "Judge ID is required" }, { status: 400 });
     }
 
-    const competition = await prisma.competition.findUnique({
-      where: { id: competitionId },
-      select: { id: true },
+    const competition = await db.query.competitions.findFirst({
+      where: eq(schema.competitions.id, competitionId),
+      columns: { id: true },
     });
 
     if (!competition) {
       return NextResponse.json({ error: "Competition not found" }, { status: 404 });
     }
 
-    const judge = await prisma.judge.findUnique({
-      where: { id: judgeId },
-      select: { id: true },
+    const judge = await db.query.judges.findFirst({
+      where: eq(schema.judges.id, judgeId),
+      columns: { id: true },
     });
 
     if (!judge) {
       return NextResponse.json({ error: "Judge not found" }, { status: 404 });
     }
 
-    const existing = await prisma.competitionJudge.findUnique({
-      where: { competitionId_judgeId: { competitionId, judgeId } },
-    });
-
-    if (existing) {
-      return NextResponse.json({ error: "Judge already assigned to this competition" }, { status: 409 });
-    }
-
-    const assignment = await prisma.competitionJudge.create({
-      data: {
-        competitionId,
-        judgeId,
-      },
-      include: {
-        judge: {
-          select: {
-            id: true,
-            name: true,
-            tier: true,
-            specializations: true,
-            profileImageUrl: true,
-            isVerified: true,
-          },
-        },
-      },
-    });
+    const judgeData = await createCompetitionJudge(competitionId, judgeId);
 
     return NextResponse.json({
       message: "Judge assigned successfully",
-      judge: {
-        id: assignment.judge.id,
-        name: assignment.judge.name,
-        tier: assignment.judge.tier,
-        isVerified: assignment.judge.isVerified,
-      },
+      judge: judgeData,
     });
   } catch (error) {
+    if (error instanceof Error && error.message.includes("already assigned")) {
+      return NextResponse.json({ error: "Judge already assigned to this competition" }, { status: 409 });
+    }
     console.error("Assign judge to competition error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -151,7 +102,7 @@ export async function DELETE(
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const role = (session.user as { role?: string }).role;
-    if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const competitionId = params.id;
     const { judgeId } = await request.json();
@@ -160,20 +111,13 @@ export async function DELETE(
       return NextResponse.json({ error: "Judge ID is required" }, { status: 400 });
     }
 
-    const assignment = await prisma.competitionJudge.findUnique({
-      where: { competitionId_judgeId: { competitionId, judgeId } },
-    });
-
-    if (!assignment) {
-      return NextResponse.json({ error: "Judge not assigned to this competition" }, { status: 404 });
-    }
-
-    await prisma.competitionJudge.delete({
-      where: { id: assignment.id },
-    });
+    await deleteCompetitionJudge(competitionId, judgeId);
 
     return NextResponse.json({ message: "Judge removed successfully" });
   } catch (error) {
+    if (error instanceof Error && error.message.includes("not assigned")) {
+      return NextResponse.json({ error: "Judge not assigned to this competition" }, { status: 404 });
+    }
     console.error("Remove judge from competition error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

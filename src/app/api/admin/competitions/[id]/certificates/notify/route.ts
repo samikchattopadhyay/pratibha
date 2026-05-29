@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
 import { createAndDispatchNotification } from "@/lib/notificationService";
-import prisma from "@/lib/db";
+import {
+  getGeneratedCertificatesByCompetition,
+  updateCertificateStatus,
+} from "@/lib/db/queries";
 
 export async function POST(
   _: NextRequest,
@@ -23,33 +26,13 @@ export async function POST(
 
     const { id: competitionId } = await params;
 
-    // Find GENERATED (non-SHARED) certificates for this competition
-    const certificates = await prisma.certificate.findMany({
-      where: {
-        registration: {
-          competitionCategory: { competitionId },
-        },
-        status: "GENERATED",
-      },
-      include: {
-        registration: {
-          include: {
-            student: {
-              include: {
-                parent: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const certificates = await getGeneratedCertificatesByCompetition(competitionId);
 
     let notifiedCount = 0;
 
-    // Dispatch notifications and mark as SHARED
     for (const cert of certificates) {
       try {
-        const userId = (cert.registration.student.parent as any).userId;
+        const userId = cert.registration.student.parent?.userId;
         if (userId) {
           await createAndDispatchNotification({
             userId,
@@ -59,10 +42,7 @@ export async function POST(
             body: `Your certificate for ${cert.registration.student.name} is ready!`,
           });
 
-          await prisma.certificate.update({
-            where: { id: cert.id },
-            data: { status: "SHARED" },
-          });
+          await updateCertificateStatus(cert.id, "SHARED");
 
           notifiedCount++;
         }

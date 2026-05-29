@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getCertificateStatsByCompetition } from "@/lib/db/queries";
 
 export async function GET(
   _: NextRequest,
@@ -22,37 +22,7 @@ export async function GET(
 
     const { id: competitionId } = await params;
 
-    const certificates = await prisma.certificate.findMany({
-      where: {
-        registration: {
-          competitionCategory: { competitionId },
-        },
-      },
-      select: {
-        status: true,
-        type: true,
-      },
-    });
-
-    const byStatus = {
-      PENDING: 0,
-      GENERATED: 0,
-      SHARED: 0,
-      REVOKED: 0,
-    };
-
-    const byType = {
-      PARTICIPATION: 0,
-      MERIT_1: 0,
-      MERIT_2: 0,
-      MERIT_3: 0,
-      SPECIAL_MENTION: 0,
-    };
-
-    certificates.forEach((cert: any) => {
-      byStatus[cert.status as keyof typeof byStatus]++;
-      byType[cert.type as keyof typeof byType]++;
-    });
+    const { byStatus, byType } = await getCertificateStatsByCompetition(competitionId);
 
     return NextResponse.json({ byStatus, byType });
   } catch (err) {

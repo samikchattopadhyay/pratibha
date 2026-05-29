@@ -1800,3 +1800,272 @@ export async function createPrizePoolWithItems(data: {
     return prizePool[0];
   });
 }
+
+export async function getCompetitionJudges(competitionId: string) {
+  const judges = await db.query.competitionJudges.findMany({
+    where: eq(schema.competitionJudges.competitionId, competitionId),
+    with: {
+      judge: {
+        columns: {
+          id: true,
+          name: true,
+          tier: true,
+          specializations: true,
+          profileImageUrl: true,
+          isVerified: true,
+        },
+      },
+    },
+    orderBy: desc(schema.competitionJudges.assignedAt),
+  });
+
+  return judges.map((cj) => ({
+    id: cj.judge.id,
+    name: cj.judge.name,
+    tier: cj.judge.tier,
+    specializations: cj.judge.specializations,
+    profileImageUrl: cj.judge.profileImageUrl,
+    isVerified: cj.judge.isVerified,
+    assignedAt: cj.assignedAt,
+  }));
+}
+
+export async function createCompetitionJudge(competitionId: string, judgeId: string) {
+  const existing = await db.query.competitionJudges.findFirst({
+    where: and(
+      eq(schema.competitionJudges.competitionId, competitionId),
+      eq(schema.competitionJudges.judgeId, judgeId)
+    ),
+  });
+
+  if (existing) {
+    throw new Error("Judge already assigned to this competition");
+  }
+
+  const assignment = await db
+    .insert(schema.competitionJudges)
+    .values({ competitionId, judgeId })
+    .returning();
+
+  const judge = await db.query.judges.findFirst({
+    where: eq(schema.judges.id, judgeId),
+    columns: {
+      id: true,
+      name: true,
+      tier: true,
+      isVerified: true,
+    },
+  });
+
+  return {
+    id: judge!.id,
+    name: judge!.name,
+    tier: judge!.tier,
+    isVerified: judge!.isVerified,
+  };
+}
+
+export async function deleteCompetitionJudge(competitionId: string, judgeId: string) {
+  const existing = await db.query.competitionJudges.findFirst({
+    where: and(
+      eq(schema.competitionJudges.competitionId, competitionId),
+      eq(schema.competitionJudges.judgeId, judgeId)
+    ),
+  });
+
+  if (!existing) {
+    throw new Error("Judge not assigned to this competition");
+  }
+
+  await db.delete(schema.competitionJudges).where(eq(schema.competitionJudges.id, existing.id));
+}
+
+export async function getCertificatesByCompetition(competitionId: string, status?: string, limit?: number, offset?: number) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const whereConditions = [inArray(schema.registrations.competitionCategoryId, categoryIds)];
+  if (status && status !== "ALL") {
+    whereConditions.push(eq(schema.certificates.status, status as any));
+  }
+
+  const certs = await db.query.certificates.findMany({
+    where: and(...whereConditions),
+    with: {
+      registration: {
+        columns: { registrationId: true },
+        with: {
+          student: {
+            columns: { name: true },
+          },
+        },
+      },
+    },
+    orderBy: desc(schema.certificates.issuedAt),
+    limit: limit || 10,
+    offset: offset || 0,
+  });
+
+  const countResult = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.certificates)
+    .innerJoin(schema.registrations, eq(schema.certificates.registrationId, schema.registrations.id))
+    .where(and(...whereConditions));
+
+  return {
+    certificates: certs.map((cert) => ({
+      id: cert.id,
+      registrationId: cert.registration.registrationId,
+      studentName: cert.registration.student.name,
+      type: cert.type,
+      status: cert.status || "PENDING",
+      certificateId: cert.certificateId,
+      qrCodeUrl: cert.qrCodeUrl,
+      generatedAt: cert.issuedAt,
+    })),
+    totalCount: countResult[0]?.count || 0,
+  };
+}
+
+export async function getCertificateStatsByCompetition(competitionId: string) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const certs = await db
+    .select({ status: schema.certificates.status, type: schema.certificates.type })
+    .from(schema.certificates)
+    .innerJoin(schema.registrations, eq(schema.certificates.registrationId, schema.registrations.id))
+    .where(inArray(schema.registrations.competitionCategoryId, categoryIds));
+
+  const byStatus: Record<string, number> = {
+    PENDING: 0,
+    GENERATED: 0,
+    SHARED: 0,
+    REVOKED: 0,
+  };
+
+  const byType: Record<string, number> = {
+    PARTICIPATION: 0,
+    MERIT_1: 0,
+    MERIT_2: 0,
+    MERIT_3: 0,
+    SPECIAL_MENTION: 0,
+  };
+
+  certs.forEach((cert) => {
+    if (cert.status && cert.status in byStatus) {
+      byStatus[cert.status]++;
+    }
+    if (cert.type && cert.type in byType) {
+      byType[cert.type]++;
+    }
+  });
+
+  return { byStatus, byType };
+}
+
+export async function getEligibleRegistrationsForCertificateGeneration(competitionId: string) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  return db.query.registrations.findMany({
+    where: and(
+      inArray(schema.registrations.competitionCategoryId, categoryIds),
+      eq(schema.registrations.status, "VERIFIED")
+    ),
+    with: {
+      student: {
+        with: {
+          parent: {
+            columns: { userId: true },
+          },
+        },
+      },
+      certificate: true,
+    },
+  });
+}
+
+export async function updateOrCreateCertificate(
+  registrationId: string,
+  data: {
+    certificateId: string;
+    certificateUrl: string;
+    qrCodeUrl: string;
+    type: string;
+    status: string;
+  }
+) {
+  const existing = await db.query.certificates.findFirst({
+    where: eq(schema.certificates.registrationId, registrationId),
+  });
+
+  if (existing) {
+    await db
+      .update(schema.certificates)
+      .set({
+        certificateUrl: data.certificateUrl,
+        qrCodeUrl: data.qrCodeUrl,
+        type: data.type as any,
+        status: data.status as any,
+      })
+      .where(eq(schema.certificates.id, existing.id));
+  } else {
+    await db.insert(schema.certificates).values({
+      registrationId,
+      certificateId: data.certificateId,
+      certificateUrl: data.certificateUrl,
+      qrCodeUrl: data.qrCodeUrl,
+      type: data.type as any,
+      status: data.status as any,
+    });
+  }
+}
+
+export async function getGeneratedCertificatesByCompetition(competitionId: string) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  return db.query.certificates.findMany({
+    where: and(
+      inArray(schema.registrations.competitionCategoryId, categoryIds),
+      eq(schema.certificates.status, "GENERATED")
+    ),
+    with: {
+      registration: {
+        with: {
+          student: {
+            with: {
+              parent: {
+                columns: { userId: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function updateCertificateStatus(certificateId: string, status: string) {
+  await db
+    .update(schema.certificates)
+    .set({ status: status as any })
+    .where(eq(schema.certificates.id, certificateId));
+}

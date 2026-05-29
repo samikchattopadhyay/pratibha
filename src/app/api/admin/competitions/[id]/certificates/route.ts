@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { getCertificatesByCompetition } from "@/lib/db/queries";
 
 export async function GET(
   request: NextRequest,
@@ -27,47 +26,27 @@ export async function GET(
     const limit = parseInt(url.searchParams.get("limit") || "10");
     const statusFilter = url.searchParams.get("status") || "ALL";
 
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-    // Build filter conditions with DB-level status filtering
-    const where: Prisma.CertificateWhereInput = {
-      registration: {
-        competitionCategory: { competitionId },
-      },
-      ...(statusFilter !== "ALL" ? { status: statusFilter as any } : {}),
-    };
-
-    // Fetch total count and paginated results at database level
-    const [totalCount, paginatedCerts] = await prisma.$transaction([
-      prisma.certificate.count({ where }),
-      prisma.certificate.findMany({
-        where,
-        include: {
-          registration: {
-            select: {
-              registrationId: true,
-              student: { select: { name: true } },
-            },
-          },
-        },
-        orderBy: { issuedAt: "desc" },
-        skip,
-        take: limit,
-      }),
-    ]);
+    const { certificates, totalCount } = await getCertificatesByCompetition(
+      competitionId,
+      statusFilter,
+      limit,
+      offset
+    );
 
     const totalPages = Math.ceil(totalCount / limit);
 
     return NextResponse.json({
-      data: paginatedCerts.map((cert: any) => ({
+      data: certificates.map((cert) => ({
         id: cert.id,
-        registrationId: cert.registration.registrationId,
-        studentName: cert.registration.student.name,
+        registrationId: cert.registrationId,
+        studentName: cert.studentName,
         type: cert.type,
-        status: cert.status || "PENDING",
+        status: cert.status,
         certificateId: cert.certificateId,
         qrCodeUrl: cert.qrCodeUrl,
-        generatedAt: cert.issuedAt.toISOString(),
+        generatedAt: new Date(cert.generatedAt).toISOString(),
       })),
       pagination: {
         totalCount,

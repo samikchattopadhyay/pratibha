@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
 import { createAndDispatchNotification } from "@/lib/notificationService";
-import prisma from "@/lib/db";
+import {
+  getEligibleRegistrationsForCertificateGeneration,
+  updateOrCreateCertificate,
+} from "@/lib/db/queries";
 
 export async function POST(
   _: NextRequest,
@@ -23,36 +26,19 @@ export async function POST(
 
     const { id: competitionId } = await params;
 
-    // Find eligible registrations (VERIFIED status, missing certificates or with empty certificateUrl)
-    const eligibleRegistrations = await prisma.registration.findMany({
-      where: {
-        competitionCategory: { competitionId },
-        status: "VERIFIED",
-      },
-      include: {
-        student: {
-          include: {
-            parent: true,
-          },
-        },
-        certificate: true,
-      },
-    });
+    const eligibleRegistrations = await getEligibleRegistrationsForCertificateGeneration(competitionId);
 
     let generatedCount = 0;
     let failedCount = 0;
     const certificateIds: string[] = [];
 
-    // Generate certificates for eligible entries
     for (const registration of eligibleRegistrations) {
       try {
-        // Only generate if certificate doesn't exist or has no URL
         if (!registration.certificate || !registration.certificate.certificateUrl) {
           const certificateId = `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
           const qrCodeUrl = `https://pratibha.local/verify/${certificateId}`;
           const certificateUrl = `https://cdn.example.com/certificates/${certificateId}.pdf`;
 
-          // Determine certificate type based on final rank
           let certType = "PARTICIPATION";
           if (registration.finalRank === 1) {
             certType = "MERIT_1";
@@ -64,28 +50,13 @@ export async function POST(
             certType = "SPECIAL_MENTION";
           }
 
-          if (registration.certificate) {
-            await prisma.certificate.update({
-              where: { id: registration.certificate.id },
-              data: {
-                certificateUrl,
-                qrCodeUrl,
-                type: certType as any,
-                status: "GENERATED",
-              },
-            });
-          } else {
-            await prisma.certificate.create({
-              data: {
-                registrationId: registration.id,
-                certificateId,
-                certificateUrl,
-                qrCodeUrl,
-                type: certType as any,
-                status: "GENERATED",
-              },
-            });
-          }
+          await updateOrCreateCertificate(registration.id, {
+            certificateId,
+            certificateUrl,
+            qrCodeUrl,
+            type: certType,
+            status: "GENERATED",
+          });
 
           certificateIds.push(registration.id);
           generatedCount++;
@@ -96,7 +67,6 @@ export async function POST(
       }
     }
 
-    // Fire notifications for generated certificates (fire-and-forget)
     for (const registrationId of certificateIds) {
       const reg = eligibleRegistrations.find((r) => r.id === registrationId);
       if (reg?.student?.parent?.userId) {
