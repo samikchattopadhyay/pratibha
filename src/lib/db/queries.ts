@@ -2545,6 +2545,29 @@ export async function getTelegramDeliveryCount(status: string | null, chatId: st
   return result[0]?.count || 0;
 }
 
+export async function getTelegramDeliveryById(deliveryId: string) {
+  return db.query.telegramMessageDeliveries.findFirst({
+    where: eq(schema.telegramMessageDeliveries.id, deliveryId),
+    with: {
+      notification: true,
+    },
+  });
+}
+
+export async function getTelegramFailedDeliveriesDueForRetry(limit: number) {
+  return db.query.telegramMessageDeliveries.findMany({
+    where: and(
+      eq(schema.telegramMessageDeliveries.status, "TEMPORARILY_FAILED" as any),
+      sql`${schema.telegramMessageDeliveries.nextRetryAt} <= now()`
+    ),
+    with: {
+      notification: true,
+    },
+    limit,
+    orderBy: asc(schema.telegramMessageDeliveries.nextRetryAt),
+  });
+}
+
 export async function getTelegramDeliveryStatsByStatus(status: string | null, chatId: string | null) {
   const whereConditions: any[] = [];
 

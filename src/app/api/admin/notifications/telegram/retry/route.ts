@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getUserByEmail } from "@/lib/db/queries";
 import { sendTelegramWithTracking } from "@/lib/notifications";
-import { DeliveryStatus } from "@prisma/client";
+import {
+  getTelegramDeliveryById,
+  getTelegramFailedDeliveriesDueForRetry,
+} from "@/lib/db/queries";
 
 /**
  * POST /api/admin/notifications/telegram/retry
@@ -18,9 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
+  const user = await getUserByEmail(session.user.email);
 
   if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "MODERATOR")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -34,22 +35,10 @@ export async function POST(request: NextRequest) {
     let deliveriesToRetry;
 
     if (deliveryId) {
-      // Retry specific delivery
-      deliveriesToRetry = await prisma.telegramMessageDelivery.findMany({
-        where: { id: deliveryId },
-        include: { notification: true },
-      });
+      const delivery = await getTelegramDeliveryById(deliveryId);
+      deliveriesToRetry = delivery ? [delivery] : [];
     } else {
-      // Retry failed deliveries that are due for retry
-      deliveriesToRetry = await prisma.telegramMessageDelivery.findMany({
-        where: {
-          status: DeliveryStatus.TEMPORARILY_FAILED,
-          nextRetryAt: { lte: new Date() },
-        },
-        take: limit,
-        include: { notification: true },
-        orderBy: { nextRetryAt: "asc" },
-      });
+      deliveriesToRetry = await getTelegramFailedDeliveriesDueForRetry(limit);
     }
 
     const results = {
