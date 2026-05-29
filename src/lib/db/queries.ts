@@ -2545,6 +2545,46 @@ export async function getTelegramDeliveryCount(status: string | null, chatId: st
   return result[0]?.count || 0;
 }
 
+export async function getJudgeAssignmentsPaginated(
+  judgeId: string,
+  limit: number,
+  offset: number
+) {
+  const assignments = await db.query.judgeAssignments.findMany({
+    where: eq(schema.judgeAssignments.judgeId, judgeId),
+    with: {
+      registration: {
+        with: {
+          competitionCategory: {
+            with: {
+              competition: {
+                columns: { id: true, title: true, scope: true },
+              },
+              category: {
+                columns: { id: true, name: true },
+              },
+            },
+          },
+        },
+      },
+      score: true,
+    },
+    orderBy: desc(schema.judgeAssignments.assignedAt),
+    limit,
+    offset,
+  });
+
+  const total = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.judgeAssignments)
+    .where(eq(schema.judgeAssignments.judgeId, judgeId));
+
+  return {
+    assignments,
+    totalCount: total[0]?.count || 0,
+  };
+}
+
 export async function getJudgeByUserIdWithAssignmentCount(userId: string) {
   const judge = await db.query.judges.findFirst({
     where: eq(schema.judges.userId, userId),
