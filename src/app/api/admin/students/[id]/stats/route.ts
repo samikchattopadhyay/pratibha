@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getStudentWithRegistrationsForStats } from "@/lib/db/queries";
 import type { StudentStats } from "@/types/student-details";
 
 export async function GET(
@@ -20,26 +20,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const student = await prisma.student.findUnique({
-      where: { id },
-      include: {
-        registrations: {
-          include: {
-            competitionCategory: {
-              include: {
-                category: true,
-              },
-            },
-            judgeAssignments: {
-              include: {
-                score: true,
-              },
-            },
-            prizeAward: true,
-          },
-        },
-      },
-    });
+    const student = await getStudentWithRegistrationsForStats(id);
 
     if (!student) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -61,7 +42,7 @@ export async function GET(
       })
       .map((reg) => {
         const firstScore = reg.judgeAssignments?.[0]?.score;
-        return firstScore ? firstScore.totalScore : 0;
+        return firstScore ? parseFloat(String(firstScore.totalScore)) : 0;
       });
 
     const averageScore = scoresArray.length > 0

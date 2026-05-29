@@ -2473,6 +2473,35 @@ export async function updateCertificateUrl(
   return updated[0];
 }
 
+export async function getStudentWithRegistrationsForStats(studentId: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.id, studentId),
+    with: {
+      registrations: {
+        with: {
+          competitionCategory: {
+            with: {
+              category: {
+                columns: { id: true, name: true },
+              },
+            },
+          },
+          judgeAssignments: {
+            with: {
+              score: {
+                columns: { totalScore: true },
+              },
+            },
+          },
+          prizeAward: {
+            columns: { id: true },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function getStudentCompetitionsPaginated(
   studentId: string,
   filter: string,
