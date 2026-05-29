@@ -2107,6 +2107,63 @@ export async function updateCertificateStatusOnly(certificateId: string, status:
   return updated[0];
 }
 
+export async function getRecentVotingActivity(competitionId: string, limit?: number) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const recentScores = await db.query.scores.findMany({
+    where: inArray(schema.registrations.competitionCategoryId, categoryIds),
+    with: {
+      assignment: {
+        columns: {},
+        with: {
+          judge: {
+            columns: { id: true, name: true },
+          },
+          registration: {
+            columns: { id: true },
+            with: {
+              student: {
+                columns: { name: true },
+              },
+              competitionCategory: {
+                columns: {},
+                with: {
+                  category: {
+                    columns: { name: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: desc(schema.scores.createdAt),
+    limit: limit || 20,
+  });
+
+  return recentScores.map((score) => ({
+    id: score.id,
+    judgeId: score.assignment.judge.id,
+    judgeName: score.assignment.judge.name,
+    participantName: score.assignment.registration.student.name,
+    categoryName: score.assignment.registration.competitionCategory.category.name,
+    scores: {
+      criteria1: score.criteria1 ? parseFloat(score.criteria1.toString()) : 0,
+      criteria2: score.criteria2 ? parseFloat(score.criteria2.toString()) : 0,
+      criteria3: score.criteria3 ? parseFloat(score.criteria3.toString()) : 0,
+      criteria4: score.criteria4 ? parseFloat(score.criteria4.toString()) : 0,
+      total: score.totalScore ? parseFloat(score.totalScore.toString()) : 0,
+    },
+    submittedAt: score.createdAt,
+  }));
+}
+
 export async function getPendingShipmentsForCompetition(competitionId: string, shipmentIds?: string[]) {
   const competitionCategories = await db
     .select({ id: schema.competitionCategories.id })
