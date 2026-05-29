@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getJudgeAssignmentWithCompetitionScope,
+  createScoreAndUpdateAssignment,
+} from "@/lib/db/queries";
 
 export async function POST(req: Request) {
   try {
@@ -20,21 +23,7 @@ export async function POST(req: Request) {
     const c2 = Number(criteria2);
     const c3 = Number(criteria3);
 
-    // Verify assignment exists and get the competition scope
-    const assignment = await prisma.judgeAssignment.findUnique({
-      where: { id: assignmentId },
-      include: {
-        registration: {
-          include: {
-            competitionCategory: {
-              include: {
-                competition: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const assignment = await getJudgeAssignmentWithCompetitionScope(assignmentId);
 
     if (!assignment) {
       return NextResponse.json({ error: "Assigned queue entry not found" }, { status: 404 });
@@ -44,9 +33,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "This entry has already been graded and finalized" }, { status: 400 });
     }
 
-    const scope = assignment.registration.competitionCategory.competition.scope; // STATE or NATIONAL
+    const scope = assignment.registration.competitionCategory.competition.scope;
 
-    // Validate boundaries based on scope
     if (scope === "NATIONAL") {
       if (criteria4 === undefined) {
         return NextResponse.json({ error: "Originality/Innovation score (criteria4) is required for national competitions" }, { status: 400 });
@@ -65,7 +53,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Rhythm/Composition score must be between 0 and 25 for national competitions" }, { status: 400 });
       }
     } else {
-      // STATE level
       if (c1 < 0 || c1 > 40) {
         return NextResponse.json({ error: "Technique/Skill score must be between 0 and 40" }, { status: 400 });
       }
@@ -80,49 +67,13 @@ export async function POST(req: Request) {
     const c4 = scope === "NATIONAL" ? Number(criteria4) : 0;
     const totalScore = c1 + c2 + c3 + c4;
 
-    // Database transaction to write score and flag assignment
-    await prisma.$transaction(async (tx) => {
-      await tx.score.create({
-        data: {
-          judgeAssignmentId: assignmentId,
-          criteria1: c1,
-          criteria2: c2,
-          criteria3: c3,
-          criteria4: scope === "NATIONAL" ? c4 : null,
-          totalScore,
-          remarks,
-        },
-      });
-
-      await tx.judgeAssignment.update({
-        where: { id: assignmentId },
-        data: {
-          isSubmitted: true,
-          submittedAt: new Date(),
-        },
-      });
-
-      // Recalculate average score given and total evaluations count for the judge
-      const submittedAssignments = await tx.judgeAssignment.findMany({
-        where: { judgeId: assignment.judgeId, isSubmitted: true },
-        include: { score: true },
-      });
-
-      // Sum existing submitted scores
-      const totalScoreSum = submittedAssignments.reduce((sum, asg) => sum + (asg.score?.totalScore || 0), 0);
-      
-      // Calculate new average including this current score
-      const finalCount = submittedAssignments.length + 1;
-      const finalSum = totalScoreSum + totalScore;
-      const averageScoreGiven = Number((finalSum / finalCount).toFixed(2));
-
-      await tx.judge.update({
-        where: { id: assignment.judgeId },
-        data: {
-          totalEvaluations: finalCount,
-          averageScoreGiven,
-        },
-      });
+    await createScoreAndUpdateAssignment(assignmentId, assignment.judgeId, {
+      criteria1: c1,
+      criteria2: c2,
+      criteria3: c3,
+      criteria4: scope === "NATIONAL" ? c4 : null,
+      totalScore,
+      remarks,
     });
 
     return NextResponse.json({ message: "Grading finalized successfully", totalScore });

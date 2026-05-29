@@ -2545,6 +2545,89 @@ export async function getTelegramDeliveryCount(status: string | null, chatId: st
   return result[0]?.count || 0;
 }
 
+export async function getJudgeAssignmentWithCompetitionScope(assignmentId: string) {
+  return db.query.judgeAssignments.findFirst({
+    where: eq(schema.judgeAssignments.id, assignmentId),
+    with: {
+      registration: {
+        with: {
+          competitionCategory: {
+            with: {
+              competition: {
+                columns: { id: true, scope: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function createScoreAndUpdateAssignment(
+  assignmentId: string,
+  judgeId: string,
+  scoreData: {
+    criteria1: number;
+    criteria2: number;
+    criteria3: number;
+    criteria4: number | null;
+    totalScore: number;
+    remarks?: string;
+  }
+) {
+  // Create the score
+  await db.insert(schema.scores).values({
+    judgeAssignmentId: assignmentId,
+    criteria1: scoreData.criteria1,
+    criteria2: scoreData.criteria2,
+    criteria3: scoreData.criteria3,
+    criteria4: scoreData.criteria4,
+    totalScore: scoreData.totalScore,
+    remarks: scoreData.remarks,
+  });
+
+  // Update assignment as submitted
+  await db
+    .update(schema.judgeAssignments)
+    .set({
+      isSubmitted: true,
+      submittedAt: new Date(),
+    })
+    .where(eq(schema.judgeAssignments.id, assignmentId));
+
+  // Get all submitted assignments for this judge to calculate average
+  const submittedAssignments = await db.query.judgeAssignments.findMany({
+    where: and(
+      eq(schema.judgeAssignments.judgeId, judgeId),
+      eq(schema.judgeAssignments.isSubmitted, true)
+    ),
+    with: {
+      score: {
+        columns: { totalScore: true },
+      },
+    },
+  });
+
+  // Calculate average
+  const totalScoreSum = submittedAssignments.reduce(
+    (sum, asg) => sum + (asg.score?.totalScore ? parseFloat(String(asg.score.totalScore)) : 0),
+    0
+  );
+
+  const finalCount = submittedAssignments.length;
+  const averageScoreGiven = finalCount > 0 ? parseFloat((totalScoreSum / finalCount).toFixed(2)) : 0;
+
+  // Update judge stats
+  await db
+    .update(schema.judges)
+    .set({
+      totalEvaluations: finalCount,
+      averageScoreGiven: String(averageScoreGiven),
+    })
+    .where(eq(schema.judges.id, judgeId));
+}
+
 export async function getJudgeAssignmentsPaginated(
   judgeId: string,
   limit: number,
