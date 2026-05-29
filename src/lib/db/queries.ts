@@ -2107,6 +2107,82 @@ export async function updateCertificateStatusOnly(certificateId: string, status:
   return updated[0];
 }
 
+export async function getCompetitionShipments(competitionId: string, status?: string, limit?: number, offset?: number) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const statusMap: Record<string, string> = {
+    PENDING: "PENDING",
+    LABEL_GENERATED: "LABEL_GENERATED",
+    PICKED_UP: "PICKUP_SCHEDULED",
+    IN_TRANSIT: "IN_TRANSIT",
+    DELIVERED: "DELIVERED",
+  };
+
+  const whereConditions = [inArray(schema.registrations.competitionCategoryId, categoryIds)];
+  if (status && status !== "ALL" && statusMap[status]) {
+    whereConditions.push(eq(schema.physicalPrizeOrders.status, statusMap[status] as any));
+  }
+
+  const shipments = await db.query.physicalPrizeOrders.findMany({
+    where: and(...whereConditions),
+    with: {
+      prizeAward: {
+        columns: {},
+        with: {
+          registration: {
+            columns: { registrationId: true },
+            with: {
+              student: {
+                columns: { name: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: desc(schema.physicalPrizeOrders.createdAt),
+    limit: limit || 10,
+    offset: offset || 0,
+  });
+
+  const totalCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.physicalPrizeOrders)
+    .innerJoin(schema.prizeAwards, eq(schema.physicalPrizeOrders.prizeAwardId, schema.prizeAwards.id))
+    .innerJoin(schema.registrations, eq(schema.prizeAwards.registrationId, schema.registrations.id))
+    .where(and(...whereConditions));
+
+  const reverseStatusMap: Record<string, string> = {
+    PENDING: "PENDING",
+    LABEL_GENERATED: "LABEL_GENERATED",
+    PICKUP_SCHEDULED: "PICKED_UP",
+    IN_TRANSIT: "IN_TRANSIT",
+    OUT_FOR_DELIVERY: "IN_TRANSIT",
+    DELIVERED: "DELIVERED",
+    DELIVERY_FAILED: "DELIVERED",
+    RETURNED: "DELIVERED",
+  };
+
+  return {
+    data: shipments.map((ship) => ({
+      id: ship.id,
+      registrationId: ship.prizeAward.registration.registrationId,
+      studentName: ship.prizeAward.registration.student.name,
+      shipmentId: ship.awbNumber,
+      status: reverseStatusMap[ship.status] || ship.status,
+      carrier: ship.courierName,
+      trackingUrl: ship.shiprocketLabelUrl,
+      estimatedDelivery: ship.estimatedDelivery ? new Date(ship.estimatedDelivery).toISOString() : null,
+    })),
+    totalCount: totalCount[0]?.count || 0,
+  };
+}
+
 export async function getCompetitionJudgesWithVotingStats(competitionId: string, limit?: number, offset?: number) {
   const competitionCategories = await db
     .select({ id: schema.competitionCategories.id })
