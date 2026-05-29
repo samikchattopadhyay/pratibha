@@ -1277,3 +1277,85 @@ export async function getStudentsForAdminList(params: {
 
   return { students: paginatedStudents, totalCount };
 }
+
+export async function getAllPrizePools() {
+  return db.query.prizePools.findMany({
+    with: {
+      competition: {
+        columns: {
+          id: true,
+          title: true,
+          scope: true,
+        },
+      },
+      items: {
+        with: {
+          awards: {
+            columns: {
+              id: true,
+              registrationId: true,
+              rank: true,
+              isDispatched: true,
+            },
+          },
+        },
+        orderBy: (items, { asc }) => [asc(items.createdAt)],
+      },
+    },
+    orderBy: (pools, { desc }) => [desc(pools.createdAt)],
+  });
+}
+
+export async function getPrizePoolByCompetitionId(competitionId: string) {
+  return db.query.prizePools.findFirst({
+    where: eq(schema.prizePools.competitionId, competitionId),
+  });
+}
+
+export async function createPrizePoolWithItems(data: {
+  competitionId: string;
+  title: string;
+  description?: string | null;
+  isPublished: boolean;
+  items: Array<{
+    rank: string;
+    type: any;
+    title: string;
+    description?: string | null;
+    estimatedValue?: string | null;
+    isPhysical: boolean;
+    imageUrl?: string | null;
+    perCategory: boolean;
+  }>;
+}) {
+  const { competitionId, title, description, isPublished, items } = data;
+
+  return db.transaction(async (tx) => {
+    const prizePool = await tx
+      .insert(schema.prizePools)
+      .values({
+        competitionId,
+        title,
+        description,
+        isPublished,
+      })
+      .returning();
+
+    if (items.length > 0) {
+      const prizeItemValues = items.map((item) => ({
+        prizePoolId: prizePool[0].id,
+        rank: item.rank as any,
+        type: item.type as any,
+        title: item.title,
+        description: item.description,
+        estimatedValue: item.estimatedValue,
+        isPhysical: item.isPhysical,
+        imageUrl: item.imageUrl,
+        perCategory: item.perCategory,
+      }));
+      await tx.insert(schema.prizeItems).values(prizeItemValues);
+    }
+
+    return prizePool[0];
+  });
+}

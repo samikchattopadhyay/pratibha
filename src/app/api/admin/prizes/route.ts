@@ -1,30 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
-
-import { PrizeRank } from "@prisma/client";
+import {
+  getAllPrizePools,
+  getPrizePoolByCompetitionId,
+  createPrizePoolWithItems,
+  getCompetitionById,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// GET /api/admin/prizes — all prize pools with items
 export async function GET() {
   try {
     const session = await getEdgeSession();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!ADMIN_ROLES.includes((session.user as { role?: string }).role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const prizePools = await prisma.prizePool.findMany({
-      include: {
-        competition: { select: { id: true, title: true, scope: true } },
-        items: {
-          include: {
-            awards: { select: { id: true, registrationId: true, rank: true, isDispatched: true } },
-          },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const prizePools = await getAllPrizePools();
 
     const formatted = prizePools.map((pool) => ({
       id: pool.id,
@@ -42,7 +33,7 @@ export async function GET() {
         type: item.type,
         title: item.title,
         description: item.description,
-        estimatedValue: item.estimatedValue ? Number(item.estimatedValue) : null,
+        estimatedValue: item.estimatedValue ? parseFloat(item.estimatedValue.toString()) : null,
         isPhysical: item.isPhysical,
         imageUrl: item.imageUrl,
         perCategory: item.perCategory,
@@ -57,7 +48,6 @@ export async function GET() {
   }
 }
 
-// POST /api/admin/prizes — create a prize pool for a competition
 export async function POST(request: NextRequest) {
   try {
     const session = await getEdgeSession(request);
@@ -71,40 +61,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "competitionId and title are required" }, { status: 400 });
     }
 
-    const competition = await prisma.competition.findUnique({ where: { id: competitionId } });
+    const competition = await getCompetitionById(competitionId);
     if (!competition) return NextResponse.json({ error: "Competition not found" }, { status: 404 });
 
-    // Check if a prize pool already exists
-    const existing = await prisma.prizePool.findUnique({ where: { competitionId } });
+    const existing = await getPrizePoolByCompetitionId(competitionId);
     if (existing) {
       return NextResponse.json({ error: "A prize pool already exists for this competition. Use PATCH to update." }, { status: 409 });
     }
 
-    const prizePool = await prisma.prizePool.create({
-      data: {
-        competitionId,
-        title,
-        description: description || null,
-        isPublished: false,
-        items: {
-          create: (items || []).map((item: { rank: PrizeRank; type: string; title: string; description?: string; estimatedValue?: string; isPhysical?: boolean; imageUrl?: string; perCategory?: boolean }) => ({
-            rank: item.rank,
-            type: item.type,
-            title: item.title,
-            description: item.description || null,
-            estimatedValue: item.estimatedValue ? parseFloat(item.estimatedValue) : null,
-            isPhysical: item.isPhysical ?? false,
-            imageUrl: item.imageUrl || null,
-            perCategory: item.perCategory ?? false,
-          })),
-        },
-      },
-      include: { items: true },
+    const prizePool = await createPrizePoolWithItems({
+      competitionId,
+      title,
+      description: description || null,
+      isPublished: false,
+      items: (items || []).map((item: any) => ({
+        rank: item.rank,
+        type: item.type,
+        title: item.title,
+        description: item.description || null,
+        estimatedValue: item.estimatedValue ? item.estimatedValue.toString() : null,
+        isPhysical: item.isPhysical ?? false,
+        imageUrl: item.imageUrl || null,
+        perCategory: item.perCategory ?? false,
+      })),
     });
 
     return NextResponse.json({
       message: "Prize pool created successfully",
-      prizePool: { id: prizePool.id, title: prizePool.title, itemCount: prizePool.items.length },
+      prizePool: { id: prizePool.id, title: prizePool.title, itemCount: items?.length ?? 0 },
     });
   } catch (error) {
     console.error("Admin prizes POST error:", error);
