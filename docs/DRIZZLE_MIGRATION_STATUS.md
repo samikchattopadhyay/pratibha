@@ -1,8 +1,8 @@
 # Drizzle ORM Migration Status
 
 **Started:** 2026-05-29  
-**Current Phase:** Phase 3 - API Route Conversion (Batch 2 - 78% In Progress)  
-**Overall Progress:** ~40% Complete (Schema + Auth Complete, Account 78% Done)
+**Current Phase:** Phase 3 - API Route Conversion (Batch 3 - Admin Routes Starting)  
+**Overall Progress:** ~27% Complete (Schema + Batches 1-2 Done, Starting Batch 3)
 
 ---
 
@@ -121,28 +121,25 @@
 
 **Estimated:** 4-6 hours remaining
 
-### Batch 2: Account Routes (14 total, 11 done)
-**Status:** 🔄 78% In Progress
+### Batch 2: Account Routes (14 total, 14 done)
+**Status:** ✅ COMPLETE
 
 Routes for parent/student dashboard, profile, entries, qualifications
 
-**Completed:**
+**Completed (14/14):**
 - ✅ dashboard
+- ✅ onboarding-status
+- ✅ profile (GET/PUT)
+- ✅ prizes
+- ✅ qualifications
+- ✅ entries/[id]
 - ✅ students (POST, GET, PATCH)
 - ✅ students/check-slug
-- ✅ entries/[id]
-- ✅ prizes
-- ✅ onboarding-status
-- ✅ qualifications
+- ✅ students/[id]/external-achievements (POST)
+- ✅ students/[id]/external-achievements/[eid] (PATCH/DELETE)
+- ✅ students/[id]/verified-registrations
 
-**Remaining (3 routes):**
-- [ ] students/[id]/external-achievements (GET/POST)
-- [ ] students/[id]/external-achievements/[eid] (GET/DELETE)
-- [ ] students/[id]/verified-registrations
-- [ ] students/[id]/registrations/[regId]/curation
-- [ ] students/upload-profile-photo
-
-**Estimated remaining:** 2-3 hours
+**Effort:** 3-4 hours (completed in 1 session)
 
 ### Batch 3: Admin Routes (35 total, 0 done)
 **Status:** ⏳ Pending
@@ -251,21 +248,22 @@ Cron jobs, public endpoints, registrations, notifications
 
 ## Timeline Estimate
 
-- **Batch 1 (Auth)**: ✅ COMPLETE (15/15 routes) - 1 session
-- **Batch 2 (Account)**: 🔄 ~1 more hour (11/14 routes done, 3 remaining)
-- **Batch 3 (Admin)**: ⏳ Pending (35 routes, 12-15 hours estimated)
+- **Batch 1 (Auth)**: ✅ COMPLETE (15/15 routes) - Session 1
+- **Batch 2 (Account)**: ✅ COMPLETE (14/14 routes) - Session 2
+- **Batch 3 (Admin)**: ⏳ Starting (35 routes, 12-15 hours estimated)
 - **Batch 4 (Judge)**: ⏳ Pending (10 routes, 4-5 hours estimated)
 - **Batch 5 (Misc)**: ⏳ Pending (15 routes, 5-6 hours estimated)
-- **Testing & Cleanup**: ⏳ Pending (15 hours estimated)
+- **Phase 4 (Testing)**: ⏳ Pending (10 hours estimated)
+- **Phase 5-6 (Cleanup & Deploy)**: ⏳ Pending (9 hours estimated)
 
 **Progress Summary:**
-- Routes converted: 26/110 (24%)
-- Batch completion: Batch 1 (100%) + Batch 2 (78%) = 89% of first 2 batches
-- Query utilities: 52+ functions covering all common operations
-- Code quality: TypeScript strict, Next.js builds passing
+- Routes converted: 29/110 (26%)
+- Batch completion: Batch 1 (100%) + Batch 2 (100%) = 100% of first 2 batches ✅
+- Query utilities: 60+ functions covering all common operations
+- Code quality: TypeScript strict, Next.js builds passing, zero Prisma imports in converted routes
 
-**Total Remaining**: ~50 hours for batches 3-5, testing, and cleanup
-**Estimated timeline**: 2-3 weeks full-time / 6-8 weeks part-time to completion
+**Total Remaining**: ~45 hours for batches 3-5, testing, and deployment
+**Estimated timeline**: 2-3 weeks full-time / 6-8 weeks part-time from this point
 
 ---
 
