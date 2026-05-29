@@ -1,8 +1,8 @@
 # Drizzle ORM Migration Status
 
 **Started:** 2026-05-29  
-**Current Phase:** Phase 3 - API Route Conversion (Batch 1)  
-**Overall Progress:** ~15% Complete (Schema + Initial Routes)
+**Current Phase:** Phase 3 - API Route Conversion (Batch 1 - 40% Complete)  
+**Overall Progress:** ~25% Complete (Schema + Auth Routes + Helpers)
 
 ---
 
@@ -34,10 +34,17 @@
 - Type-safe select, insert, update, delete operations
 - Relation counting utilities
 
-✅ **Auth Routes Converted** (3/15)
+✅ **Auth Routes Converted** (6/15)
 - `POST /api/auth/register` - Create user + parent with transaction
 - `POST/GET /api/auth/verify-email` - Email verification
-- `POST/GET /api/auth/set-password` - Password setup
+- `POST/GET /api/auth/set-password` - Password setup  
+- `POST /api/auth/forgot-password` - Password reset request
+- `POST/GET /api/auth/reset-password` - Password reset with token
+- `POST /api/auth/resend-verification` - Email verification retry
+
+✅ **Auth Helper Libraries Converted**
+- `src/lib/email-verification.ts` - Token generation, verification, cleanup
+- `src/lib/profile-setup-token.ts` - Profile setup token management
 
 ---
 
@@ -86,14 +93,14 @@
 
 ## Routes Remaining by Batch
 
-### Batch 1: Auth Routes (15 total, 3 done)
-**Status:** 🔄 In Progress  
-**Remaining:** 12 routes
+### Batch 1: Auth Routes (15 total, 6 done)
+**Status:** 🔄 In Progress (40% complete)  
+**Remaining:** 9 routes
 
-- [ ] `/api/auth/forgot-password` - POST
-- [ ] `/api/auth/reset-password` - POST
-- [ ] `/api/auth/resend-verification` - POST
-- [ ] `/api/auth/facebook/create-user` - POST
+- [x] `/api/auth/forgot-password` - POST
+- [x] `/api/auth/reset-password` - POST
+- [x] `/api/auth/resend-verification` - POST
+- [ ] `/api/auth/facebook/create-user` - POST (uses helper lib, auto-converted)
 - [ ] `/api/auth/setup/verify-email` - POST
 - [ ] `/api/auth/setup/add-phone` - POST
 - [ ] `/api/auth/setup/confirm-phone-otp` - POST
