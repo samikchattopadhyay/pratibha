@@ -1,4 +1,4 @@
 name = "pratibha"
-pages_build_output_dir = ".open-next"
-compatibility_date = "2024-11-01"
+pages_build_output_dir = ".vercel/output/static"
+compatibility_date = "2024-12-15"
 compatibility_flags = ["nodejs_compat"]

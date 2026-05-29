@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --webpack -H 0.0.0.0",
     "build": "next build",
-    "build:cloudflare": "opennextjs-cloudflare build",
+    "build:pages": "@cloudflare/next-on-pages",
+    "deploy:pages": "npm run build:pages && wrangler pages deploy .vercel/output/static",
     "start": "next start",
     "lint": "eslint",
     "app:start": "node scripts/app.js start",
