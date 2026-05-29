@@ -2198,6 +2198,110 @@ export async function checkExistingPrizeAward(registrationId: string) {
   });
 }
 
+export async function getPrizePoolWithItems(prizePoolId: string) {
+  return db.query.prizePools.findFirst({
+    where: eq(schema.prizePools.id, prizePoolId),
+    with: { items: true },
+  });
+}
+
+export async function getActiveQualificationRules(stateCompetitionId: string) {
+  return db.query.qualificationRules.findMany({
+    where: and(
+      eq(schema.qualificationRules.stateCompetitionId, stateCompetitionId),
+      eq(schema.qualificationRules.isActive, true)
+    ),
+    with: {
+      nationalCompetition: {
+        columns: { id: true, title: true, registrationDeadline: true },
+      },
+    },
+  });
+}
+
+export async function getCategoriesWithFinalizedRegistrations(stateCompetitionId: string) {
+  return db.query.competitionCategories.findMany({
+    where: eq(schema.competitionCategories.competitionId, stateCompetitionId),
+    with: {
+      registrations: {
+        where: and(
+          eq(schema.registrations.scoringFinalized, true),
+          sql`${schema.registrations.finalRank} IS NOT NULL`
+        ),
+        orderBy: asc(schema.registrations.finalRank),
+      },
+    },
+  });
+}
+
+export async function getExistingQualificationSlots(qualificationRuleId: string) {
+  const slots = await db
+    .select({ registrationId: schema.qualificationSlots.registrationId })
+    .from(schema.qualificationSlots)
+    .where(eq(schema.qualificationSlots.qualificationRuleId, qualificationRuleId));
+
+  return new Set(slots.map((s) => s.registrationId));
+}
+
+export async function createQualificationSlots(slots: Array<{
+  qualificationRuleId: string;
+  registrationId: string;
+  studentId: string;
+  nationalCompetitionId: string;
+  status: string;
+  expiresAt: Date;
+  isWildCard: boolean;
+}>) {
+  if (slots.length === 0) return [];
+
+  return db.insert(schema.qualificationSlots).values(
+    slots.map((s) => ({
+      qualificationRuleId: s.qualificationRuleId,
+      registrationId: s.registrationId,
+      studentId: s.studentId,
+      nationalCompetitionId: s.nationalCompetitionId,
+      status: s.status as any,
+      expiresAt: s.expiresAt,
+      isWildCard: s.isWildCard,
+    }))
+  );
+}
+
+export async function getRegistrationForNotification(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          category: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getParentById(parentId: string) {
+  return db.query.parents.findFirst({
+    where: eq(schema.parents.id, parentId),
+    with: {
+      user: {
+        columns: { email: true },
+      },
+    },
+  });
+}
+
+export async function publishPrizePool(prizePoolId: string) {
+  const updated = await db
+    .update(schema.prizePools)
+    .set({ isPublished: true })
+    .where(eq(schema.prizePools.id, prizePoolId))
+    .returning({ id: schema.prizePools.id });
+
+  return updated[0];
+}
+
 export async function createPrizeAwardWithCertificate(
   registrationId: string,
   prizeItemId: string,

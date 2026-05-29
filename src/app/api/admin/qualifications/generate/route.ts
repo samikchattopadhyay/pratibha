@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
 import { createAndDispatchNotification } from "@/lib/notificationService";
+import {
+  getActiveQualificationRules,
+  getCategoriesWithFinalizedRegistrations,
+  getExistingQualificationSlots,
+  createQualificationSlots,
+  getRegistrationForNotification,
+  getParentById,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// POST /api/admin/qualifications/generate — generate slots after state results finalized
 export async function POST(request: NextRequest) {
   try {
     const session = await getEdgeSession(request);
@@ -17,28 +23,13 @@ export async function POST(request: NextRequest) {
 
     if (!stateCompetitionId) return NextResponse.json({ error: "stateCompetitionId is required" }, { status: 400 });
 
-    // Find all rules for this state competition
-    const rules = await prisma.qualificationRule.findMany({
-      where: { stateCompetitionId, isActive: true },
-      include: {
-        nationalCompetition: { select: { id: true, title: true, registrationDeadline: true } },
-      },
-    });
+    const rules = await getActiveQualificationRules(stateCompetitionId);
 
     if (rules.length === 0) {
       return NextResponse.json({ error: "No active qualification rules found for this competition" }, { status: 404 });
     }
 
-    // Load all finalized registrations grouped by category
-    const categories = await prisma.competitionCategory.findMany({
-      where: { competitionId: stateCompetitionId },
-      include: {
-        registrations: {
-          where: { scoringFinalized: true, finalRank: { not: null } },
-          orderBy: { finalRank: "asc" },
-        },
-      },
-    });
+    const categories = await getCategoriesWithFinalizedRegistrations(stateCompetitionId);
 
     interface SlotItem {
       qualificationRuleId: string;
@@ -55,25 +46,18 @@ export async function POST(request: NextRequest) {
     for (const rule of rules) {
       const expiresAt = new Date(Date.now() + rule.slotExpiryDays * 86400000);
 
-      // Check national registration deadline hasn't passed
       if (new Date() > rule.nationalCompetition.registrationDeadline) {
-        continue; // Skip this rule — window closed
+        continue;
       }
 
-      const alreadyOffered = new Set(
-        (await prisma.qualificationSlot.findMany({
-          where: { qualificationRuleId: rule.id },
-          select: { registrationId: true },
-        })).map((s) => s.registrationId)
-      );
+      const alreadyOffered = await getExistingQualificationSlots(rule.id);
 
-      const categoryQualifiers: string[] = []; // Track reg IDs added by category slots
+      const categoryQualifiers: string[] = [];
 
-      // Per-category top-N slots
       for (const cat of categories) {
         const topRegs = cat.registrations
           .filter((r) => !alreadyOffered.has(r.id))
-          .filter((r) => !rule.minScoreThreshold || (r.finalScore && Number(r.finalScore) >= Number(rule.minScoreThreshold)))
+          .filter((r) => !rule.minScoreThreshold || (r.finalScore && parseFloat(String(r.finalScore)) >= parseFloat(String(rule.minScoreThreshold))))
           .slice(0, rule.slotsPerCategory);
 
         for (const reg of topRegs) {
@@ -91,11 +75,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Wild card slots from overall top performers not already qualified
       const allRanked = categories
         .flatMap((c) => c.registrations)
         .filter((r) => r.finalRank !== null && !alreadyOffered.has(r.id))
-        .sort((a, b) => (a.finalScore && b.finalScore ? Number(b.finalScore) - Number(a.finalScore) : 0))
+        .sort((a, b) => (a.finalScore && b.finalScore ? parseFloat(String(b.finalScore)) - parseFloat(String(a.finalScore)) : 0))
         .slice(0, rule.wildCardSlots);
 
       for (const reg of allRanked) {
@@ -116,50 +99,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "No new qualification slots to generate (all may already exist or no finalized results)" });
     }
 
-    await prisma.qualificationSlot.createMany({ data: slotsCreated });
+    await createQualificationSlots(slotsCreated);
 
-    // Create a map for quick rule lookup
-    const ruleMap = new Map(rules.map((r: typeof rules[0]) => [r.id, r]));
+    const ruleMap = new Map(rules.map((r) => [r.id, r]));
 
-    // Send notifications to parents for offered slots (fire-and-forget)
     for (const slot of slotsCreated) {
-      const registration = await prisma.registration.findUnique({
-        where: { id: slot.registrationId },
-        include: {
-          student: true,
-          competitionCategory: {
-            include: { category: true },
-          },
-        },
-      });
+      const registration = await getRegistrationForNotification(slot.registrationId);
 
       if (registration) {
         const student = registration.student;
-        const parent = await prisma.parent.findFirst({
-          where: { id: student.parentId },
-        });
+        const parent = await getParentById(student.parentId);
 
         if (parent) {
-          const user = await prisma.user.findUnique({
-            where: { id: parent.userId },
-          });
-
           const rule = ruleMap.get(slot.qualificationRuleId);
           const nationalCompTitle = rule?.nationalCompetition.title || "National Competition";
 
-          if (user?.email) {
-            createAndDispatchNotification({
-              userId: parent.userId,
-              type: "QUALIFICATION_OFFERED",
-              title: "Qualification Slot Offered",
-              body: `${student.name} has qualified for ${nationalCompTitle}. A qualification slot is reserved until ${new Date(slot.expiresAt).toLocaleDateString()}.`,
-              actionUrl: "/account/dashboard",
-              registrationId: registration.id,
-              recipientEmail: user.email,
-            }).catch((err) =>
-              console.error("Failed to send qualification offered notification:", err)
-            );
-          }
+          createAndDispatchNotification({
+            userId: parent.userId,
+            type: "QUALIFICATION_OFFERED",
+            title: "Qualification Slot Offered",
+            body: `${student.name} has qualified for ${nationalCompTitle}. A qualification slot is reserved until ${new Date(slot.expiresAt).toLocaleDateString()}.`,
+            actionUrl: "/account/dashboard",
+            registrationId: registration.id,
+            recipientEmail: parent.user?.email || "",
+          }).catch((err) =>
+            console.error("Failed to send qualification offered notification:", err)
+          );
         }
       }
     }

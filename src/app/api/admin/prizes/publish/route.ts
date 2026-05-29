@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getPrizePoolWithItems,
+  publishPrizePool,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// POST /api/admin/prizes/publish — publish a prize pool (locks it from editing)
 export async function POST(request: NextRequest) {
   try {
     const session = await getEdgeSession(request);
@@ -16,15 +18,11 @@ export async function POST(request: NextRequest) {
 
     if (!prizePoolId) return NextResponse.json({ error: "prizePoolId is required" }, { status: 400 });
 
-    const pool = await prisma.prizePool.findUnique({
-      where: { id: prizePoolId },
-      include: { items: true },
-    });
+    const pool = await getPrizePoolWithItems(prizePoolId);
 
     if (!pool) return NextResponse.json({ error: "Prize pool not found" }, { status: 404 });
     if (pool.isPublished) return NextResponse.json({ error: "Prize pool is already published" }, { status: 409 });
 
-    // Validate: must have at least FIRST_PLACE and PARTICIPATION items
     const ranks = pool.items.map((i) => i.rank);
     if (!ranks.includes("FIRST_PLACE")) {
       return NextResponse.json({ error: "Prize pool must include a FIRST_PLACE prize before publishing" }, { status: 400 });
@@ -33,10 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Prize pool must include a PARTICIPATION prize before publishing" }, { status: 400 });
     }
 
-    const updated = await prisma.prizePool.update({
-      where: { id: prizePoolId },
-      data: { isPublished: true },
-    });
+    const updated = await publishPrizePool(prizePoolId);
 
     return NextResponse.json({ message: "Prize pool published successfully", prizePoolId: updated.id });
   } catch (error) {
