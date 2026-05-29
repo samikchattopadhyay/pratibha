@@ -2473,6 +2473,69 @@ export async function updateCertificateUrl(
   return updated[0];
 }
 
+export async function getStudentCompetitionsPaginated(
+  studentId: string,
+  filter: string,
+  limit: number,
+  offset: number
+) {
+  const whereConditions: any[] = [eq(schema.registrations.studentId, studentId)];
+
+  if (filter === "VERIFIED") {
+    whereConditions.push(eq(schema.registrations.status, "VERIFIED" as any));
+  } else if (filter === "PENDING") {
+    whereConditions.push(eq(schema.registrations.status, "PENDING_VERIFICATION" as any));
+  } else if (filter === "PAID") {
+    whereConditions.push(eq(schema.registrations.paymentStatus, "SUCCESS" as any));
+  } else if (filter === "AWARDED") {
+    whereConditions.push(
+      sql`EXISTS (SELECT 1 FROM ${schema.prizeAwards} WHERE ${schema.prizeAwards.registrationId} = ${schema.registrations.id})`
+    );
+  }
+
+  const registrations = await db.query.registrations.findMany({
+    where: and(...whereConditions),
+    with: {
+      competitionCategory: {
+        with: {
+          competition: {
+            columns: { id: true, title: true },
+          },
+          category: {
+            columns: { id: true, name: true },
+          },
+        },
+      },
+      judgeAssignments: {
+        with: {
+          judge: {
+            columns: { id: true, name: true },
+          },
+          score: {
+            columns: { totalScore: true },
+          },
+        },
+      },
+      prizeAward: {
+        columns: { id: true },
+      },
+    },
+    orderBy: desc(schema.registrations.createdAt),
+    limit,
+    offset,
+  });
+
+  const total = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .where(and(...whereConditions));
+
+  return {
+    registrations,
+    totalCount: total[0]?.count || 0,
+  };
+}
+
 export async function getStudentWithCertificatesAndAwards(studentId: string) {
   return db.query.students.findFirst({
     where: eq(schema.students.id, studentId),
