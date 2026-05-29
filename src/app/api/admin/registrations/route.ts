@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db/drizzle";
+import * as schema from "@/lib/db/schema";
+import {
+  getRegistrationsForAdminList,
+  getRegistrationCountsForMetrics,
+  getRegistrationWithDetailsForNotification,
+  updateRegistration,
+} from "@/lib/db/queries";
 import { createAndDispatchNotification } from "@/lib/notificationService";
-import { Prisma, NotificationType } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,113 +27,16 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
     const search = searchParams.get("search") || "";
-    const filter = searchParams.get("filter") || "ALL";
+    const filter = (searchParams.get("filter") || "ALL") as "ALL" | "PENDING" | "PAID" | "UNASSIGNED";
 
-    // Build query filters
-    const where: Prisma.RegistrationWhereInput = {};
+    const { registrations, totalCount } = await getRegistrationsForAdminList({
+      limit,
+      offset: (page - 1) * limit,
+      search,
+      filter,
+    });
 
-    if (filter === "PENDING") {
-      where.status = "PENDING_VERIFICATION";
-    } else if (filter === "PAID") {
-      where.paymentStatus = "SUCCESS";
-    } else if (filter === "UNASSIGNED") {
-      where.judgeAssignments = {
-        none: {},
-      };
-    }
-
-    if (search.trim()) {
-      const searchPattern = search.trim();
-      where.OR = [
-        {
-          registrationId: {
-            contains: searchPattern,
-            mode: "insensitive",
-          },
-        },
-        {
-          student: {
-            name: {
-              contains: searchPattern,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          student: {
-            parent: {
-              phone: {
-                contains: searchPattern,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
-        {
-          competitionCategory: {
-            category: {
-              name: {
-                contains: searchPattern,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
-        {
-          judgeAssignments: {
-            some: {
-              judge: {
-                name: {
-                  contains: searchPattern,
-                  mode: "insensitive",
-                },
-              },
-            },
-          },
-        },
-      ];
-    }
-
-    // Run query counting and paging in a transaction
-    const [
-      totalCount,
-      registrations,
-      totalCountAll,
-      pendingCount,
-      paidCount,
-      unassignedCount
-    ] = await prisma.$transaction([
-      prisma.registration.count({ where }),
-      prisma.registration.findMany({
-        where,
-        include: {
-          student: {
-            include: {
-              parent: true,
-            },
-          },
-          competitionCategory: {
-            include: {
-              competition: true,
-              category: true,
-            },
-          },
-          judgeAssignments: {
-            include: {
-              judge: true,
-              score: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.registration.count(),
-      prisma.registration.count({ where: { status: "PENDING_VERIFICATION" } }),
-      prisma.registration.count({ where: { paymentStatus: "SUCCESS" } }),
-      prisma.registration.count({ where: { judgeAssignments: { none: {} } } }),
-    ]);
+    const metrics = await getRegistrationCountsForMetrics();
 
     const formatted = registrations.map((reg) => ({
       id: reg.id,
@@ -159,10 +69,10 @@ export async function GET(request: NextRequest) {
         limit,
       },
       metrics: {
-        total: totalCountAll,
-        pending: pendingCount,
-        paid: paidCount,
-        unassigned: unassignedCount,
+        total: metrics.total,
+        pending: metrics.pending,
+        paid: metrics.paid,
+        unassigned: metrics.unassigned,
       },
     });
   } catch (error) {
@@ -190,7 +100,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Registration ID is required" }, { status: 400 });
     }
 
-    const updateData: Prisma.RegistrationUpdateInput = {};
+    const updateData: any = {};
     if (status !== undefined) {
       updateData.status = status;
     }
@@ -198,58 +108,43 @@ export async function PATCH(request: NextRequest) {
       updateData.scoringFinalized = scoringFinalized;
     }
 
-    const updated = await prisma.registration.update({
-      where: { id },
-      data: updateData,
-    });
+    const updated = await updateRegistration(id, updateData);
 
-    // Send notifications based on status change (fire-and-forget)
     if (status === "VERIFIED" || status === "REJECTED") {
-      const registration = await prisma.registration.findUnique({
-        where: { id },
-        include: {
-          student: true,
-          competitionCategory: {
-            include: { category: true },
-          },
-        },
-      });
+      const registration = await getRegistrationWithDetailsForNotification(id);
 
       if (registration) {
         const student = registration.student;
-        const parent = await prisma.parent.findFirst({
-          where: { id: student.parentId },
+        const parent = await db.query.parents.findFirst({
+          where: eq(schema.parents.id, student.parentId),
+          with: {
+            user: true,
+          },
         });
 
-        if (parent) {
-          const user = await prisma.user.findUnique({
-            where: { id: parent.userId },
-          });
+        if (parent?.user?.email) {
+          const notificationType = status === "VERIFIED" ? "REGISTRATION_VERIFIED" : "REGISTRATION_REJECTED";
+          const title = status === "VERIFIED" ? "Registration Verified" : "Registration Rejected";
+          const bodyText = status === "VERIFIED"
+            ? `${student.name}'s registration for ${registration.competitionCategory.category.name} has been verified and approved.`
+            : `${student.name}'s registration for ${registration.competitionCategory.category.name} has been rejected. Please contact support for more details.`;
 
-          if (user?.email) {
-            const notificationType = status === "VERIFIED" ? "REGISTRATION_VERIFIED" : "REGISTRATION_REJECTED";
-            const title = status === "VERIFIED" ? "Registration Verified" : "Registration Rejected";
-            const body = status === "VERIFIED"
-              ? `${student.name}'s registration for ${registration.competitionCategory.category.name} has been verified and approved.`
-              : `${student.name}'s registration for ${registration.competitionCategory.category.name} has been rejected. Please contact support for more details.`;
-
-            createAndDispatchNotification({
-              userId: parent.userId,
-              type: notificationType as NotificationType,
-              title,
-              body,
-              actionUrl: "/account/dashboard",
-              registrationId: registration.id,
-              recipientEmail: user.email,
-            }).catch((err) =>
-              console.error(`Failed to send ${notificationType} notification:`, err)
-            );
-          }
+          createAndDispatchNotification({
+            userId: parent.userId,
+            type: notificationType as any,
+            title,
+            body: bodyText,
+            actionUrl: "/account/dashboard",
+            registrationId: registration.id,
+            recipientEmail: parent.user.email,
+          }).catch((err) =>
+            console.error(`Failed to send ${notificationType} notification:`, err)
+          );
         }
       }
     }
 
-    return NextResponse.json({ message: "Registration updated successfully", registration: updated });
+    return NextResponse.json({ message: "Registration updated successfully", registration: updated[0] });
   } catch (error) {
     console.error("Admin registration update error:", error);
     return NextResponse.json({ error: "Internal server error occurred" }, { status: 500 });

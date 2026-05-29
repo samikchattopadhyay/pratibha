@@ -1223,6 +1223,121 @@ export async function getJudgesByIds(judgeIds: string[]) {
     .where(inArray(schema.judges.id, judgeIds));
 }
 
+export async function getRegistrationsForAdminList(params: {
+  limit: number;
+  offset: number;
+  search?: string;
+  filter?: "ALL" | "PENDING" | "PAID" | "UNASSIGNED";
+}) {
+  const { limit, offset, search, filter } = params;
+
+  let registrations = await db.query.registrations.findMany({
+    with: {
+      student: {
+        with: {
+          parent: true,
+        },
+      },
+      competitionCategory: {
+        with: {
+          competition: true,
+          category: true,
+        },
+      },
+      judgeAssignments: {
+        with: {
+          judge: true,
+          score: true,
+        },
+      },
+    },
+    orderBy: (reg, { desc }) => [desc(reg.createdAt)],
+  });
+
+  let filtered = registrations;
+
+  if (filter === "PENDING") {
+    filtered = filtered.filter((r) => r.status === "PENDING_VERIFICATION");
+  } else if (filter === "PAID") {
+    filtered = filtered.filter((r) => r.paymentStatus === "SUCCESS");
+  } else if (filter === "UNASSIGNED") {
+    filtered = filtered.filter((r) => r.judgeAssignments.length === 0);
+  }
+
+  if (search?.trim()) {
+    const searchPattern = search.trim().toLowerCase();
+    filtered = filtered.filter(
+      (r) =>
+        r.registrationId.toLowerCase().includes(searchPattern) ||
+        r.student.name.toLowerCase().includes(searchPattern) ||
+        (r.student.parent.phone?.toLowerCase() ?? "").includes(searchPattern) ||
+        r.competitionCategory.category.name.toLowerCase().includes(searchPattern) ||
+        r.judgeAssignments.some((a) =>
+          a.judge.name.toLowerCase().includes(searchPattern)
+        )
+    );
+  }
+
+  const totalCount = filtered.length;
+  const paginatedRegistrations = filtered.slice(offset, offset + limit);
+
+  return { registrations: paginatedRegistrations, totalCount };
+}
+
+export async function getRegistrationCountsForMetrics() {
+  const totalCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations);
+
+  const pendingCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .where(eq(schema.registrations.status, "PENDING_VERIFICATION"));
+
+  const paidCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .where(eq(schema.registrations.paymentStatus, "SUCCESS"));
+
+  const unassignedCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .leftJoin(
+      schema.judgeAssignments,
+      eq(schema.registrations.id, schema.judgeAssignments.registrationId)
+    )
+    .where(isNull(schema.judgeAssignments.id));
+
+  return {
+    total: totalCount[0]?.count ?? 0,
+    pending: pendingCount[0]?.count ?? 0,
+    paid: paidCount[0]?.count ?? 0,
+    unassigned: unassignedCount[0]?.count ?? 0,
+  };
+}
+
+export async function getRegistrationWithDetailsForNotification(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          category: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getParentByStudentId(studentId: string) {
+  return db.query.parents.findFirst({
+    with: {
+      user: true,
+    },
+  });
+}
+
 export async function getStudentsForAdminList(params: {
   limit: number;
   offset: number;
