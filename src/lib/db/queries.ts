@@ -1431,6 +1431,41 @@ export async function createPhysicalPrizeOrders(orders: Array<{
   return db.insert(schema.physicalPrizeOrders).values(orders as any);
 }
 
+export async function getJudgePayoutsPaginated(judgeId: string, limit: number, offset: number) {
+  const [payouts, total] = await Promise.all([
+    db
+      .select({
+        id: schema.judgePayouts.id,
+        amount: schema.judgePayouts.amount,
+        status: schema.judgePayouts.status,
+        transactionRef: schema.judgePayouts.transactionRef,
+        createdAt: schema.judgePayouts.createdAt,
+        paymentDate: schema.judgePayouts.paymentDate,
+      })
+      .from(schema.judgePayouts)
+      .where(eq(schema.judgePayouts.judgeId, judgeId))
+      .orderBy(desc(schema.judgePayouts.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(schema.judgePayouts)
+      .where(eq(schema.judgePayouts.judgeId, judgeId)),
+  ]);
+
+  return {
+    payouts: payouts.map((p) => ({
+      id: p.id,
+      amount: parseFloat(p.amount.toString()),
+      status: (p.status.toLowerCase()) as "pending" | "completed" | "failed",
+      invoiceNumber: p.transactionRef || p.id.substring(0, 8),
+      createdAt: p.createdAt.toISOString(),
+      completedAt: p.paymentDate?.toISOString() ?? null,
+    })),
+    total: total[0]?.count ?? 0,
+  };
+}
+
 export async function getStudentsForAdminList(params: {
   limit: number;
   offset: number;
