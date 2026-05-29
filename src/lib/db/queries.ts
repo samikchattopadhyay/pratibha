@@ -1,5 +1,5 @@
 import { db } from "./drizzle";
-import { eq, and, isNull, gt, lt, desc } from "drizzle-orm";
+import { eq, and, isNull, gt, lt, desc, sql, gte, inArray } from "drizzle-orm";
 import * as schema from "./schema";
 
 // ─── USER QUERIES ────────────────────────────────────────────────────────────
@@ -1080,4 +1080,200 @@ export async function getParentWithStudentsAndPrizes(userId: string) {
       },
     },
   });
+}
+
+export async function getActiveBannerTemplates() {
+  return db.query.bannerTemplates.findMany({
+    where: eq(schema.bannerTemplates.isActive, true),
+    orderBy: (templates, { asc }) => [asc(templates.name)],
+  });
+}
+
+export async function getBannerTemplateBySlug(slug: string) {
+  return db.query.bannerTemplates.findFirst({
+    where: eq(schema.bannerTemplates.slug, slug),
+  });
+}
+
+export async function createBannerTemplate(data: {
+  name: string;
+  slug: string;
+  imageUrl: string;
+  description?: string | null;
+  tags?: string[];
+  isActive: boolean;
+}) {
+  return db.insert(schema.bannerTemplates).values(data).returning();
+}
+
+export async function getActiveCompetitionsCount() {
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.competitions)
+    .where(eq(schema.competitions.isActive, true));
+  return result[0]?.count ?? 0;
+}
+
+export async function getPendingJudgingCount() {
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.judgeAssignments)
+    .where(eq(schema.judgeAssignments.isSubmitted, false));
+  return result[0]?.count ?? 0;
+}
+
+export async function getRegistrationsPostedTodayCount() {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .where(gte(schema.registrations.createdAt, startOfToday));
+  return result[0]?.count ?? 0;
+}
+
+export async function getPendingPaymentsCount() {
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .where(eq(schema.registrations.paymentStatus, "PENDING"));
+  return result[0]?.count ?? 0;
+}
+
+export async function getCertificatesCount() {
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.certificates);
+  return result[0]?.count ?? 0;
+}
+
+export async function getCourierPendingCount() {
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.registrations)
+    .leftJoin(schema.certificates, eq(schema.registrations.id, schema.certificates.registrationId))
+    .where(
+      and(
+        eq(schema.registrations.scoringFinalized, true),
+        isNull(schema.certificates.id)
+      )
+    );
+  return result[0]?.count ?? 0;
+}
+
+export async function getSuccessfulTransactionsLast7Days() {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  return db
+    .select({
+      amount: schema.transactions.amount,
+      createdAt: schema.transactions.createdAt,
+    })
+    .from(schema.transactions)
+    .where(
+      and(
+        eq(schema.transactions.status, "SUCCESS"),
+        gte(schema.transactions.createdAt, sevenDaysAgo)
+      )
+    );
+}
+
+export async function getEndedCompetitions(limit: number = 3) {
+  return db
+    .select({ title: schema.competitions.title })
+    .from(schema.competitions)
+    .where(lt(schema.competitions.endDate, new Date()))
+    .limit(limit);
+}
+
+export async function getParentsByState() {
+  const result = await db
+    .select({
+      state: schema.parents.state,
+      count: sql<number>`cast(count(*) as integer)`,
+    })
+    .from(schema.parents)
+    .groupBy(schema.parents.state)
+    .orderBy((fields) => desc(fields.count))
+    .limit(4);
+  return result;
+}
+
+export async function getPendingAssignmentsByJudge() {
+  const result = await db
+    .select({
+      judgeId: schema.judgeAssignments.judgeId,
+      count: sql<number>`cast(count(*) as integer)`,
+    })
+    .from(schema.judgeAssignments)
+    .where(eq(schema.judgeAssignments.isSubmitted, false))
+    .groupBy(schema.judgeAssignments.judgeId);
+  return result;
+}
+
+export async function getJudgesByIds(judgeIds: string[]) {
+  return db
+    .select({
+      id: schema.judges.id,
+      name: schema.judges.name,
+    })
+    .from(schema.judges)
+    .where(inArray(schema.judges.id, judgeIds));
+}
+
+export async function getStudentsForAdminList(params: {
+  limit: number;
+  offset: number;
+  search?: string;
+  filter?: "ALL" | "HAS_AWARDS" | "PENDING_PAYMENT";
+}) {
+  const { limit, offset, search, filter } = params;
+
+  const students = await db.query.students.findMany({
+    with: {
+      parent: {
+        columns: {
+          id: true,
+          name: true,
+          phone: true,
+        },
+      },
+      registrations: {
+        with: {
+          prizeAward: true,
+        },
+        orderBy: (reg, { desc }) => [desc(reg.createdAt)],
+      },
+    },
+    orderBy: (s, { desc }) => [desc(s.createdAt)],
+  });
+
+  let filtered = students;
+
+  if (search?.trim()) {
+    const searchPattern = search.trim().toLowerCase();
+    filtered = filtered.filter(
+      (s) =>
+        s.name.toLowerCase().includes(searchPattern) ||
+        s.parent.name.toLowerCase().includes(searchPattern) ||
+        (s.parent.phone?.toLowerCase() ?? "").includes(searchPattern)
+    );
+  }
+
+  if (filter === "HAS_AWARDS") {
+    filtered = filtered.filter((s) =>
+      s.registrations.some((reg) => reg.prizeAward)
+    );
+  } else if (filter === "PENDING_PAYMENT") {
+    filtered = filtered.filter((s) =>
+      s.registrations.some((reg) => reg.paymentStatus === "PENDING")
+    );
+  }
+
+  const totalCount = filtered.length;
+  const paginatedStudents = filtered.slice(offset, offset + limit);
+
+  return { students: paginatedStudents, totalCount };
 }

@@ -1,6 +1,18 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getActiveCompetitionsCount,
+  getPendingJudgingCount,
+  getRegistrationsPostedTodayCount,
+  getPendingPaymentsCount,
+  getCertificatesCount,
+  getCourierPendingCount,
+  getSuccessfulTransactionsLast7Days,
+  getEndedCompetitions,
+  getParentsByState,
+  getPendingAssignmentsByJudge,
+  getJudgesByIds,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -14,61 +26,18 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden access: Admins only" }, { status: 403 });
     }
 
-    // 1. Core counters
-    const activeContestsCount = await prisma.competition.count({
-      where: { isActive: true },
-    });
+    const activeContestsCount = await getActiveCompetitionsCount();
+    const pendingJudgingCount = await getPendingJudgingCount();
+    const videosPostedTodayCount = await getRegistrationsPostedTodayCount();
+    const pendingPaymentsCount = await getPendingPaymentsCount();
+    const certificatesCount = await getCertificatesCount();
+    const courierPendingCount = await getCourierPendingCount();
 
-    const pendingJudgingCount = await prisma.judgeAssignment.count({
-      where: { isSubmitted: false },
-    });
+    const successfulTransactions = await getSuccessfulTransactionsLast7Days();
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const videosPostedTodayCount = await prisma.registration.count({
-      where: {
-        createdAt: {
-          gte: startOfToday,
-        },
-      },
-    });
-
-    const pendingPaymentsCount = await prisma.registration.count({
-      where: { paymentStatus: "PENDING" },
-    });
-
-    const certificatesCount = await prisma.certificate.count();
-
-    const courierPendingCount = await prisma.registration.count({
-      where: {
-        scoringFinalized: true,
-        certificate: null,
-      },
-    });
-
-    // 2. 7-Day Revenue Intake
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-
-    const successfulTransactions = await prisma.transaction.findMany({
-      where: {
-        status: "SUCCESS",
-        createdAt: {
-          gte: sevenDaysAgo,
-        },
-      },
-      select: {
-        amount: true,
-        createdAt: true,
-      },
-    });
-
-    // Initialize daily revenue map
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dailyRevenue: { [key: string]: number } = {};
-    
-    // Fill last 7 days with 0
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -79,7 +48,7 @@ export async function GET() {
     successfulTransactions.forEach((tx) => {
       const dayName = daysOfWeek[new Date(tx.createdAt).getDay()];
       if (dailyRevenue[dayName] !== undefined) {
-        dailyRevenue[dayName] += Number(tx.amount);
+        dailyRevenue[dayName] += parseFloat(tx.amount.toString());
       }
     });
 
@@ -88,73 +57,36 @@ export async function GET() {
       amount: dailyRevenue[day],
     }));
 
-    const totalRevenueSum = successfulTransactions.reduce((acc, curr) => acc + Number(curr.amount), 0);
+    const totalRevenueSum = successfulTransactions.reduce((acc, curr) => acc + parseFloat(curr.amount.toString()), 0);
 
-    // 3. Hotspots grouping
-    const stateGroupings = await prisma.parent.groupBy({
-      by: ["state"],
-      _count: {
-        id: true,
-      },
-      orderBy: {
-        _count: {
-          id: "desc",
-        },
-      },
-      take: 4,
-    });
+    const stateGroupings = await getParentsByState();
 
-    const totalParents = await prisma.parent.count();
+    const totalParents = stateGroupings.reduce((sum, g) => sum + g.count, 0);
     const hotspots = stateGroupings.map((g) => {
-      const count = g._count.id;
-      const pct = totalParents > 0 ? Math.round((count / totalParents) * 100) : 0;
+      const pct = totalParents > 0 ? Math.round((g.count / totalParents) * 100) : 0;
       return {
         state: g.state || "Other",
-        count,
+        count: g.count,
         percentage: pct,
       };
     });
 
-    // 4. Today's Urgent operations
-    const endedCompetitions = await prisma.competition.findMany({
-      where: {
-        endDate: {
-          lt: new Date(),
-        },
-      },
-      take: 3,
-      select: {
-        title: true,
-      },
-    });
+    const endedCompetitions = await getEndedCompetitions(3);
 
-    const pendingAssignmentsByJudge = await prisma.judgeAssignment.groupBy({
-      by: ["judgeId"],
-      where: { isSubmitted: false },
-      _count: {
-        id: true,
-      },
-    });
+    const pendingAssignmentsByJudge = await getPendingAssignmentsByJudge();
+    const judgeIds = pendingAssignmentsByJudge.map((pa) => pa.judgeId);
+    const judgesList = judgeIds.length > 0 ? await getJudgesByIds(judgeIds) : [];
 
-    const judgesList = await prisma.judge.findMany({
-      where: {
-        id: {
-          in: pendingAssignmentsByJudge.map((pa) => pa.judgeId),
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-
-    const urgentJudges = judgesList.map((j) => {
-      const pCount = pendingAssignmentsByJudge.find((pa) => pa.judgeId === j.id)?._count.id || 0;
-      return {
-        name: j.name,
-        pendingCount: pCount,
-      };
-    }).filter(j => j.pendingCount > 0);
+    const urgentJudges = judgesList
+      .map((j) => {
+        const pCount = pendingAssignmentsByJudge.find((pa) => pa.judgeId === j.id)?.count || 0;
+        return {
+          name: j.name,
+          pendingCount: pCount,
+        };
+      })
+      .filter(j => j.pendingCount > 0)
+      .slice(0, 3);
 
     return NextResponse.json({
       metrics: {
@@ -172,7 +104,7 @@ export async function GET() {
       hotspots,
       operations: {
         endedCompetitions: endedCompetitions.map(c => c.title),
-        urgentJudges: urgentJudges.slice(0, 3),
+        urgentJudges,
       },
     });
   } catch (error) {

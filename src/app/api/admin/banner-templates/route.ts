@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getActiveBannerTemplates,
+  getBannerTemplateBySlug,
+  createBannerTemplate,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
@@ -16,10 +20,7 @@ export async function GET() {
     const role = (session.user as { role?: string }).role;
     if (!requireAdmin(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const templates = await prisma.bannerTemplate.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-    });
+    const templates = await getActiveBannerTemplates();
 
     return NextResponse.json({ templates });
   } catch (error) {
@@ -43,7 +44,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name and imageUrl are required" }, { status: 400 });
     }
 
-    // Generate slug from name
     const slug = name
       .toLowerCase()
       .trim()
@@ -51,25 +51,22 @@ export async function POST(request: NextRequest) {
       .replace(/[\s_-]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
-    // Check if slug already exists
-    const existing = await prisma.bannerTemplate.findUnique({
-      where: { slug },
-    });
+    const existing = await getBannerTemplateBySlug(slug);
 
     if (existing) {
       return NextResponse.json({ error: "A template with this name already exists" }, { status: 400 });
     }
 
-    const template = await prisma.bannerTemplate.create({
-      data: {
-        name,
-        slug,
-        imageUrl,
-        description: description || null,
-        tags: tags || [],
-        isActive: true,
-      },
+    const result = await createBannerTemplate({
+      name,
+      slug,
+      imageUrl,
+      description: description || null,
+      tags: tags || [],
+      isActive: true,
     });
+
+    const template = result[0];
 
     return NextResponse.json({ template });
   } catch (error) {

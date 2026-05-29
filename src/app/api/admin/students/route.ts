@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getStudentsForAdminList } from "@/lib/db/queries";
 import type { PaginatedResponse, StudentSummary } from "@/types/student-details";
-import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,73 +19,14 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
     const search = searchParams.get("search") || "";
-    const filter = searchParams.get("filter") || "ALL";
+    const filter = (searchParams.get("filter") || "ALL") as "ALL" | "HAS_AWARDS" | "PENDING_PAYMENT";
 
-    // Build query filters
-    const where: Prisma.StudentWhereInput = {};
-
-    if (search.trim()) {
-      const searchPattern = search.trim();
-      where.OR = [
-        {
-          name: {
-            contains: searchPattern,
-            mode: "insensitive",
-          },
-        },
-        {
-          parent: {
-            name: {
-              contains: searchPattern,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          parent: {
-            phone: {
-              contains: searchPattern,
-              mode: "insensitive",
-            },
-          },
-        },
-      ];
-    }
-
-    if (filter === "HAS_AWARDS") {
-      where.registrations = {
-        some: {
-          prizeAward: {
-            isNot: null,
-          },
-        },
-      };
-    } else if (filter === "PENDING_PAYMENT") {
-      where.registrations = {
-        some: {
-          paymentStatus: "PENDING",
-        },
-      };
-    }
-
-    // Run query counting and paging in a transaction
-    const [totalCount, students] = await prisma.$transaction([
-      prisma.student.count({ where }),
-      prisma.student.findMany({
-        where,
-        include: {
-          parent: true,
-          registrations: {
-            include: {
-              prizeAward: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    const { students, totalCount } = await getStudentsForAdminList({
+      limit,
+      offset: (page - 1) * limit,
+      search,
+      filter,
+    });
 
     const formatted: StudentSummary[] = students.map((student) => ({
       id: student.id,
