@@ -1,6 +1,9 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getJudgeWithAssignmentsAndPayouts,
+  getAveragePeerScore,
+} from "@/lib/db/queries";
 import { getJudgeRate } from "@/lib/constants";
 
 export async function GET() {
@@ -12,28 +15,7 @@ export async function GET() {
 
     const userId = (session.user as { id?: string }).id;
 
-    // Get judge profile
-    const judge = await prisma.judge.findUnique({
-      where: { userId },
-      include: {
-        assignments: {
-          include: {
-            registration: {
-              include: {
-                competitionCategory: {
-                  include: {
-                    competition: true,
-                    category: true,
-                  },
-                },
-              },
-            },
-            score: true,
-          },
-        },
-        payouts: true,
-      },
-    });
+    const judge = await getJudgeWithAssignmentsAndPayouts(userId!);
 
     if (!judge) {
       return NextResponse.json({ error: "Judge profile not found" }, { status: 404 });
@@ -43,52 +25,31 @@ export async function GET() {
     const completedAssignments = assignments.filter((asg) => asg.isSubmitted);
     const pendingAssignmentsCount = assignments.length - completedAssignments.length;
 
-    // Calculate dynamic earnings based on Plan 07 rate matrix
     let totalUnpaidEarnings = 0;
     let totalEarnings = 0;
 
-    // Dynamic sum of completed evaluations mapped to their specific competition scope rates
     completedAssignments.forEach((asg) => {
       const scope = asg.registration.competitionCategory.competition.scope as "STATE" | "NATIONAL";
       const rate = getJudgeRate(judge.tier, scope);
       totalEarnings += rate;
     });
 
-    // Substract paid payouts to get pending balance
     const totalPaidPayouts = judge.payouts
       .filter((p) => p.status === "PAID")
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+      .reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
 
     totalUnpaidEarnings = Math.max(0, totalEarnings - totalPaidPayouts);
 
-    // Calculate average score given vs category global average
-    const judgeAverageScore = judge.averageScoreGiven ? Number(judge.averageScoreGiven) : null;
-    
-    // Get list of category IDs this judge evaluated
+    const judgeAverageScore = judge.averageScoreGiven ? parseFloat(String(judge.averageScoreGiven)) : null;
+
     const categoryIdsEvaluated = Array.from(
       new Set(
         completedAssignments.map((asg) => asg.registration.competitionCategory.categoryId)
       )
     );
 
-    let peerAverageScore = null;
-    if (categoryIdsEvaluated.length > 0) {
-      const peerScores = await prisma.score.aggregate({
-        where: {
-          assignment: {
-            registration: {
-              competitionCategory: {
-                categoryId: { in: categoryIdsEvaluated },
-              },
-            },
-          },
-        },
-        _avg: {
-          totalScore: true,
-        },
-      });
-      peerAverageScore = peerScores._avg.totalScore ? Number(peerScores._avg.totalScore.toFixed(2)) : null;
-    }
+    const peerAverageScoreStr = await getAveragePeerScore(categoryIdsEvaluated);
+    const peerAverageScore = peerAverageScoreStr ? parseFloat(peerAverageScoreStr) : null;
 
     // Workload category distribution counts
     const categoryCounts: Record<string, number> = {};

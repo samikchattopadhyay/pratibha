@@ -2545,6 +2545,63 @@ export async function getTelegramDeliveryCount(status: string | null, chatId: st
   return result[0]?.count || 0;
 }
 
+export async function getJudgeWithAssignmentsAndPayouts(userId: string) {
+  return db.query.judges.findFirst({
+    where: eq(schema.judges.userId, userId),
+    with: {
+      assignments: {
+        with: {
+          registration: {
+            with: {
+              competitionCategory: {
+                with: {
+                  competition: {
+                    columns: { id: true, scope: true },
+                  },
+                  category: {
+                    columns: { id: true, name: true },
+                  },
+                },
+              },
+            },
+          },
+          score: {
+            columns: { totalScore: true },
+          },
+        },
+      },
+      payouts: {
+        columns: { id: true, status: true, amount: true },
+      },
+    },
+  });
+}
+
+export async function getAveragePeerScore(categoryIds: string[]) {
+  if (categoryIds.length === 0) return null;
+
+  const result = await db
+    .select({
+      avgScore: sql<number>`avg(cast(${schema.scores.totalScore} as numeric))`,
+    })
+    .from(schema.scores)
+    .innerJoin(
+      schema.judgeAssignments,
+      eq(schema.scores.judgeAssignmentId, schema.judgeAssignments.id)
+    )
+    .innerJoin(
+      schema.registrations,
+      eq(schema.judgeAssignments.registrationId, schema.registrations.id)
+    )
+    .innerJoin(
+      schema.competitionCategories,
+      eq(schema.registrations.competitionCategoryId, schema.competitionCategories.id)
+    )
+    .where(inArray(schema.competitionCategories.categoryId, categoryIds));
+
+  return result[0]?.avgScore ? parseFloat(result[0].avgScore.toString()).toFixed(2) : null;
+}
+
 export async function getJudgeAssignmentWithCompetitionScope(assignmentId: string) {
   return db.query.judgeAssignments.findFirst({
     where: eq(schema.judgeAssignments.id, assignmentId),
