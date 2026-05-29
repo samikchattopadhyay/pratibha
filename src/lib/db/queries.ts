@@ -1516,6 +1516,84 @@ export async function getJudgeRevenueMetadata(judgeId: string) {
   };
 }
 
+export async function getJudgeSettings(judgeId: string) {
+  return db.query.judges.findFirst({
+    where: eq(schema.judges.id, judgeId),
+    columns: {
+      id: true,
+      paymentPerEvaluation: true,
+      revenueShareLOCAL: true,
+      revenueShareREGIONAL: true,
+      revenueShareNATIONAL: true,
+      revenueShareEXPERT: true,
+      specializations: true,
+    },
+  });
+}
+
+export async function updateJudgeSettings(judgeId: string, data: {
+  specializations?: string[];
+  paymentPerEvaluation?: string;
+  revenueShareLOCAL?: string | null;
+  revenueShareREGIONAL?: string | null;
+  revenueShareNATIONAL?: string | null;
+  revenueShareEXPERT?: string | null;
+}) {
+  const updateData: any = {};
+
+  if (data.specializations !== undefined) {
+    updateData.specializations = data.specializations;
+  }
+  if (data.paymentPerEvaluation !== undefined) {
+    updateData.paymentPerEvaluation = data.paymentPerEvaluation;
+  }
+  if (data.revenueShareLOCAL !== undefined) {
+    updateData.revenueShareLOCAL = data.revenueShareLOCAL;
+  }
+  if (data.revenueShareREGIONAL !== undefined) {
+    updateData.revenueShareREGIONAL = data.revenueShareREGIONAL;
+  }
+  if (data.revenueShareNATIONAL !== undefined) {
+    updateData.revenueShareNATIONAL = data.revenueShareNATIONAL;
+  }
+  if (data.revenueShareEXPERT !== undefined) {
+    updateData.revenueShareEXPERT = data.revenueShareEXPERT;
+  }
+
+  return db
+    .update(schema.judges)
+    .set(updateData)
+    .where(eq(schema.judges.id, judgeId))
+    .returning();
+}
+
+export async function getCompetitionPanelData(competitionId: string) {
+  return db.query.competitions.findFirst({
+    where: eq(schema.competitions.id, competitionId),
+    with: {
+      categories: {
+        with: {
+          registrations: {
+            with: {
+              judgeAssignments: {
+                with: {
+                  judge: {
+                    columns: {
+                      id: true,
+                      name: true,
+                      tier: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function getStudentsForAdminList(params: {
   limit: number;
   offset: number;

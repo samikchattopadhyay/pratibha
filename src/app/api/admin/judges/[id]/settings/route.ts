@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
 import { z } from "zod";
-import prisma from "@/lib/db";
+import { getJudgeSettings, updateJudgeSettings } from "@/lib/db/queries";
 import type { JudgeSettings } from "@/types/judges-details";
 
-// ✅ Pattern: Request DTO validation
 const UpdateSettingsSchema = z.object({
   maxEvaluationsPerDay: z.number().min(1).max(50),
   restPeriodHours: z.number().min(0).max(24),
@@ -18,7 +17,6 @@ const UpdateSettingsSchema = z.object({
   smsNotifications: z.boolean(),
 });
 
-// ✅ Pattern: Type guard for auth
 async function checkAdminAuth(): Promise<boolean> {
   const session = await getEdgeSession();
   if (!session?.user) return false;
@@ -35,7 +33,6 @@ export async function PATCH(
     const { id: judgeId } = await params;
     const body: unknown = await request.json();
 
-    // Validate input
     const validated = UpdateSettingsSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
@@ -44,7 +41,6 @@ export async function PATCH(
       );
     }
 
-    // Check authorization
     const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
@@ -53,33 +49,15 @@ export async function PATCH(
       );
     }
 
-    // Update judge with payment and preferred categories
-    const updateData: any = {
+    await updateJudgeSettings(judgeId, {
       specializations: validated.data.preferredCategories,
-    };
-
-    if (validated.data.paymentPerEvaluation > 0) {
-      updateData.paymentPerEvaluation = validated.data.paymentPerEvaluation;
-    }
-    if (validated.data.revenueShareLOCAL !== undefined && validated.data.revenueShareLOCAL !== null) {
-      updateData.revenueShareLOCAL = validated.data.revenueShareLOCAL;
-    }
-    if (validated.data.revenueShareREGIONAL !== undefined && validated.data.revenueShareREGIONAL !== null) {
-      updateData.revenueShareREGIONAL = validated.data.revenueShareREGIONAL;
-    }
-    if (validated.data.revenueShareNATIONAL !== undefined && validated.data.revenueShareNATIONAL !== null) {
-      updateData.revenueShareNATIONAL = validated.data.revenueShareNATIONAL;
-    }
-    if (validated.data.revenueShareEXPERT !== undefined && validated.data.revenueShareEXPERT !== null) {
-      updateData.revenueShareEXPERT = validated.data.revenueShareEXPERT;
-    }
-
-    await prisma.judge.update({
-      where: { id: judgeId },
-      data: updateData,
+      paymentPerEvaluation: validated.data.paymentPerEvaluation.toString(),
+      revenueShareLOCAL: validated.data.revenueShareLOCAL?.toString() ?? null,
+      revenueShareREGIONAL: validated.data.revenueShareREGIONAL?.toString() ?? null,
+      revenueShareNATIONAL: validated.data.revenueShareNATIONAL?.toString() ?? null,
+      revenueShareEXPERT: validated.data.revenueShareEXPERT?.toString() ?? null,
     });
 
-    // Return settings DTO
     const settings: JudgeSettings = {
       maxEvaluationsPerDay: validated.data.maxEvaluationsPerDay,
       restPeriodHours: validated.data.restPeriodHours,
@@ -118,7 +96,6 @@ export async function GET(
   try {
     const { id: judgeId } = await params;
 
-    // Check authorization
     const isAuthorized = await checkAdminAuth();
     if (!isAuthorized) {
       return NextResponse.json(
@@ -127,9 +104,7 @@ export async function GET(
       );
     }
 
-    const judge = (await prisma.judge.findUnique({
-      where: { id: judgeId },
-    })) as any;
+    const judge = await getJudgeSettings(judgeId);
 
     if (!judge) {
       return NextResponse.json(
@@ -138,16 +113,15 @@ export async function GET(
       );
     }
 
-    // Return settings with judge's actual values
     const settings: JudgeSettings = {
       maxEvaluationsPerDay: 5,
       restPeriodHours: 8,
-      paymentPerEvaluation: judge.paymentPerEvaluation ? Number(judge.paymentPerEvaluation) : 0,
+      paymentPerEvaluation: judge.paymentPerEvaluation ? parseFloat(judge.paymentPerEvaluation.toString()) : 0,
       revenueShareByTier: {
-        LOCAL: judge.revenueShareLOCAL ? Number(judge.revenueShareLOCAL) : null,
-        REGIONAL: judge.revenueShareREGIONAL ? Number(judge.revenueShareREGIONAL) : null,
-        NATIONAL: judge.revenueShareNATIONAL ? Number(judge.revenueShareNATIONAL) : null,
-        EXPERT: judge.revenueShareEXPERT ? Number(judge.revenueShareEXPERT) : null,
+        LOCAL: judge.revenueShareLOCAL ? parseFloat(judge.revenueShareLOCAL.toString()) : null,
+        REGIONAL: judge.revenueShareREGIONAL ? parseFloat(judge.revenueShareREGIONAL.toString()) : null,
+        NATIONAL: judge.revenueShareNATIONAL ? parseFloat(judge.revenueShareNATIONAL.toString()) : null,
+        EXPERT: judge.revenueShareEXPERT ? parseFloat(judge.revenueShareEXPERT.toString()) : null,
       },
       preferredCategories: judge.specializations as readonly string[],
       emailNotifications: true,

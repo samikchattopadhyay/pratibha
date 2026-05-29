@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getCompetitionPanelData } from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// GET /api/admin/judges/panel-check/[competitionId]
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ competitionId: string }> }
@@ -16,27 +15,10 @@ export async function GET(
 
     const { competitionId } = await params;
 
-    const competition = await prisma.competition.findUnique({
-      where: { id: competitionId },
-      include: {
-        panelRequirement: true,
-        categories: {
-          include: {
-            registrations: {
-              include: {
-                judgeAssignments: {
-                  include: { judge: { select: { id: true, name: true, tier: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const competition = await getCompetitionPanelData(competitionId);
 
     if (!competition) return NextResponse.json({ error: "Competition not found" }, { status: 404 });
 
-    // Collect unique judges assigned to any registration in this competition
     const judgeMap = new Map<string, { id: string; name: string; tier: string; conflictFlagged: boolean }>();
     for (const cat of competition.categories) {
       for (const reg of cat.registrations) {
@@ -54,11 +36,10 @@ export async function GET(
     }
 
     const assignedJudges = Array.from(judgeMap.values());
-    const req = competition.panelRequirement;
 
     const currentCount = assignedJudges.length;
-    const minRequired = req?.minJudges ?? competition.minJudgesRequired;
-    const minNational = req?.minNationalTierJudges ?? 0;
+    const minRequired = competition.minJudgesRequired;
+    const minNational = 0;
     const nationalTierCount = assignedJudges.filter((j) => j.tier === "NATIONAL" || j.tier === "EXPERT").length;
     const conflictedCount = assignedJudges.filter((j) => j.conflictFlagged).length;
 
