@@ -2106,3 +2106,75 @@ export async function updateCertificateStatusOnly(certificateId: string, status:
 
   return updated[0];
 }
+
+export async function getCompetitionJudgesWithVotingStats(competitionId: string, limit?: number, offset?: number) {
+  const competitionCategories = await db
+    .select({ id: schema.competitionCategories.id })
+    .from(schema.competitionCategories)
+    .where(eq(schema.competitionCategories.competitionId, competitionId));
+
+  const categoryIds = competitionCategories.map((cc) => cc.id);
+
+  const registrationIds = await db
+    .select({ id: schema.registrations.id })
+    .from(schema.registrations)
+    .where(inArray(schema.registrations.competitionCategoryId, categoryIds));
+
+  const regIds = registrationIds.map((r) => r.id);
+
+  const judgesData = await db.query.competitionJudges.findMany({
+    where: eq(schema.competitionJudges.competitionId, competitionId),
+    with: {
+      judge: {
+        columns: { id: true, name: true, tier: true },
+        with: {
+          assignments: {
+            columns: { isSubmitted: true },
+            where: inArray(schema.judgeAssignments.registrationId, regIds),
+            with: {
+              score: {
+                columns: { totalScore: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    limit: limit || 10,
+    offset: offset || 0,
+  });
+
+  const totalCount = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.competitionJudges)
+    .where(eq(schema.competitionJudges.competitionId, competitionId));
+
+  const votingData = judgesData.map((cj) => {
+    const assignments = cj.judge.assignments;
+    const submitted = assignments.filter((a) => a.isSubmitted);
+    const scores = submitted.map((a) => a.score?.totalScore ?? 0).map(s => parseFloat(s.toString()));
+    const averageScore =
+      scores.length > 0
+        ? scores.reduce((a, b) => a + b, 0) / scores.length
+        : undefined;
+
+    return {
+      judgeId: cj.judge.id,
+      judgeName: cj.judge.name,
+      tier: cj.judge.tier,
+      assignmentCount: assignments.length,
+      submittedCount: submitted.length,
+      averageScore: averageScore ? Math.round(averageScore * 10) / 10 : undefined,
+      isOutlier: false,
+      completionPercentage:
+        assignments.length > 0
+          ? Math.round((submitted.length / assignments.length) * 100)
+          : 0,
+    };
+  });
+
+  return {
+    data: votingData,
+    totalCount: totalCount[0]?.count || 0,
+  };
+}
