@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getCertificateWithCompetition,
+  updateCertificateStatusOnly,
+} from "@/lib/db/queries";
 
 export async function PATCH(
   request: NextRequest,
@@ -30,17 +33,7 @@ export async function PATCH(
       );
     }
 
-    // Verify certificate belongs to the competition
-    const certificate = await prisma.certificate.findUnique({
-      where: { id: certId },
-      include: {
-        registration: {
-          include: {
-            competitionCategory: true,
-          },
-        },
-      },
-    });
+    const certificate = await getCertificateWithCompetition(certId);
 
     if (!certificate) {
       return NextResponse.json(
@@ -56,11 +49,7 @@ export async function PATCH(
       );
     }
 
-    // Update certificate status
-    const updated = await prisma.certificate.update({
-      where: { id: certId },
-      data: { status },
-    });
+    const updated = await updateCertificateStatusOnly(certId, status);
 
     return NextResponse.json({
       message: "Certificate status updated successfully",

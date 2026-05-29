@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getCertificateWithCompetition,
+  revokeCertificate,
+} from "@/lib/db/queries";
 
 export async function POST(
   _: NextRequest,
@@ -22,17 +25,7 @@ export async function POST(
 
     const { certId, id: competitionId } = await params;
 
-    // Verify certificate belongs to the competition
-    const certificate = await prisma.certificate.findUnique({
-      where: { id: certId },
-      include: {
-        registration: {
-          include: {
-            competitionCategory: true,
-          },
-        },
-      },
-    });
+    const certificate = await getCertificateWithCompetition(certId);
 
     if (!certificate) {
       return NextResponse.json(
@@ -48,15 +41,7 @@ export async function POST(
       );
     }
 
-    // Update certificate status to REVOKED
-    const updated = await prisma.certificate.update({
-      where: { id: certId },
-      data: {
-        status: "REVOKED",
-        revokedAt: new Date(),
-        revokedBy: customUser.email || "unknown",
-      },
-    });
+    const updated = await revokeCertificate(certId, customUser.email || "unknown");
 
     return NextResponse.json({
       message: "Certificate revoked successfully",

@@ -2069,3 +2069,40 @@ export async function updateCertificateStatus(certificateId: string, status: str
     .set({ status: status as any })
     .where(eq(schema.certificates.id, certificateId));
 }
+
+export async function getCertificateWithCompetition(certificateId: string) {
+  return db.query.certificates.findFirst({
+    where: eq(schema.certificates.id, certificateId),
+    with: {
+      registration: {
+        with: {
+          competitionCategory: true,
+        },
+      },
+    },
+  });
+}
+
+export async function revokeCertificate(certificateId: string, revokedBy: string) {
+  const updated = await db
+    .update(schema.certificates)
+    .set({
+      status: "REVOKED" as any,
+      revokedAt: new Date(),
+      revokedBy,
+    })
+    .where(eq(schema.certificates.id, certificateId))
+    .returning();
+
+  return updated[0];
+}
+
+export async function updateCertificateStatusOnly(certificateId: string, status: string) {
+  const updated = await db
+    .update(schema.certificates)
+    .set({ status: status as any })
+    .where(eq(schema.certificates.id, certificateId))
+    .returning();
+
+  return updated[0];
+}
