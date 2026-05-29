@@ -74,27 +74,15 @@ Testing require accounts mapped to appropriate access control levels:
 
 ## 2. Running the Seed script
 
-A pre-configured JavaScript seeding utility is located in the repository at [seed.js](file:///c:/Development/pratibha/prisma/seed.js).
+A pre-configured TypeScript seeding utility is located in the repository at `prisma/seed.ts`.
 
 To execute the database seed:
 
-1. Ensure the PostgreSQL docker container is running:
-   ```bash
-   docker compose up -d
-   ```
-
-2. Invoke the Prisma command or execute the Node script directly:
-   ```bash
-   node prisma/seed.js
-   ```
-
-To make it run automatically on every schema push/migration, you can add this line to your `package.json` under `"prisma"` config:
-```json
-"prisma": {
-  "seed": "node prisma/seed.js"
-}
+```bash
+npx ts-node prisma/seed.ts
 ```
-And trigger it using:
+
+Or if Prisma seed is configured in `package.json`:
 ```bash
 npx prisma db seed
 ```
