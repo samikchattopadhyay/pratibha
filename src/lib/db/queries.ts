@@ -1,5 +1,5 @@
 import { db } from "./drizzle";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, gt, desc } from "drizzle-orm";
 import * as schema from "./schema";
 
 // ─── USER QUERIES ────────────────────────────────────────────────────────────
@@ -478,5 +478,105 @@ export async function getEmailVerificationTokenByTokenWithUser(token: string) {
   return db.query.emailVerificationTokens.findFirst({
     where: eq(schema.emailVerificationTokens.token, token),
     with: { user: true },
+  });
+}
+
+// ─── ADDITIONAL ACCOUNT QUERIES ───────────────────────────────────────────
+
+export async function getStudentBySlug(slug: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.slug, slug),
+  });
+}
+
+export async function getStudentByIdWithAchievements(studentId: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.id, studentId),
+    with: {
+      externalAchievements: true,
+    },
+  });
+}
+
+export async function getAllCategories() {
+  return db.query.categories.findMany({
+    orderBy: (categories, { asc }) => [asc(categories.name)],
+  });
+}
+
+export async function getRegistrationWithRelations(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      competitionCategory: {
+        with: {
+          competition: true,
+          category: true,
+        },
+      },
+      certificate: true,
+    },
+  });
+}
+
+export async function getRegistrationsByStudentIdWithDetails(studentId: string) {
+  return db.query.registrations.findMany({
+    where: eq(schema.registrations.studentId, studentId),
+    with: {
+      competitionCategory: {
+        with: {
+          competition: true,
+          category: true,
+        },
+      },
+      certificate: true,
+    },
+  });
+}
+
+export async function getParentWithStudentsAndRegistrations(userId: string) {
+  return db.query.parents.findFirst({
+    where: eq(schema.parents.userId, userId),
+    with: {
+      students: {
+        with: {
+          registrations: {
+            with: {
+              competitionCategory: {
+                with: {
+                  competition: true,
+                  category: true,
+                },
+              },
+              certificate: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getParentWithUserEmail(userId: string) {
+  return db.query.parents.findFirst({
+    where: eq(schema.parents.userId, userId),
+    with: {
+      user: {
+        columns: {
+          email: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getUnusedProfileSetupToken(userId: string) {
+  return db.query.profileSetupTokens.findFirst({
+    where: and(
+      eq(schema.profileSetupTokens.userId, userId),
+      isNull(schema.profileSetupTokens.usedAt),
+      gt(schema.profileSetupTokens.expiresAt, new Date())
+    ),
+    orderBy: (tokens, { desc }) => [desc(tokens.createdAt)],
   });
 }

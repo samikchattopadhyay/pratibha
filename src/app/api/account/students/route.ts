@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentByUserId,
+  createStudent,
+  getStudentBySlug,
+} from "@/lib/db/queries";
 import { z } from "zod";
 
 // Zod validation schema for student creation
@@ -35,9 +39,7 @@ async function ensureUniqueSlug(
   let counter = 1;
 
   while (true) {
-    const existing = await prisma.student.findUnique({
-      where: { slug },
-    });
+    const existing = await getStudentBySlug(slug);
 
     if (!existing || existing.id === excludeId) {
       return slug;
@@ -79,9 +81,7 @@ export async function POST(req: Request) {
 
     // 3. Business logic
     // Find parent profile ID
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
@@ -96,33 +96,31 @@ export async function POST(req: Request) {
     slug = await ensureUniqueSlug(slug);
 
     // Create student
-    const student = await prisma.student.create({
-      data: {
-        parentId: parent.id,
-        name: data.name,
-        dateOfBirth: data.dateOfBirth,
-        gender: data.gender,
-        slug,
-        schoolClass: data.schoolClass,
-        schoolName: data.schoolName,
-        city: data.city,
-        state: data.state,
-        profileImageUrl: data.profileImageUrl,
-        bio: data.bio,
-        heightCm: data.heightCm,
-        hairColor: data.hairColor,
-        eyeColor: data.eyeColor,
-        disciplineInterests: data.disciplineInterests,
-        languages: data.languages,
-        trainingInstitutes: data.trainingInstitutes,
-        specialSkills: data.specialSkills,
-        isPublic: data.isPublic,
-      },
+    const result = await createStudent({
+      parentId: parent.id,
+      name: data.name,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender,
+      slug,
+      schoolClass: data.schoolClass,
+      schoolName: data.schoolName,
+      city: data.city,
+      state: data.state,
+      profileImageUrl: data.profileImageUrl,
+      bio: data.bio,
+      heightCm: data.heightCm,
+      hairColor: data.hairColor,
+      eyeColor: data.eyeColor,
+      disciplineInterests: data.disciplineInterests,
+      languages: data.languages,
+      trainingInstitutes: data.trainingInstitutes,
+      specialSkills: data.specialSkills,
+      isPublic: data.isPublic,
     });
 
     // 4. Response
     return NextResponse.json(
-      { message: "Student profile added successfully", studentId: student.id },
+      { message: "Student profile added successfully", studentId: result[0].id },
       { status: 201 }
     );
   } catch (error: any) {

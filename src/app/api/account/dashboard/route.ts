@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getUserById,
+  getParentWithStudentsAndRegistrations,
+  getAllCategories,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -13,9 +17,7 @@ export async function GET() {
     const userId = (session.user as any).id;
 
     // Check if user has completed all onboarding steps
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await getUserById(userId);
 
     if (!user) {
       return NextResponse.json(
@@ -31,18 +33,16 @@ export async function GET() {
       // 1. User's email is verified
       // 2. User has a parent profile with phone
       // 3. User has completed address (street, city, state, postalCode)
-      const parent = await prisma.parent.findUnique({
-        where: { userId },
-      });
+      const parentWithDetails = await getParentWithStudentsAndRegistrations(userId);
 
       const isOnboardingComplete =
         user.emailVerified &&
-        parent &&
-        parent.phone &&
-        parent.address &&
-        parent.city &&
-        parent.state &&
-        parent.postalCode;
+        parentWithDetails &&
+        parentWithDetails.phone &&
+        parentWithDetails.address &&
+        parentWithDetails.city &&
+        parentWithDetails.state &&
+        parentWithDetails.postalCode;
 
       if (!isOnboardingComplete) {
         return NextResponse.json(
@@ -53,26 +53,7 @@ export async function GET() {
     }
 
     // Get parent profile with full details
-    const parentWithDetails = await prisma.parent.findUnique({
-      where: { userId },
-      include: {
-        students: {
-          include: {
-            registrations: {
-              include: {
-                competitionCategory: {
-                  include: {
-                    competition: true,
-                    category: true,
-                  },
-                },
-                certificate: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const parentWithDetails = await getParentWithStudentsAndRegistrations(userId);
 
     if (!parentWithDetails) {
       return NextResponse.json(
@@ -111,9 +92,7 @@ export async function GET() {
     registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     // Fetch all categories for discipline choices
-    const categories = await prisma.category.findMany({
-      orderBy: { name: "asc" },
-    });
+    const categories = await getAllCategories();
 
     return NextResponse.json({
       parent: {

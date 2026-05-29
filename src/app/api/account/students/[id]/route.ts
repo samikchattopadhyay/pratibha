@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentByUserId,
+  getStudentById,
+  getStudentByIdWithAchievements,
+  updateStudent,
+  getStudentBySlug,
+} from "@/lib/db/queries";
 import { z } from "zod";
 
 // ─── SECTION 1: VALIDATION SCHEMAS ────────────────────────────────────────
@@ -36,9 +42,7 @@ async function ensureUniqueSlug(
   let counter = 1;
 
   while (true) {
-    const existing = await prisma.student.findUnique({
-      where: { slug },
-    });
+    const existing = await getStudentBySlug(slug);
 
     if (!existing || existing.id === excludeId) {
       return slug;
@@ -66,20 +70,13 @@ export async function GET(
     const { id: studentId } = await params;
 
     // 2. Business logic — verify ownership
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
     }
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      include: {
-        externalAchievements: true,
-      },
-    });
+    const student = await getStudentByIdWithAchievements(studentId);
 
     if (!student || student.parentId !== parent.id) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -118,18 +115,14 @@ export async function PATCH(
 
     // 3. Business logic
     // Find parent profile ID
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
     }
 
     // Verify student ownership
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
+    const student = await getStudentById(studentId);
 
     if (!student || student.parentId !== parent.id) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -160,37 +153,35 @@ export async function PATCH(
     if (data.specialSkills !== undefined) updatePayload.specialSkills = data.specialSkills;
     if (data.isPublic !== undefined) updatePayload.isPublic = data.isPublic;
 
-    const updatedStudent = await prisma.student.update({
-      where: { id: studentId },
-      data: updatePayload,
-      include: {
-        externalAchievements: true,
-      },
-    });
+    const result = await updateStudent(studentId, updatePayload);
+    const updatedStudent = result[0];
+
+    // Fetch with achievements
+    const updatedStudentWithAchievements = await getStudentByIdWithAchievements(studentId);
 
     // 4. Response - Return full student object
     return NextResponse.json({
-      id: updatedStudent.id,
-      name: updatedStudent.name,
-      slug: updatedStudent.slug || undefined,
-      dateOfBirth: updatedStudent.dateOfBirth.toISOString(),
-      gender: updatedStudent.gender,
-      schoolClass: updatedStudent.schoolClass || null,
-      schoolName: updatedStudent.schoolName || null,
-      city: updatedStudent.city || null,
-      state: updatedStudent.state || null,
-      profileImageUrl: updatedStudent.profileImageUrl || null,
-      bio: updatedStudent.bio || null,
-      heightCm: updatedStudent.heightCm || null,
-      hairColor: updatedStudent.hairColor || null,
-      eyeColor: updatedStudent.eyeColor || null,
-      disciplineInterests: updatedStudent.disciplineInterests || [],
-      languages: updatedStudent.languages || [],
-      categoryGrouping: [], // Derived from competition registrations, not stored on student
-      trainingInstitutes: updatedStudent.trainingInstitutes || [],
-      specialSkills: updatedStudent.specialSkills || [],
-      isPublic: updatedStudent.isPublic || false,
-      externalAchievements: updatedStudent.externalAchievements || [],
+      id: updatedStudentWithAchievements!.id,
+      name: updatedStudentWithAchievements!.name,
+      slug: updatedStudentWithAchievements!.slug || undefined,
+      dateOfBirth: updatedStudentWithAchievements!.dateOfBirth.toISOString(),
+      gender: updatedStudentWithAchievements!.gender,
+      schoolClass: updatedStudentWithAchievements!.schoolClass || null,
+      schoolName: updatedStudentWithAchievements!.schoolName || null,
+      city: updatedStudentWithAchievements!.city || null,
+      state: updatedStudentWithAchievements!.state || null,
+      profileImageUrl: updatedStudentWithAchievements!.profileImageUrl || null,
+      bio: updatedStudentWithAchievements!.bio || null,
+      heightCm: updatedStudentWithAchievements!.heightCm || null,
+      hairColor: updatedStudentWithAchievements!.hairColor || null,
+      eyeColor: updatedStudentWithAchievements!.eyeColor || null,
+      disciplineInterests: updatedStudentWithAchievements!.disciplineInterests || [],
+      languages: updatedStudentWithAchievements!.languages || [],
+      categoryGrouping: [],
+      trainingInstitutes: updatedStudentWithAchievements!.trainingInstitutes || [],
+      specialSkills: updatedStudentWithAchievements!.specialSkills || [],
+      isPublic: updatedStudentWithAchievements!.isPublic || false,
+      externalAchievements: updatedStudentWithAchievements!.externalAchievements || [],
     }, { status: 200 });
   } catch (error: any) {
     console.error("Student update error:", error);

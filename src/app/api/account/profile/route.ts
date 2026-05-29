@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentWithUserEmail,
+  updateParent,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -9,16 +12,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
 
-    const userId = (session.user as { id?: string }).id;
+    const userId = (session.user as { id?: string }).id!;
 
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-      include: {
-        user: {
-          select: { email: true },
-        },
-      },
-    });
+    const parent = await getParentWithUserEmail(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
@@ -48,7 +44,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
 
-    const userId = (session.user as { id?: string }).id;
+    const userId = (session.user as { id?: string }).id!;
     const body = await request.json();
 
     const { name, phone, address, city, state, postalCode, country, preferredState } = body;
@@ -81,38 +77,35 @@ export async function PUT(request: NextRequest) {
       updateData.profileCompletedAt = new Date();
     }
 
-    const updatedParent = await prisma.parent.update({
-      where: { userId },
-      data: updateData,
-      include: {
-        user: {
-          select: { email: true },
-        },
-      },
-    });
+    // Get parent ID first
+    const parent = await getParentWithUserEmail(userId);
+    if (!parent) {
+      return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
+    }
+
+    const result = await updateParent(parent.id, updateData);
+    const updatedParent = result[0];
+
+    // Fetch with user email
+    const updatedParentWithEmail = await getParentWithUserEmail(userId);
 
     return NextResponse.json({
       success: true,
       parent: {
-        id: updatedParent.id,
-        email: updatedParent.user.email,
-        name: updatedParent.name,
-        phone: updatedParent.phone,
-        address: updatedParent.address,
-        city: updatedParent.city,
-        state: updatedParent.state,
-        postalCode: updatedParent.postalCode,
-        preferredState: updatedParent.preferredState,
-        country: updatedParent.country,
-        profileImageUrl: updatedParent.profileImageUrl,
+        id: updatedParentWithEmail!.id,
+        email: updatedParentWithEmail!.user.email,
+        name: updatedParentWithEmail!.name,
+        phone: updatedParentWithEmail!.phone,
+        address: updatedParentWithEmail!.address,
+        city: updatedParentWithEmail!.city,
+        state: updatedParentWithEmail!.state,
+        postalCode: updatedParentWithEmail!.postalCode,
+        preferredState: updatedParentWithEmail!.preferredState,
+        country: updatedParentWithEmail!.country,
+        profileImageUrl: updatedParentWithEmail!.profileImageUrl,
       },
     });
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-      const meta = (error as { meta?: { target?: string[] } }).meta;
-      const field = meta?.target?.[0] || "field";
-      return NextResponse.json({ error: `${field} already in use` }, { status: 409 });
-    }
     console.error("Parent profile update error:", error);
     return NextResponse.json({ error: "Internal server error occurred" }, { status: 500 });
   }

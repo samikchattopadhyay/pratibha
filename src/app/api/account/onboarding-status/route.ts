@@ -1,6 +1,10 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getUserById,
+  getParentByUserId,
+  getUnusedProfileSetupToken,
+} from "@/lib/db/queries";
 import { generateProfileSetupToken } from "@/lib/profile-setup-token";
 
 interface OnboardingStatusResponse {
@@ -25,23 +29,19 @@ export async function GET(): Promise<NextResponse<OnboardingStatusResponse | { e
     }
 
     const userId = (session.user as SessionUser).id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await getUserById(userId);
 
     if (!user || user.role !== "PARENT") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     const passwordSet = user.passwordHash !== null;
-    const phoneSet = parent !== null && parent.phone !== null;
+    const phoneSet = !!parent && parent.phone !== null;
     const emailVerified = user.emailVerified !== null;
     const addressSet =
-      parent !== null &&
+      !!parent &&
       parent.address !== null &&
       parent.city !== null &&
       parent.state !== null &&
@@ -52,14 +52,7 @@ export async function GET(): Promise<NextResponse<OnboardingStatusResponse | { e
     // Generate token only if password or phone steps are needed
     if (!passwordSet || !phoneSet) {
       try {
-        const existingToken = await prisma.profileSetupToken.findFirst({
-          where: {
-            userId,
-            usedAt: null,
-            expiresAt: { gt: new Date() },
-          },
-          orderBy: { createdAt: "desc" },
-        });
+        const existingToken = await getUnusedProfileSetupToken(userId);
 
         if (existingToken && existingToken.expiresAt > new Date()) {
           setupToken = existingToken.token;
