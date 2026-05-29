@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { users, parents } from "@/lib/db/schema";
+import { getUserByEmail, getParentByPhone } from "@/lib/db/queries";
 import bcrypt from "bcryptjs";
 import { generateVerificationToken } from "@/lib/email-verification";
 import { sendEmailVerificationLink } from "@/lib/notifications";
@@ -28,10 +30,7 @@ export async function POST(req: Request) {
     }
 
     // Check if email already registered
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const existingUser = await getUserByEmail(email);
     if (existingUser) {
       return NextResponse.json(
         { error: "Account already exists with this email address" },
@@ -40,10 +39,7 @@ export async function POST(req: Request) {
     }
 
     // Check if phone number already registered
-    const existingParent = await prisma.parent.findUnique({
-      where: { phone },
-    });
-
+    const existingParent = await getParentByPhone(phone);
     if (existingParent) {
       return NextResponse.json(
         { error: "Account already exists with this phone number" },
@@ -55,23 +51,29 @@ export async function POST(req: Request) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create User & Parent in transaction
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
+    const result = await db.transaction(async (tx) => {
+      const userResult = await tx
+        .insert(users)
+        .values({
           email,
           passwordHash,
           role: "PARENT",
-          emailVerified: null, // Not verified yet
-        },
-      });
+          emailVerified: null,
+        })
+        .returning();
 
-      const parent = await tx.parent.create({
-        data: {
+      const user = userResult[0];
+
+      const parentResult = await tx
+        .insert(parents)
+        .values({
           userId: user.id,
           name,
           phone,
-        },
-      });
+        })
+        .returning();
+
+      const parent = parentResult[0];
 
       return { user, parent };
     });

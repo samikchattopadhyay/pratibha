@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { users, passwordSetupTokens, judges } from "@/lib/db/schema";
+import { getPasswordSetupTokenByToken, updateUser, updatePasswordSetupToken } from "@/lib/db/queries";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export async function GET(request: NextRequest) {
@@ -11,9 +14,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Token is required" }, { status: 400 });
     }
 
-    const setupToken = await prisma.passwordSetupToken.findUnique({
-      where: { token },
-      include: { user: { include: { judgeProfile: true } } },
+    const setupToken = await db.query.passwordSetupTokens.findFirst({
+      where: eq(passwordSetupTokens.token, token),
+      with: {
+        user: true,
+      },
     });
 
     if (!setupToken) {
@@ -28,7 +33,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Token expired", valid: false, reason: "expired" }, { status: 400 });
     }
 
-    const judgeName = setupToken.user.judgeProfile?.name || setupToken.user.email;
+    // Try to get judge profile for name
+    const judge = await db.query.judges.findFirst({
+      where: eq(judges.userId, setupToken.user.id),
+    });
+
+    const judgeName = judge?.name || setupToken.user.email;
 
     return NextResponse.json({
       valid: true,
@@ -64,9 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const setupToken = await prisma.passwordSetupToken.findUnique({
-      where: { token },
-    });
+    const setupToken = await getPasswordSetupTokenByToken(token);
 
     if (!setupToken) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
@@ -82,16 +90,16 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: setupToken.userId },
-        data: { passwordHash },
-      });
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ passwordHash })
+        .where(eq(users.id, setupToken.userId));
 
-      await tx.passwordSetupToken.update({
-        where: { id: setupToken.id },
-        data: { usedAt: new Date() },
-      });
+      await tx
+        .update(passwordSetupTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordSetupTokens.id, setupToken.id));
     });
 
     return NextResponse.json({ message: "Password set successfully" }, { status: 200 });

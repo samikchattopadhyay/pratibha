@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getUserByEmail, getParentByUserId } from "@/lib/db/queries";
 import {
   verifyEmailToken,
   isTokenExpired,
@@ -19,9 +19,7 @@ export async function POST(req: Request) {
     }
 
     // 1. Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await getUserByEmail(email);
 
     if (!user) {
       return NextResponse.json(
@@ -62,9 +60,7 @@ export async function POST(req: Request) {
 
     // 5. Send confirmation email
     try {
-      const parent = await prisma.parent.findUnique({
-        where: { userId: user.id },
-      });
+      const parent = await getParentByUserId(user.id);
       await sendEmailVerificationSuccess(
         email,
         parent?.name || "User"
@@ -108,9 +104,7 @@ export async function GET(req: Request) {
 
   // Verify the token
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await getUserByEmail(email);
 
     if (!user) {
       return NextResponse.redirect(
@@ -136,9 +130,7 @@ export async function GET(req: Request) {
 
     // Send confirmation email
     try {
-      const parent = await prisma.parent.findUnique({
-        where: { userId: user.id },
-      });
+      const parent = await getParentByUserId(user.id);
       await sendEmailVerificationSuccess(
         email,
         parent?.name || "User"
