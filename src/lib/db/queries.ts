@@ -2473,6 +2473,100 @@ export async function updateCertificateUrl(
   return updated[0];
 }
 
+export async function getTelegramDeliveriesWithFilters(
+  status: string | null,
+  chatId: string | null,
+  limit: number,
+  offset: number,
+  sortBy: string,
+  sortOrder: "asc" | "desc"
+) {
+  const whereConditions: any[] = [];
+
+  if (status) {
+    whereConditions.push(eq(schema.telegramMessageDeliveries.status, status as any));
+  }
+  if (chatId) {
+    whereConditions.push(sql`${schema.telegramMessageDeliveries.chatId} ILIKE ${'%' + chatId + '%'}`);
+  }
+
+  let orderByClause: any;
+  if (sortBy === "sentAt") {
+    orderByClause = sortOrder === "desc"
+      ? desc(schema.telegramMessageDeliveries.sentAt)
+      : asc(schema.telegramMessageDeliveries.sentAt);
+  } else if (sortBy === "failureCount") {
+    orderByClause = sortOrder === "desc"
+      ? desc(schema.telegramMessageDeliveries.failureCount)
+      : asc(schema.telegramMessageDeliveries.failureCount);
+  } else {
+    orderByClause = sortOrder === "desc"
+      ? desc(schema.telegramMessageDeliveries.createdAt)
+      : asc(schema.telegramMessageDeliveries.createdAt);
+  }
+
+  const deliveries = await db.query.telegramMessageDeliveries.findMany({
+    where: whereConditions.length > 0 ? and(...whereConditions) : undefined,
+    with: {
+      notification: {
+        columns: {
+          id: true,
+          type: true,
+          title: true,
+          body: true,
+          userId: true,
+          createdAt: true,
+        },
+      },
+    },
+    limit,
+    offset,
+    orderBy: orderByClause,
+  });
+
+  return deliveries;
+}
+
+export async function getTelegramDeliveryCount(status: string | null, chatId: string | null) {
+  const whereConditions: any[] = [];
+
+  if (status) {
+    whereConditions.push(eq(schema.telegramMessageDeliveries.status, status as any));
+  }
+  if (chatId) {
+    whereConditions.push(sql`${schema.telegramMessageDeliveries.chatId} ILIKE ${'%' + chatId + '%'}`);
+  }
+
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.telegramMessageDeliveries)
+    .where(whereConditions.length > 0 ? and(...whereConditions) : undefined);
+
+  return result[0]?.count || 0;
+}
+
+export async function getTelegramDeliveryStatsByStatus(status: string | null, chatId: string | null) {
+  const whereConditions: any[] = [];
+
+  if (status) {
+    whereConditions.push(eq(schema.telegramMessageDeliveries.status, status as any));
+  }
+  if (chatId) {
+    whereConditions.push(sql`${schema.telegramMessageDeliveries.chatId} ILIKE ${'%' + chatId + '%'}`);
+  }
+
+  const stats = await db
+    .select({
+      status: schema.telegramMessageDeliveries.status,
+      count: sql<number>`cast(count(*) as integer)`,
+    })
+    .from(schema.telegramMessageDeliveries)
+    .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+    .groupBy(schema.telegramMessageDeliveries.status);
+
+  return stats;
+}
+
 export async function getStudentWithRegistrationsForStats(studentId: string) {
   return db.query.students.findFirst({
     where: eq(schema.students.id, studentId),

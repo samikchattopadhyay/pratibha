@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
-import { DeliveryStatus } from "@prisma/client";
+import { getUserByEmail } from "@/lib/db/queries";
+import {
+  getTelegramDeliveriesWithFilters,
+  getTelegramDeliveryCount,
+  getTelegramDeliveryStatsByStatus,
+} from "@/lib/db/queries";
 
 /**
  * GET /api/admin/notifications/telegram/delivery-status
@@ -21,9 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
+  const user = await getUserByEmail(session.user.email);
 
   if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "MODERATOR")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") as DeliveryStatus | null;
+    const status = searchParams.get("status");
     const chatId = searchParams.get("chatId");
     const limit = Math.min(
       parseInt(searchParams.get("limit") || "50"),
@@ -39,46 +41,20 @@ export async function GET(request: NextRequest) {
     );
     const offset = parseInt(searchParams.get("offset") || "0");
     const sortBy = searchParams.get("sortBy") || "createdAt";
-    const sortOrder = searchParams.get("sortOrder") || "desc";
+    const sortOrder = (searchParams.get("sortOrder") || "desc") as "asc" | "desc";
 
-    // Build where clause
-    const where: { status?: DeliveryStatus; chatId?: { contains: string } } = {};
-    if (status) {
-      where.status = status;
-    }
-    if (chatId) {
-      where.chatId = { contains: chatId };
-    }
+    const totalCount = await getTelegramDeliveryCount(status, chatId);
 
-    // Get total count
-    const totalCount = await prisma.telegramMessageDelivery.count({ where });
+    const deliveries = await getTelegramDeliveriesWithFilters(
+      status,
+      chatId,
+      limit,
+      offset,
+      sortBy,
+      sortOrder
+    );
 
-    // Get deliveries
-    const deliveries = await prisma.telegramMessageDelivery.findMany({
-      where,
-      include: {
-        notification: {
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            body: true,
-            userId: true,
-            createdAt: true,
-          },
-        },
-      },
-      take: limit,
-      skip: offset,
-      orderBy: { [sortBy]: sortOrder },
-    });
-
-    // Calculate statistics
-    const stats = await prisma.telegramMessageDelivery.groupBy({
-      by: ["status"],
-      where,
-      _count: true,
-    });
+    const stats = await getTelegramDeliveryStatsByStatus(status, chatId);
 
     const statusCounts = {
       QUEUED: 0,
@@ -89,7 +65,7 @@ export async function GET(request: NextRequest) {
     };
 
     stats.forEach((stat) => {
-      statusCounts[stat.status as keyof typeof statusCounts] = stat._count;
+      statusCounts[stat.status as keyof typeof statusCounts] = stat.count;
     });
 
     // Calculate delivery rate
@@ -124,11 +100,11 @@ export async function GET(request: NextRequest) {
           errorCode: d.errorCode,
           errorMessage: d.errorMessage,
           failureCount: d.failureCount,
-          sentAt: d.sentAt,
-          lastAttemptAt: d.lastAttemptAt,
-          nextRetryAt: d.nextRetryAt,
-          createdAt: d.createdAt,
-          updatedAt: d.updatedAt,
+          sentAt: d.sentAt ? new Date(d.sentAt).toISOString() : null,
+          lastAttemptAt: d.lastAttemptAt ? new Date(d.lastAttemptAt).toISOString() : null,
+          nextRetryAt: d.nextRetryAt ? new Date(d.nextRetryAt).toISOString() : null,
+          createdAt: new Date(d.createdAt).toISOString(),
+          updatedAt: new Date(d.updatedAt).toISOString(),
           notification: d.notification,
         })),
       },
