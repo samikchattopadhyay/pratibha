@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
 import { createAndDispatchNotification } from "@/lib/notificationService";
-import prisma from "@/lib/db";
-import { CertificateType, CertificateStatus, PrizeRank } from "@prisma/client";
+import {
+  getCompetitionWithFinalizedRegistrations,
+  getParentsByIds,
+  getUsersByIds,
+  createCertificate,
+  updateCertificateUrl,
+  createPrizeAwardWithNewCertificate,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"] as const;
 
-function rankToCertType(rank: number | null): CertificateType {
-  if (rank === 1) return CertificateType.MERIT_1;
-  if (rank === 2) return CertificateType.MERIT_2;
-  if (rank === 3) return CertificateType.MERIT_3;
-  if (rank !== null && rank > 3) return CertificateType.SPECIAL_MENTION;
-  return CertificateType.PARTICIPATION;
+function rankToCertType(rank: number | null): string {
+  if (rank === 1) return "MERIT_1";
+  if (rank === 2) return "MERIT_2";
+  if (rank === 3) return "MERIT_3";
+  if (rank !== null && rank > 3) return "SPECIAL_MENTION";
+  return "PARTICIPATION";
 }
 
-function rankToPrizeRank(rank: number): PrizeRank {
+function rankToPrizeRank(rank: number): string {
   if (rank === 1) return "FIRST_PLACE";
   if (rank === 2) return "SECOND_PLACE";
   if (rank === 3) return "THIRD_PLACE";
@@ -36,6 +42,18 @@ type TxResult =
 
 type ParentInfo = { userId: string; email: string };
 
+type CertPlan = {
+  registration: any;
+  certId: string;
+  certType: string;
+  certUrl: string;
+  qrUrl: string;
+  isUpdate: boolean;
+  needsPrizeAward: boolean;
+  prizeItemId: string | null;
+  prizeRank: string | null;
+};
+
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -56,30 +74,7 @@ export async function POST(
 
     const { id: competitionId } = await params;
 
-    // 2. Load competition with all necessary relations
-    const competition = await prisma.competition.findUnique({
-      where: { id: competitionId },
-      include: {
-        prizePool: { include: { items: true } },
-        categories: {
-          include: {
-            registrations: {
-              where: {
-                status: "VERIFIED",
-                scoringFinalized: true,
-              },
-              include: {
-                certificate: true,
-                prizeAward: true,
-                student: {
-                  include: { parent: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const competition = await getCompetitionWithFinalizedRegistrations(competitionId);
 
     if (!competition) {
       return NextResponse.json(
@@ -114,19 +109,12 @@ export async function POST(
       });
     }
 
-    // 5. Bulk-fetch parent user emails
     const uniqueParentIds = [
       ...new Set(toProcess.map((r) => r.student.parentId)),
     ];
-    const parents = await prisma.parent.findMany({
-      where: { id: { in: uniqueParentIds } },
-      select: { id: true, userId: true },
-    });
+    const parents = await getParentsByIds(uniqueParentIds);
     const parentUserIds = parents.map((p) => p.userId);
-    const users = await prisma.user.findMany({
-      where: { id: { in: parentUserIds } },
-      select: { id: true, email: true },
-    });
+    const users = await getUsersByIds(parentUserIds);
 
     const parentLookup = new Map<string, ParentInfo>();
     for (const p of parents) {
@@ -136,19 +124,6 @@ export async function POST(
       }
     }
 
-    // 6. Prepare per-registration cert data
-    type CertPlan = {
-      registration: (typeof toProcess)[number];
-      certId: string;
-      certType: CertificateType;
-      certUrl: string;
-      qrUrl: string;
-      isUpdate: boolean;
-      needsPrizeAward: boolean;
-      prizeItemId: string | null;
-      prizeRank: PrizeRank | null;
-    };
-
     const plans: CertPlan[] = toProcess.map((reg) => {
       const certId = generateCertId();
       const certType = rankToCertType(reg.finalRank);
@@ -157,7 +132,7 @@ export async function POST(
       const isUpdate = !!(reg.certificate && !reg.certificate.certificateUrl);
 
       let prizeItemId: string | null = null;
-      let prizeRank: PrizeRank | null = null;
+      let prizeRank: string | null = null;
 
       if (hasPrizePool && reg.finalRank !== null && !reg.prizeAward) {
         prizeRank = rankToPrizeRank(reg.finalRank);
@@ -187,81 +162,59 @@ export async function POST(
       };
     });
 
-    // 7. Execute all writes in an interactive transaction
-    const results: TxResult[] = await prisma.$transaction(async (tx) => {
-      const out: TxResult[] = [];
+    const results: TxResult[] = [];
 
-      for (const plan of plans) {
-        if (
-          plan.needsPrizeAward &&
-          plan.prizeItemId &&
-          plan.prizeRank
-        ) {
-          // Case A: award + cert created together
-          const award = await tx.prizeAward.create({
-            data: {
-              registrationId: plan.registration.id,
-              prizeItemId: plan.prizeItemId,
-              rank: plan.prizeRank,
-              certificate: {
-                create: {
-                  registrationId: plan.registration.id,
-                  certificateId: plan.certId,
-                  certificateUrl: plan.certUrl,
-                  qrCodeUrl: plan.qrUrl,
-                  type: plan.certType,
-                  status: CertificateStatus.GENERATED,
-                },
-              },
-            },
-            include: { certificate: true },
-          });
-          out.push({
-            kind: "award",
-            registrationId: plan.registration.id,
-            dbCertId: award.certificate?.id ?? "",
-          });
-        } else if (plan.isUpdate && plan.registration.certificate) {
-          // Case B: repair existing stub
-          const cert = await tx.certificate.update({
-            where: { id: plan.registration.certificate.id },
-            data: {
-              certificateId: plan.certId,
-              certificateUrl: plan.certUrl,
-              qrCodeUrl: plan.qrUrl,
-              type: plan.certType,
-              status: CertificateStatus.GENERATED,
-            },
-            select: { id: true },
-          });
-          out.push({
-            kind: "update",
-            registrationId: plan.registration.id,
-            dbCertId: cert.id,
-          });
-        } else {
-          // Case C: plain create
-          const cert = await tx.certificate.create({
-            data: {
-              registrationId: plan.registration.id,
-              certificateId: plan.certId,
-              certificateUrl: plan.certUrl,
-              qrCodeUrl: plan.qrUrl,
-              type: plan.certType,
-              status: CertificateStatus.GENERATED,
-            },
-            select: { id: true },
-          });
-          out.push({
-            kind: "create",
-            registrationId: plan.registration.id,
-            dbCertId: cert.id,
-          });
-        }
+    for (const plan of plans) {
+      if (plan.needsPrizeAward && plan.prizeItemId && plan.prizeRank) {
+        const result = await createPrizeAwardWithNewCertificate(
+          plan.registration.id,
+          plan.prizeItemId,
+          plan.prizeRank,
+          {
+            certificateId: plan.certId,
+            certificateUrl: plan.certUrl,
+            qrCodeUrl: plan.qrUrl,
+            type: plan.certType,
+            status: "GENERATED",
+          }
+        );
+        results.push({
+          kind: "award",
+          registrationId: plan.registration.id,
+          dbCertId: result.certificate?.id ?? "",
+        });
+      } else if (plan.isUpdate && plan.registration.certificate) {
+        const updated = await updateCertificateUrl(
+          plan.registration.certificate.id,
+          {
+            certificateId: plan.certId,
+            certificateUrl: plan.certUrl,
+            qrCodeUrl: plan.qrUrl,
+            type: plan.certType,
+            status: "GENERATED",
+          }
+        );
+        results.push({
+          kind: "update",
+          registrationId: plan.registration.id,
+          dbCertId: updated?.id ?? "",
+        });
+      } else {
+        const created = await createCertificate({
+          registrationId: plan.registration.id,
+          certificateId: plan.certId,
+          certificateUrl: plan.certUrl,
+          qrCodeUrl: plan.qrUrl,
+          type: plan.certType as any,
+          status: "GENERATED" as any,
+        });
+        results.push({
+          kind: "create",
+          registrationId: plan.registration.id,
+          dbCertId: created?.[0]?.id ?? "",
+        });
       }
-
-      return out;
-    });
+    }
 
     // 8. Count results
     const prizesAwarded = results.filter((r) => r.kind === "award").length;

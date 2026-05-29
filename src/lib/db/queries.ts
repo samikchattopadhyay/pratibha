@@ -2402,6 +2402,116 @@ export async function createCategories(categories: Array<{
   return db.insert(schema.categories).values(categories).returning();
 }
 
+export async function getCompetitionWithFinalizedRegistrations(competitionId: string) {
+  return db.query.competitions.findFirst({
+    where: eq(schema.competitions.id, competitionId),
+    with: {
+      prizePool: {
+        with: { items: true },
+      },
+      categories: {
+        with: {
+          registrations: {
+            where: and(
+              eq(schema.registrations.status, "VERIFIED" as any),
+              eq(schema.registrations.scoringFinalized, true)
+            ),
+            with: {
+              certificate: {
+                columns: { id: true, status: true, certificateUrl: true },
+              },
+              prizeAward: {
+                columns: { id: true },
+              },
+              student: {
+                columns: { id: true, name: true, parentId: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getParentsByIds(parentIds: string[]) {
+  return db.query.parents.findMany({
+    where: inArray(schema.parents.id, parentIds),
+    columns: { id: true, userId: true },
+  });
+}
+
+export async function getUsersByIds(userIds: string[]) {
+  return db.query.users.findMany({
+    where: inArray(schema.users.id, userIds),
+    columns: { id: true, email: true },
+  });
+}
+
+export async function updateCertificateUrl(
+  certificateId: string,
+  data: {
+    certificateId: string;
+    certificateUrl: string;
+    qrCodeUrl: string;
+    type: string;
+    status: string;
+  }
+) {
+  const updated = await db
+    .update(schema.certificates)
+    .set({
+      certificateId: data.certificateId,
+      certificateUrl: data.certificateUrl,
+      qrCodeUrl: data.qrCodeUrl,
+      type: data.type as any,
+      status: data.status as any,
+    })
+    .where(eq(schema.certificates.id, certificateId))
+    .returning({ id: schema.certificates.id });
+
+  return updated[0];
+}
+
+export async function createPrizeAwardWithNewCertificate(
+  registrationId: string,
+  prizeItemId: string,
+  prizeRank: string,
+  certificateData: {
+    certificateId: string;
+    certificateUrl: string;
+    qrCodeUrl: string;
+    type: string;
+    status: string;
+  }
+) {
+  // Create certificate first
+  const cert = await db
+    .insert(schema.certificates)
+    .values({
+      ...certificateData,
+      registrationId,
+      status: certificateData.status as any,
+      type: certificateData.type as any,
+    })
+    .returning();
+
+  // Then create prize award
+  const award = await db
+    .insert(schema.prizeAwards)
+    .values({
+      registrationId,
+      prizeItemId,
+      rank: prizeRank as any,
+    })
+    .returning();
+
+  return {
+    certificate: cert[0],
+    award: award[0],
+  };
+}
+
 export async function createPrizeAwardWithCertificate(
   registrationId: string,
   prizeItemId: string,
