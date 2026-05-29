@@ -1,5 +1,5 @@
 import { db } from "./drizzle";
-import { eq, and, isNull, gt, desc } from "drizzle-orm";
+import { eq, and, isNull, gt, lt, desc } from "drizzle-orm";
 import * as schema from "./schema";
 
 // ─── USER QUERIES ────────────────────────────────────────────────────────────
@@ -478,6 +478,60 @@ export async function countRegistrationsByCategoryId(competitionCategoryId: stri
     .from(schema.registrations)
     .where(eq(schema.registrations.competitionCategoryId, competitionCategoryId));
   return result.length;
+}
+
+export async function getParentWithStudentsAndQualifications(userId: string) {
+  return db.query.parents.findFirst({
+    where: eq(schema.parents.userId, userId),
+    with: {
+      students: {
+        with: {
+          qualificationSlots: {
+            with: {
+              qualificationRule: {
+                with: {
+                  stateCompetition: {
+                    columns: {
+                      title: true,
+                    },
+                  },
+                },
+              },
+              nationalCompetition: {
+                columns: {
+                  id: true,
+                  title: true,
+                  entryFeeINR: true,
+                  registrationDeadline: true,
+                },
+              },
+              registration: {
+                columns: {
+                  finalRank: true,
+                  finalScore: true,
+                  registrationId: true,
+                },
+              },
+            },
+            orderBy: (slots, { desc }) => [desc(slots.offeredAt)],
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function expireOverdueQualificationSlots(parentId: string) {
+  const now = new Date();
+  return db
+    .update(schema.qualificationSlots)
+    .set({ status: "EXPIRED" as any })
+    .where(
+      and(
+        eq(schema.qualificationSlots.status, "OFFERED" as any),
+        lt(schema.qualificationSlots.expiresAt, now)
+      )
+    );
 }
 
 // ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────

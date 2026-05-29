@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentWithStudentsAndQualifications,
+  expireOverdueQualificationSlots,
+} from "@/lib/db/queries";
 
 // GET /api/account/qualifications — parent's students' qualification slots
 export async function GET() {
@@ -8,43 +11,13 @@ export async function GET() {
     const session = await getEdgeSession();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const userId = (session.user as { id?: string }).id;
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-      include: {
-        students: {
-          include: {
-            qualificationSlots: {
-              include: {
-                qualificationRule: {
-                  include: {
-                    stateCompetition: { select: { title: true } },
-                  },
-                },
-                nationalCompetition: {
-                  select: { id: true, title: true, entryFeeINR: true, registrationDeadline: true },
-                },
-                registration: { select: { finalRank: true, finalScore: true, registrationId: true } },
-              },
-              orderBy: { offeredAt: "desc" },
-            },
-          },
-        },
-      },
-    });
+    const userId = (session.user as { id?: string }).id!;
+    const parent = await getParentWithStudentsAndQualifications(userId);
 
     if (!parent) return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
 
     // Auto-expire any overdue OFFERED slots
-    const now = new Date();
-    await prisma.qualificationSlot.updateMany({
-      where: {
-        status: "OFFERED",
-        expiresAt: { lt: now },
-        student: { parentId: parent.id },
-      },
-      data: { status: "EXPIRED" },
-    });
+    await expireOverdueQualificationSlots(parent.id);
 
     const qualifications = parent.students.flatMap((student) =>
       student.qualificationSlots.map((slot) => {
