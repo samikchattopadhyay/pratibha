@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
 import { createAndDispatchNotification } from "@/lib/notificationService";
+import {
+  getVerifiedRegistrationsWithAssignments,
+  getJudgeAssignmentsByRegistration,
+  deleteScoresByAssignment,
+  updateJudgeAssignmentSubmission,
+  updateRegistrationStatus,
+  getRegistrationWithAssignmentsAndScores,
+  getParentById,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -15,29 +23,7 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden access: Admins only" }, { status: 403 });
     }
 
-    // Fetch all verified registrations with assignments
-    const registrations = await prisma.registration.findMany({
-      where: {
-        status: "VERIFIED",
-        judgeAssignments: {
-          some: {},
-        },
-      },
-      include: {
-        student: true,
-        competitionCategory: {
-          include: {
-            category: true,
-          },
-        },
-        judgeAssignments: {
-          include: {
-            judge: true,
-            score: true,
-          },
-        },
-      },
-    });
+    const registrations = await getVerifiedRegistrationsWithAssignments();
 
     const cards = registrations.map((reg) => {
       // Determine Kanban Column Status
@@ -48,7 +34,7 @@ export async function GET() {
       const allSubmitted = totalAssignments > 0 && submittedAssignments.length === totalAssignments;
       
       const scores = submittedAssignments
-        .map((a) => a.score?.totalScore)
+        .map((a) => a.score?.totalScore ? parseFloat(String(a.score.totalScore)) : null)
         .filter((s): s is number => s !== undefined && s !== null);
 
       let avgScore: number | null = null;
@@ -93,7 +79,7 @@ export async function GET() {
           judgeId: a.judge.id,
           judgeName: a.judge.name,
           isSubmitted: a.isSubmitted,
-          score: a.score ? a.score.totalScore : null,
+          score: a.score ? parseFloat(String(a.score.totalScore)) : null,
         })),
       };
     });
@@ -125,111 +111,68 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === "re-queue") {
-      // Re-queue: set isSubmitted to false for all assignments of this registration, delete scores
-      await prisma.$transaction(async (tx) => {
-        const assignments = await tx.judgeAssignment.findMany({
-          where: { registrationId },
-        });
+      const assignments = await getJudgeAssignmentsByRegistration(registrationId);
 
-        for (const assignment of assignments) {
-          if (assignment.isSubmitted) {
-            // Delete associated score first due to CASCADE/onDelete constraints
-            await tx.score.deleteMany({
-              where: { judgeAssignmentId: assignment.id },
-            });
-            
-            await tx.judgeAssignment.update({
-              where: { id: assignment.id },
-              data: {
-                isSubmitted: false,
-                submittedAt: null,
-              },
-            });
-          }
+      for (const assignment of assignments) {
+        if (assignment.isSubmitted) {
+          await deleteScoresByAssignment(assignment.id);
+          await updateJudgeAssignmentSubmission(assignment.id, {
+            isSubmitted: false,
+            submittedAt: null,
+          });
         }
+      }
 
-        await tx.registration.update({
-          where: { id: registrationId },
-          data: {
-            scoringFinalized: false,
-            conflictResolved: false,
-          },
-        });
+      await updateRegistrationStatus(registrationId, {
+        scoringFinalized: false,
+        conflictResolved: false,
       });
 
       return NextResponse.json({ message: "Registration re-queued successfully" });
     }
 
     if (action === "review") {
-      // Review: moves card from Conflict to Jury Review by marking conflictResolved = true
-      await prisma.registration.update({
-        where: { id: registrationId },
-        data: {
-          conflictResolved: true,
-          scoringFinalized: false,
-        },
+      await updateRegistrationStatus(registrationId, {
+        conflictResolved: true,
+        scoringFinalized: false,
       });
 
       return NextResponse.json({ message: "Registration marked for jury review" });
     }
 
     if (action === "approve") {
-      // Approve: freeze results by setting scoringFinalized = true and conflictResolved = true
-      await prisma.registration.update({
-        where: { id: registrationId },
-        data: {
-          scoringFinalized: true,
-          conflictResolved: true,
-        },
+      await updateRegistrationStatus(registrationId, {
+        scoringFinalized: true,
+        conflictResolved: true,
       });
 
-      // Send notification to parent (fire-and-forget)
-      const registration = await prisma.registration.findUnique({
-        where: { id: registrationId },
-        include: {
-          student: true,
-          competitionCategory: {
-            include: { category: true },
-          },
-          judgeAssignments: {
-            include: { score: true },
-          },
-        },
-      });
+      const registration = await getRegistrationWithAssignmentsAndScores(registrationId);
 
       if (registration) {
         const student = registration.student;
-        const parent = await prisma.parent.findFirst({
-          where: { id: student.parentId },
-        });
+        const parent = await getParentById(student.parentId);
 
         if (parent) {
-          const user = await prisma.user.findUnique({
-            where: { id: parent.userId },
-          });
-
           const scores = registration.judgeAssignments
             .filter((a) => a.score?.totalScore)
-            .map((a) => a.score?.totalScore)
+            .map((a) => a.score?.totalScore ? parseFloat(String(a.score.totalScore)) : null)
             .filter((s): s is number => s !== undefined && s !== null);
 
           const avgScore = scores.length > 0
             ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
             : 0;
 
-          if (user?.email) {
-            createAndDispatchNotification({
-              userId: parent.userId,
-              type: "RESULTS_PUBLISHED",
-              title: "Results Published",
-              body: `Results for ${student.name}'s submission in ${registration.competitionCategory.category.name} have been finalized. Average score: ${avgScore}/100.`,
-              actionUrl: "/account/dashboard",
-              registrationId: registration.id,
-              recipientEmail: user.email,
-            }).catch((err) =>
-              console.error("Failed to send results published notification:", err)
-            );
-          }
+          createAndDispatchNotification({
+            userId: parent.userId,
+            type: "RESULTS_PUBLISHED",
+            title: "Results Published",
+            body: `Results for ${student.name}'s submission in ${registration.competitionCategory.category.name} have been finalized. Average score: ${avgScore}/100.`,
+            actionUrl: "/account/dashboard",
+            registrationId: registration.id,
+            recipientEmail: parent.user?.email || "",
+          }).catch((err) =>
+            console.error("Failed to send results published notification:", err)
+          );
         }
       }
 

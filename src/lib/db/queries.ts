@@ -2302,6 +2302,90 @@ export async function publishPrizePool(prizePoolId: string) {
   return updated[0];
 }
 
+export async function getVerifiedRegistrationsWithAssignments() {
+  return db.query.registrations.findMany({
+    where: and(
+      eq(schema.registrations.status, "VERIFIED" as any),
+      sql`EXISTS (SELECT 1 FROM ${schema.judgeAssignments} WHERE ${schema.judgeAssignments.registrationId} = ${schema.registrations.id})`
+    ),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          category: true,
+        },
+      },
+      judgeAssignments: {
+        with: {
+          judge: {
+            columns: { id: true, name: true },
+          },
+          score: {
+            columns: { totalScore: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getJudgeAssignmentsByRegistration(registrationId: string) {
+  return db.query.judgeAssignments.findMany({
+    where: eq(schema.judgeAssignments.registrationId, registrationId),
+  });
+}
+
+export async function deleteScoresByAssignment(assignmentId: string) {
+  return db.delete(schema.scores).where(eq(schema.scores.judgeAssignmentId, assignmentId));
+}
+
+export async function updateJudgeAssignmentSubmission(
+  assignmentId: string,
+  data: { isSubmitted: boolean; submittedAt: Date | null }
+) {
+  const updated = await db
+    .update(schema.judgeAssignments)
+    .set(data)
+    .where(eq(schema.judgeAssignments.id, assignmentId))
+    .returning();
+
+  return updated[0];
+}
+
+export async function updateRegistrationStatus(
+  registrationId: string,
+  data: { scoringFinalized?: boolean; conflictResolved?: boolean }
+) {
+  const updated = await db
+    .update(schema.registrations)
+    .set(data)
+    .where(eq(schema.registrations.id, registrationId))
+    .returning();
+
+  return updated[0];
+}
+
+export async function getRegistrationWithAssignmentsAndScores(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          category: true,
+        },
+      },
+      judgeAssignments: {
+        with: {
+          score: {
+            columns: { totalScore: true },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function createPrizeAwardWithCertificate(
   registrationId: string,
   prizeItemId: string,
