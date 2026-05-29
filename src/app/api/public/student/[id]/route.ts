@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getPublicStudentProfile } from "@/lib/db/queries";
 
 // ─── SECTION 1: VALIDATION & TYPES ────────────────────────────────────────
 
@@ -52,52 +52,7 @@ export async function GET(
     const { id: studentId } = await params;
 
     // 2. Business logic — fetch student with public check
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      include: {
-        externalAchievements: {
-          select: {
-            title: true,
-            eventName: true,
-            category: true,
-            year: true,
-            rank: true,
-            description: true,
-            proofUrl: true,
-          },
-        },
-        registrations: {
-          include: {
-            certificate: {
-              select: {
-                type: true,
-                certificateUrl: true,
-                issuedAt: true,
-              },
-            },
-            prizeAward: {
-              select: {
-                rank: true,
-              },
-            },
-            competitionCategory: {
-              include: {
-                competition: {
-                  select: {
-                    title: true,
-                  },
-                },
-                category: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const student = await getPublicStudentProfile(studentId);
 
     // 3. Privacy check
     if (!student || !student.isPublic) {

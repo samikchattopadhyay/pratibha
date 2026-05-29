@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getOverdueJudgeAssignments } from "@/lib/db/queries";
 import { createAndDispatchNotification } from "@/lib/notificationService";
 
 export async function POST(request: NextRequest) {
@@ -13,27 +13,7 @@ export async function POST(request: NextRequest) {
     // Find judge assignments that haven't been submitted for 3+ days
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
-    const overdueAssignments = await prisma.judgeAssignment.findMany({
-      where: {
-        isSubmitted: false,
-        assignedAt: {
-          lte: threeDaysAgo,
-        },
-      },
-      include: {
-        judge: {
-          include: { user: true },
-        },
-        registration: {
-          include: {
-            student: true,
-            competitionCategory: {
-              include: { category: true },
-            },
-          },
-        },
-      },
-    });
+    const overdueAssignments = await getOverdueJudgeAssignments(threeDaysAgo);
 
     if (overdueAssignments.length === 0) {
       return NextResponse.json({

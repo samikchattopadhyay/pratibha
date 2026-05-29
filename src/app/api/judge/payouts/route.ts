@@ -1,6 +1,10 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getJudgeWithSubmittedAssignmentsAndPayouts,
+  getJudgeByUserId,
+  updateJudgeBankDetails,
+} from "@/lib/db/queries";
 import { getJudgeRate } from "@/lib/constants";
 
 export async function GET() {
@@ -12,35 +16,12 @@ export async function GET() {
 
     const userId = (session.user as { id?: string }).id;
 
-    // Get judge profile
-    const judge = await prisma.judge.findUnique({
-      where: { userId },
-      include: {
-        assignments: {
-          where: { isSubmitted: true },
-          include: {
-            registration: {
-              include: {
-                competitionCategory: {
-                  include: {
-                    competition: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        payouts: {
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+    const judge = await getJudgeWithSubmittedAssignmentsAndPayouts(userId!);
 
     if (!judge) {
       return NextResponse.json({ error: "Judge profile not found" }, { status: 404 });
     }
 
-    // Dynamic calculations
     let totalEarnings = 0;
     judge.assignments.forEach((asg) => {
       const scope = asg.registration.competitionCategory.competition.scope as "STATE" | "NATIONAL";
@@ -50,7 +31,7 @@ export async function GET() {
 
     const totalPaidPayouts = judge.payouts
       .filter((p) => p.status === "PAID")
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+      .reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
 
     const pendingPayoutBalance = Math.max(0, totalEarnings - totalPaidPayouts);
 
@@ -89,24 +70,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "IFSC code must be exactly 11 characters" }, { status: 400 });
     }
 
-    const judge = await prisma.judge.findUnique({
-      where: { userId },
-    });
+    const judge = await getJudgeByUserId(userId!);
 
     if (!judge) {
       return NextResponse.json({ error: "Judge profile not found" }, { status: 404 });
     }
 
-    // Save JSON details
-    await prisma.judge.update({
-      where: { id: judge.id },
-      data: {
-        bankAccountDetails: {
-          bankName,
-          accountNum,
-          ifscCode,
-        },
-      },
+    await updateJudgeBankDetails(judge.id, {
+      bankName,
+      accountNum,
+      ifscCode,
     });
 
     return NextResponse.json({ message: "Bank account details saved successfully" });

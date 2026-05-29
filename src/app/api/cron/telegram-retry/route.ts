@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db";
+import { getFailedTelegramDeliveriesDueForRetry } from "@/lib/db/queries";
 import { sendTelegramWithTracking } from "@/lib/notifications";
-import { DeliveryStatus } from "@prisma/client";
 
 /**
  * POST /api/cron/telegram-retry
@@ -18,16 +17,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Find all temporarily failed deliveries that are due for retry
-    const failedDeliveries = await prisma.telegramMessageDelivery.findMany({
-      where: {
-        status: DeliveryStatus.TEMPORARILY_FAILED,
-        nextRetryAt: { lte: new Date() },
-        failureCount: { lt: 10 }, // Max 10 attempts per delivery
-      },
-      include: { notification: true },
-      take: 100, // Process max 100 per cron run to avoid timeout
-      orderBy: { nextRetryAt: "asc" },
-    });
+    const failedDeliveries = await getFailedTelegramDeliveriesDueForRetry();
 
     const results = {
       processed: 0,

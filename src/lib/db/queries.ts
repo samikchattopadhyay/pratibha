@@ -223,6 +223,383 @@ export async function createCertificateBulk(data: (typeof schema.certificates.$i
   return db.insert(schema.certificates).values(data).returning();
 }
 
+export async function getCompetitionCategoryById(id: string) {
+  return db.query.competitionCategories.findFirst({
+    where: eq(schema.competitionCategories.id, id),
+    with: {
+      competition: {
+        columns: {
+          id: true,
+          entryFeeINR: true,
+        },
+      },
+      category: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getStudentByIdBelongingToParent(studentId: string, parentId: string) {
+  return db.query.students.findFirst({
+    where: and(eq(schema.students.id, studentId), eq(schema.students.parentId, parentId)),
+  });
+}
+
+export async function createRegistrationWithTransactionAtom(data: {
+  studentId: string;
+  competitionCategoryId: string;
+  fbPostUrl: string;
+  registrationId: string;
+}) {
+  const registration = await db.insert(schema.registrations).values({
+    studentId: data.studentId,
+    competitionCategoryId: data.competitionCategoryId,
+    fbPostUrl: data.fbPostUrl,
+    registrationId: data.registrationId,
+    paymentStatus: "PENDING",
+    status: "PENDING_VERIFICATION",
+  }).returning();
+
+  return registration[0];
+}
+
+export async function createTransactionRecord(data: {
+  registrationId: string;
+  razorpayOrderId: string;
+  amount: number;
+}) {
+  const transaction = await db.insert(schema.transactions).values({
+    registrationId: data.registrationId,
+    razorpayOrderId: data.razorpayOrderId,
+    amount: String(data.amount),
+    status: "PENDING",
+  }).returning();
+
+  return transaction[0];
+}
+
+export async function getAdminUsers() {
+  return db.query.users.findMany({
+    where: inArray(schema.users.role, ["SUPER_ADMIN", "MODERATOR"]),
+  });
+}
+
+export async function getTransactionByRazorpayOrderId(razorpayOrderId: string) {
+  return db.query.transactions.findFirst({
+    where: eq(schema.transactions.razorpayOrderId, razorpayOrderId),
+    with: {
+      registration: true,
+    },
+  });
+}
+
+export async function updateTransactionAsFailed(razorpayOrderId: string) {
+  return db
+    .update(schema.transactions)
+    .set({ status: "FAILED" })
+    .where(eq(schema.transactions.razorpayOrderId, razorpayOrderId))
+    .returning();
+}
+
+export async function updateTransactionAndRegistrationAsSuccess(
+  razorpayOrderId: string,
+  registrationId: string,
+  paymentId: string,
+  signature: string
+) {
+  await db
+    .update(schema.transactions)
+    .set({
+      razorpayPaymentId: paymentId,
+      razorpaySignature: signature,
+      status: "SUCCESS",
+    })
+    .where(eq(schema.transactions.razorpayOrderId, razorpayOrderId));
+
+  return db
+    .update(schema.registrations)
+    .set({ paymentStatus: "SUCCESS" })
+    .where(eq(schema.registrations.id, registrationId))
+    .returning();
+}
+
+export async function getRegistrationWithStudentAndCategory(registrationId: string) {
+  return db.query.registrations.findFirst({
+    where: eq(schema.registrations.id, registrationId),
+    with: {
+      student: true,
+      competitionCategory: {
+        with: {
+          category: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getParentWithUser(parentId: string) {
+  return db.query.parents.findFirst({
+    where: eq(schema.parents.id, parentId),
+    with: {
+      user: true,
+    },
+  });
+}
+
+export async function getNotificationsPaginated(userId: string, limit: number, offset: number) {
+  return db.query.notifications.findMany({
+    where: eq(schema.notifications.userId, userId),
+    orderBy: desc(schema.notifications.createdAt),
+    limit,
+    offset,
+  });
+}
+
+export async function getNotificationCount(userId: string) {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.notifications)
+    .where(eq(schema.notifications.userId, userId));
+
+  return result[0]?.count || 0;
+}
+
+export async function getUnreadNotificationCount(userId: string) {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.notifications)
+    .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.read, false)));
+
+  return result[0]?.count || 0;
+}
+
+export async function getNotificationById(id: string, userId: string) {
+  return db.query.notifications.findFirst({
+    where: and(eq(schema.notifications.id, id), eq(schema.notifications.userId, userId)),
+  });
+}
+
+export async function markNotificationAsRead(id: string) {
+  return db
+    .update(schema.notifications)
+    .set({ read: true, readAt: new Date() })
+    .where(eq(schema.notifications.id, id))
+    .returning();
+}
+
+export async function markAllNotificationsAsRead(userId: string) {
+  return db
+    .update(schema.notifications)
+    .set({ read: true, readAt: new Date() })
+    .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.read, false)));
+}
+
+export async function deleteNotification(id: string) {
+  return db
+    .delete(schema.notifications)
+    .where(eq(schema.notifications.id, id))
+    .returning();
+}
+
+export async function getPublicStudentProfile(studentId: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.id, studentId),
+    with: {
+      externalAchievements: {
+        columns: {
+          title: true,
+          eventName: true,
+          category: true,
+          year: true,
+          rank: true,
+          description: true,
+          proofUrl: true,
+        },
+      },
+      registrations: {
+        with: {
+          certificate: {
+            columns: {
+              type: true,
+              certificateUrl: true,
+              issuedAt: true,
+            },
+          },
+          prizeAward: {
+            columns: {
+              rank: true,
+            },
+          },
+          competitionCategory: {
+            with: {
+              competition: {
+                columns: {
+                  title: true,
+                },
+              },
+              category: {
+                columns: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getOverdueJudgeAssignments(threeDaysAgo: Date) {
+  return db.query.judgeAssignments.findMany({
+    where: and(
+      eq(schema.judgeAssignments.isSubmitted, false),
+      lt(schema.judgeAssignments.assignedAt, threeDaysAgo)
+    ),
+    with: {
+      judge: {
+        with: {
+          user: true,
+        },
+      },
+      registration: {
+        with: {
+          student: true,
+          competitionCategory: {
+            with: {
+              category: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getFailedTelegramDeliveriesDueForRetry() {
+  const now = new Date();
+  return db.query.telegramMessageDeliveries.findMany({
+    where: and(
+      eq(schema.telegramMessageDeliveries.status, "TEMPORARILY_FAILED"),
+      gte(schema.telegramMessageDeliveries.nextRetryAt, now),
+      lt(schema.telegramMessageDeliveries.failureCount, 10)
+    ),
+    with: {
+      notification: true,
+    },
+    orderBy: asc(schema.telegramMessageDeliveries.nextRetryAt),
+    limit: 100,
+  });
+}
+
+export async function getCompetitionWithPrizePool(competitionId: string) {
+  return db.query.competitions.findFirst({
+    where: eq(schema.competitions.id, competitionId),
+    with: {
+      categories: {
+        with: {
+          category: true,
+        },
+      },
+      prizePool: {
+        with: {
+          items: {
+            orderBy: asc(schema.prizeItems.createdAt),
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getActiveCompetitions(scope?: string, eligibleState?: string) {
+  const conditions = [eq(schema.competitions.isActive, true)];
+
+  if (scope && (scope === "STATE" || scope === "NATIONAL")) {
+    conditions.push(eq(schema.competitions.scope, scope as "STATE" | "NATIONAL"));
+  }
+
+  if (eligibleState) {
+    conditions.push(sql`${schema.competitions.eligibleStates} @> ${sql.raw(`'["${eligibleState}"]'::jsonb`)}`);
+  }
+
+  return db.query.competitions.findMany({
+    where: and(...conditions),
+    with: {
+      categories: {
+        with: {
+          category: true,
+        },
+      },
+      prizePool: {
+        with: {
+          items: {
+            orderBy: asc(schema.prizeItems.createdAt),
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getNotificationPreferencesByUserId(userId: string) {
+  return db.query.notificationPreferences.findMany({
+    where: eq(schema.notificationPreferences.userId, userId),
+    orderBy: desc(schema.notificationPreferences.createdAt),
+  });
+}
+
+export async function upsertNotificationPreference(data: {
+  userId: string;
+  type: string;
+  channel: string;
+  enabled: boolean;
+}) {
+  // Try to find existing preference
+  const existing = await db.query.notificationPreferences.findFirst({
+    where: and(
+      eq(schema.notificationPreferences.userId, data.userId),
+      eq(schema.notificationPreferences.type, data.type as any),
+      eq(schema.notificationPreferences.channel, data.channel as any)
+    ),
+  });
+
+  if (existing) {
+    // Update existing
+    return db
+      .update(schema.notificationPreferences)
+      .set({ enabled: data.enabled, updatedAt: new Date() })
+      .where(eq(schema.notificationPreferences.id, existing.id))
+      .returning();
+  } else {
+    // Create new
+    return db
+      .insert(schema.notificationPreferences)
+      .values({
+        userId: data.userId,
+        type: data.type as any,
+        channel: data.channel as any,
+        enabled: data.enabled,
+      })
+      .returning();
+  }
+}
+
+export async function getNotificationsSinceDate(userId: string, since: Date, limit: number = 10) {
+  return db.query.notifications.findMany({
+    where: and(
+      eq(schema.notifications.userId, userId),
+      gt(schema.notifications.createdAt, since)
+    ),
+    orderBy: asc(schema.notifications.createdAt),
+    limit,
+  });
+}
+
 // ─── TRANSACTION QUERIES ──────────────────────────────────────────────────────
 
 export async function getSuccessfulTransactions() {
@@ -2543,6 +2920,46 @@ export async function getTelegramDeliveryCount(status: string | null, chatId: st
     .where(whereConditions.length > 0 ? and(...whereConditions) : undefined);
 
   return result[0]?.count || 0;
+}
+
+export async function getJudgeWithSubmittedAssignmentsAndPayouts(userId: string) {
+  return db.query.judges.findFirst({
+    where: eq(schema.judges.userId, userId),
+    with: {
+      assignments: {
+        where: eq(schema.judgeAssignments.isSubmitted, true),
+        with: {
+          registration: {
+            with: {
+              competitionCategory: {
+                with: {
+                  competition: {
+                    columns: { id: true, scope: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      payouts: {
+        orderBy: desc(schema.judgePayouts.createdAt),
+      },
+    },
+  });
+}
+
+export async function updateJudgeBankDetails(
+  judgeId: string,
+  bankAccountDetails: { bankName: string; accountNum: string; ifscCode: string }
+) {
+  const updated = await db
+    .update(schema.judges)
+    .set({ bankAccountDetails: JSON.stringify(bankAccountDetails) })
+    .where(eq(schema.judges.id, judgeId))
+    .returning();
+
+  return updated[0];
 }
 
 export async function getJudgeWithAssignmentsAndPayouts(userId: string) {

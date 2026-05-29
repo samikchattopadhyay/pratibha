@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getNotificationsSinceDate } from "@/lib/db/queries";
 
 // Use serverless runtime for better compatibility with long-lived connections
 // Note: Vercel's serverless functions have a 30s timeout by default
@@ -32,14 +32,7 @@ export async function GET(req: NextRequest) {
       const sendNotification = async () => {
         try {
           // Poll for new notifications since lastSeenAt
-          const newNotifications = await prisma.notification.findMany({
-            where: {
-              userId,
-              createdAt: { gt: lastSeenAt },
-            },
-            orderBy: { createdAt: "asc" },
-            take: 10, // Limit to avoid overwhelming
-          });
+          const newNotifications = await getNotificationsSinceDate(userId!, lastSeenAt, 10);
 
           if (newNotifications.length > 0) {
             for (const notif of newNotifications) {

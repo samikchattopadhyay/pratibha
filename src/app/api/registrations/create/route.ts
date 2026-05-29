@@ -1,6 +1,14 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getParentByUserId,
+  getStudentByIdBelongingToParent,
+  getCompetitionCategoryById,
+  createRegistrationWithTransactionAtom,
+  createTransactionRecord,
+  getUserById,
+  getAdminUsers,
+} from "@/lib/db/queries";
 import Razorpay from "razorpay";
 import { createAndDispatchNotification } from "@/lib/notificationService";
 
@@ -28,30 +36,20 @@ export async function POST(req: Request) {
 
     // 1. Verify student exists and belongs to the parent
     const userId = (session.user as { id?: string }).id || "";
-    const parent = await prisma.parent.findUnique({
-      where: { userId },
-    });
+    const parent = await getParentByUserId(userId);
 
     if (!parent) {
       return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
     }
 
-    const student = await prisma.student.findFirst({
-      where: { id: studentId, parentId: parent.id },
-    });
+    const student = await getStudentByIdBelongingToParent(studentId, parent.id);
 
     if (!student) {
       return NextResponse.json({ error: "Student profile not found under this account" }, { status: 404 });
     }
 
     // 2. Fetch category and fee info
-    const compCategory = await prisma.competitionCategory.findUnique({
-      where: { id: competitionCategoryId },
-      include: {
-        competition: true,
-        category: true,
-      },
-    });
+    const compCategory = await getCompetitionCategoryById(competitionCategoryId);
 
     if (!compCategory) {
       return NextResponse.json({ error: "Selected competition category is invalid" }, { status: 400 });
@@ -65,20 +63,12 @@ export async function POST(req: Request) {
     const randDigits = Math.floor(1000 + Math.random() * 9000);
     const registrationId = `PP-${year}-${catCode}-${randDigits}`;
 
-    // 4. Create Registration in transaction
-    const registration = await prisma.$transaction(async (tx) => {
-      const reg = await tx.registration.create({
-        data: {
-          studentId,
-          competitionCategoryId,
-          fbPostUrl,
-          registrationId,
-          paymentStatus: "PENDING",
-          status: "PENDING_VERIFICATION",
-        },
-      });
-
-      return reg;
+    // 4. Create Registration
+    const registration = await createRegistrationWithTransactionAtom({
+      studentId,
+      competitionCategoryId,
+      fbPostUrl,
+      registrationId,
     });
 
     // 5. Generate Razorpay Order ID (or dummy fallback if unconfigured)
@@ -104,17 +94,14 @@ export async function POST(req: Request) {
     }
 
     // 6. Record transaction in database
-    await prisma.transaction.create({
-      data: {
-        registrationId: registration.id,
-        razorpayOrderId: orderId,
-        amount: amount,
-        status: "PENDING",
-      },
+    await createTransactionRecord({
+      registrationId: registration.id,
+      razorpayOrderId: orderId,
+      amount,
     });
 
     // 7. Send notifications (fire-and-forget)
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await getUserById(userId);
     if (user?.email) {
       createAndDispatchNotification({
         userId,
@@ -128,9 +115,7 @@ export async function POST(req: Request) {
     }
 
     // Notify all admins
-    const admins = await prisma.user.findMany({
-      where: { role: { in: ["SUPER_ADMIN", "MODERATOR"] } },
-    });
+    const admins = await getAdminUsers();
     admins.forEach((admin) => {
       createAndDispatchNotification({
         userId: admin.id,

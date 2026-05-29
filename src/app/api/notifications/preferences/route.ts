@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
-import { NotificationChannel, NotificationType } from "@prisma/client";
+import {
+  getNotificationPreferencesByUserId,
+  upsertNotificationPreference,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -15,10 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const preferences = await prisma.notificationPreference.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    });
+    const preferences = await getNotificationPreferencesByUserId(userId);
 
     return NextResponse.json({ preferences });
   } catch (error) {
@@ -48,40 +47,39 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Validate channel is one of the allowed values
-    if (!Object.values(NotificationChannel).includes(channel)) {
+    // Validate channel and type are valid strings (simple validation)
+    const validChannels = ["EMAIL", "TELEGRAM", "WHATSAPP"];
+    const validTypes = [
+      "REGISTRATION_CREATED",
+      "PAYMENT_RECEIVED",
+      "SCORING_REMINDER",
+      "RESULT_DECLARED",
+      "CERTIFICATE_GENERATED",
+      "PRIZE_AWARDED",
+    ];
+
+    if (!validChannels.includes(channel)) {
       return NextResponse.json(
         { error: `Invalid channel: ${channel}` },
         { status: 400 }
       );
     }
 
-    // Validate type is one of the allowed values
-    if (!Object.values(NotificationType).includes(type)) {
+    if (!validTypes.includes(type)) {
       return NextResponse.json(
         { error: `Invalid notification type: ${type}` },
         { status: 400 }
       );
     }
 
-    const preference = await prisma.notificationPreference.upsert({
-      where: {
-        userId_type_channel: {
-          userId,
-          type,
-          channel,
-        },
-      },
-      update: {
-        enabled: enabled !== undefined ? enabled : true,
-      },
-      create: {
-        userId,
-        type,
-        channel,
-        enabled: enabled !== undefined ? enabled : true,
-      },
+    const result = await upsertNotificationPreference({
+      userId,
+      type,
+      channel,
+      enabled: enabled !== undefined ? enabled : true,
     });
+
+    const preference = result[0];
 
     return NextResponse.json({
       message: "Preference updated successfully",

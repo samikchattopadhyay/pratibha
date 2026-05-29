@@ -1,6 +1,13 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getTransactionByRazorpayOrderId,
+  updateTransactionAsFailed,
+  updateTransactionAndRegistrationAsSuccess,
+  getRegistrationWithStudentAndCategory,
+  getParentWithUser,
+  getAdminUsers,
+} from "@/lib/db/queries";
 import crypto from "crypto";
 import { createAndDispatchNotification } from "@/lib/notificationService";
 
@@ -19,10 +26,7 @@ export async function POST(req: Request) {
     }
 
     // 1. Verify transaction in DB
-    const transaction = await prisma.transaction.findUnique({
-      where: { razorpayOrderId },
-      include: { registration: true },
-    });
+    const transaction = await getTransactionByRazorpayOrderId(razorpayOrderId);
 
     if (!transaction) {
       return NextResponse.json({ error: "Original transaction record not found" }, { status: 404 });
@@ -45,56 +49,27 @@ export async function POST(req: Request) {
     }
 
     if (!isValid) {
-      // Mark transaction failed
-      await prisma.transaction.update({
-        where: { razorpayOrderId },
-        data: { status: "FAILED" },
-      });
+      await updateTransactionAsFailed(razorpayOrderId);
       return NextResponse.json({ error: "Payment signature validation failed" }, { status: 400 });
     }
 
     // 3. Update database records as successful
-    await prisma.$transaction(async (tx) => {
-      // Update transaction status
-      await tx.transaction.update({
-        where: { razorpayOrderId },
-        data: {
-          razorpayPaymentId,
-          razorpaySignature,
-          status: "SUCCESS",
-        },
-      });
-
-      // Update registration payment status
-      await tx.registration.update({
-        where: { id: transaction.registrationId },
-        data: { paymentStatus: "SUCCESS" },
-      });
-    });
+    await updateTransactionAndRegistrationAsSuccess(
+      razorpayOrderId,
+      transaction.registrationId,
+      razorpayPaymentId || "",
+      razorpaySignature || ""
+    );
 
     // 4. Send notifications (fire-and-forget)
-    const registration = await prisma.registration.findUnique({
-      where: { id: transaction.registrationId },
-      include: {
-        student: true,
-        competitionCategory: {
-          include: { category: true },
-        },
-      },
-    });
+    const registration = await getRegistrationWithStudentAndCategory(transaction.registrationId);
 
     if (registration) {
       const student = registration.student;
-      const parent = await prisma.parent.findFirst({
-        where: { id: student.parentId },
-      });
+      const parent = await getParentWithUser(student.parentId);
 
       if (parent) {
-        const user = await prisma.user.findUnique({
-          where: { id: parent.userId },
-        });
-
-        if (user?.email) {
+        if (parent.user.email) {
           createAndDispatchNotification({
             userId: parent.userId,
             type: "PAYMENT_RECEIVED",
@@ -102,7 +77,7 @@ export async function POST(req: Request) {
             body: `Payment of ₹${transaction.amount} for ${student.name}'s registration in ${registration.competitionCategory.category.name} has been verified.`,
             actionUrl: "/account/dashboard",
             registrationId: registration.id,
-            recipientEmail: user.email,
+            recipientEmail: parent.user.email,
           }).catch((err) =>
             console.error("Failed to send payment received notification:", err)
           );
@@ -110,9 +85,7 @@ export async function POST(req: Request) {
       }
 
       // Notify all admins
-      const admins = await prisma.user.findMany({
-        where: { role: { in: ["SUPER_ADMIN", "MODERATOR"] } },
-      });
+      const admins = await getAdminUsers();
       admins.forEach((admin) => {
         createAndDispatchNotification({
           userId: admin.id,

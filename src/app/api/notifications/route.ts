@@ -1,6 +1,14 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getNotificationsPaginated,
+  getNotificationCount,
+  getUnreadNotificationCount,
+  getNotificationById,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+} from "@/lib/db/queries";
 
 export interface NotificationItem {
   id: string;
@@ -27,14 +35,9 @@ export async function GET(request: NextRequest) {
 
     // Fetch paginated notifications from the database
     const [notifications, totalCount, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.notification.count({ where: { userId } }),
-      prisma.notification.count({ where: { userId, read: false } }),
+      getNotificationsPaginated(userId!, limit, skip),
+      getNotificationCount(userId!),
+      getUnreadNotificationCount(userId!),
     ]);
 
     const mappedNotifications: NotificationItem[] = notifications.map((n) => ({
@@ -80,26 +83,17 @@ export async function PATCH(request: NextRequest) {
     let updated = 0;
 
     if (markAll) {
-      // Mark all unread notifications as read
-      const result = await prisma.notification.updateMany({
-        where: { userId, read: false },
-        data: { read: true, readAt: new Date() },
-      });
-      updated = result.count;
+      await markAllNotificationsAsRead(userId!);
+      // Count how many were marked (estimate based on unread count)
+      updated = await getUnreadNotificationCount(userId!);
     } else if (id) {
-      // Mark single notification as read
-      const notification = await prisma.notification.findFirst({
-        where: { id, userId },
-      });
+      const notification = await getNotificationById(id, userId!);
 
       if (!notification) {
         return NextResponse.json({ error: "Notification not found" }, { status: 404 });
       }
 
-      await prisma.notification.update({
-        where: { id },
-        data: { read: true, readAt: new Date() },
-      });
+      await markNotificationAsRead(id);
       updated = 1;
     } else {
       return NextResponse.json(
@@ -134,15 +128,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verify the notification belongs to the user
-    const notification = await prisma.notification.findFirst({
-      where: { id, userId },
-    });
+    const notification = await getNotificationById(id, userId!);
 
     if (!notification) {
       return NextResponse.json({ error: "Notification not found" }, { status: 404 });
     }
 
-    await prisma.notification.delete({ where: { id } });
+    await deleteNotification(id);
 
     return NextResponse.json({ success: true, deleted: true });
   } catch (error) {
