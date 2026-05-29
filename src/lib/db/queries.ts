@@ -1594,6 +1594,76 @@ export async function getCompetitionPanelData(competitionId: string) {
   });
 }
 
+export async function getCompetitionParticipantsPaginated(params: {
+  competitionId: string;
+  limit: number;
+  offset: number;
+  filter?: string;
+  search?: string;
+}) {
+  const { competitionId, limit, offset, filter, search } = params;
+
+  let registrations = await db.query.registrations.findMany({
+    where: (reg, { eq: eqOp }) =>
+      eqOp(schema.competitionCategories.competitionId, competitionId),
+    with: {
+      student: {
+        columns: {
+          name: true,
+        },
+      },
+      competitionCategory: {
+        with: {
+          category: {
+            columns: {
+              name: true,
+            },
+          },
+        },
+      },
+      judgeAssignments: {
+        with: {
+          judge: {
+            columns: {
+              id: true,
+              name: true,
+            },
+          },
+          score: {
+            columns: {
+              totalScore: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  registrations = registrations.filter(
+    (r) => r.competitionCategory.competitionId === competitionId
+  );
+
+  if (filter && filter !== "ALL") {
+    registrations = registrations.filter((r) => r.status === filter);
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    registrations = registrations.filter(
+      (r) =>
+        r.registrationId.toLowerCase().includes(searchLower) ||
+        r.student.name.toLowerCase().includes(searchLower)
+    );
+  }
+
+  const totalCount = registrations.length;
+  const paginatedRegistrations = registrations
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(offset, offset + limit);
+
+  return { registrations: paginatedRegistrations, totalCount };
+}
+
 export async function getStudentsForAdminList(params: {
   limit: number;
   offset: number;

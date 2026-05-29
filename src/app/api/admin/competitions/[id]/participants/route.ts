@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { getCompetitionParticipantsPaginated } from "@/lib/db/queries";
 
 export async function GET(
   request: NextRequest,
@@ -30,54 +29,15 @@ export async function GET(
 
     const skip = (page - 1) * limit;
 
-    // Build filter conditions
-    const where: Prisma.RegistrationWhereInput = {
-      competitionCategory: {
-        competitionId,
-      },
-    };
-
-    // Status filter
-    if (filter !== "ALL") {
-      where.status = filter as Prisma.RegistrationWhereInput["status"];
-    }
-
-    // Search filter
-    if (search) {
-      where.OR = [
-        { registrationId: { contains: search, mode: "insensitive" } },
-        { student: { name: { contains: search, mode: "insensitive" } } },
-      ];
-    }
-
-    // Fetch total count
-    const totalCount = await prisma.registration.count({ where });
-    const totalPages = Math.ceil(totalCount / limit);
-
-    // Fetch paginated registrations
-    const registrations = await prisma.registration.findMany({
-      where,
-      select: {
-        id: true,
-        registrationId: true,
-        student: { select: { name: true } },
-        competitionCategory: {
-          select: { category: { select: { name: true } } },
-        },
-        status: true,
-        paymentStatus: true,
-        judgeAssignments: {
-          select: {
-            judge: { select: { id: true, name: true } },
-            score: { select: { totalScore: true } },
-          },
-        },
-        createdAt: true,
-      },
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
+    const { registrations, totalCount } = await getCompetitionParticipantsPaginated({
+      competitionId,
+      limit,
+      offset: skip,
+      filter,
+      search,
     });
+
+    const totalPages = Math.ceil(totalCount / limit);
 
     return NextResponse.json({
       data: registrations.map((reg) => ({
