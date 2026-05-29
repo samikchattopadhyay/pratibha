@@ -1,6 +1,9 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getCategoryCount,
+  createCategories,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
@@ -38,8 +41,7 @@ export async function POST() {
     const role = (session.user as { role?: string }).role;
     if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    // Check if categories already exist
-    const existingCount = await prisma.category.count();
+    const existingCount = await getCategoryCount();
     if (existingCount > 0) {
       return NextResponse.json(
         { message: "Categories already exist. Seeding skipped.", count: existingCount },
@@ -47,22 +49,20 @@ export async function POST() {
       );
     }
 
-    // Create default categories
-    const created = await prisma.category.createMany({
-      data: DEFAULT_CATEGORIES.map((cat) => ({
-        name: cat.name,
-        slug: cat.name
-          .toLowerCase()
-          .replace(/[^\w\s-]/g, "")
-          .replace(/\s+/g, "-")
-          .substring(0, 100),
-        grouping: cat.grouping as string,
-      })),
-      skipDuplicates: true,
-    });
+    const categoriesToCreate = DEFAULT_CATEGORIES.map((cat) => ({
+      name: cat.name,
+      slug: cat.name
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .substring(0, 100),
+      grouping: cat.grouping,
+    }));
+
+    const created = await createCategories(categoriesToCreate);
 
     return NextResponse.json(
-      { message: "Categories seeded successfully", count: created.count },
+      { message: "Categories seeded successfully", count: created.length },
       { status: 201 }
     );
   } catch (error) {

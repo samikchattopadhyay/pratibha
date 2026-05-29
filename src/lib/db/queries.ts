@@ -2386,6 +2386,22 @@ export async function getRegistrationWithAssignmentsAndScores(registrationId: st
   });
 }
 
+export async function getCategoryCount() {
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.categories);
+
+  return result[0]?.count || 0;
+}
+
+export async function createCategories(categories: Array<{
+  name: string;
+  slug: string;
+  grouping: string;
+}>) {
+  return db.insert(schema.categories).values(categories).returning();
+}
+
 export async function createPrizeAwardWithCertificate(
   registrationId: string,
   prizeItemId: string,
