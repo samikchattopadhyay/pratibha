@@ -631,6 +631,27 @@ export async function getUserForAdminProfile(userId: string) {
   });
 }
 
+// ─── SYSTEM SETTINGS QUERIES ─────────────────────────────────────────
+
+export async function getSystemSettingByKey(key: string) {
+  return db.query.systemSettings.findFirst({
+    where: eq(schema.systemSettings.key, key),
+  });
+}
+
+export async function upsertSystemSetting(key: string, value: any) {
+  const existing = await getSystemSettingByKey(key);
+  if (existing) {
+    return db
+      .update(schema.systemSettings)
+      .set({ value })
+      .where(eq(schema.systemSettings.key, key))
+      .returning();
+  } else {
+    return db.insert(schema.systemSettings).values({ key, value }).returning();
+  }
+}
+
 // ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────
 
 export async function getEmailVerificationTokenByTokenWithUser(token: string) {

@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getSystemSettingByKey,
+  upsertSystemSetting,
+} from "@/lib/db/queries";
 import defaultRubrics from "@/lib/rubric-defaults.json";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
@@ -14,9 +17,7 @@ export async function GET() {
     const role = (session.user as { role?: string }).role;
     if (!ADMIN_ROLES.includes(role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const setting = await prisma.systemSetting.findUnique({
-      where: { key: SETTING_KEY },
-    });
+    const setting = await getSystemSettingByKey(SETTING_KEY);
 
     if (setting) {
       return NextResponse.json(setting.value);
@@ -42,11 +43,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload format" }, { status: 400 });
     }
 
-    await prisma.systemSetting.upsert({
-      where: { key: SETTING_KEY },
-      update: { value: data },
-      create: { key: SETTING_KEY, value: data },
-    });
+    await upsertSystemSetting(SETTING_KEY, data);
 
     return NextResponse.json({ success: true, message: "Rubrics saved successfully" });
   } catch (error) {
