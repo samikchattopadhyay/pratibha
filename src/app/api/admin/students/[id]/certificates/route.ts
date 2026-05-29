@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { getStudentWithCertificatesAndAwards } from "@/lib/db/queries";
 import type { StudentCertificate } from "@/types/student-details";
 
 export async function GET(
@@ -20,27 +20,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const student = await prisma.student.findUnique({
-      where: { id },
-      include: {
-        registrations: {
-          include: {
-            competitionCategory: {
-              include: {
-                competition: true,
-                category: true,
-              },
-            },
-            prizeAward: {
-              include: {
-                prizeItem: true,
-              },
-            },
-            certificate: true,
-          },
-        },
-      },
-    });
+    const student = await getStudentWithCertificatesAndAwards(id);
 
     if (!student) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -59,10 +39,10 @@ export async function GET(
           status: certificate?.status || "PENDING",
           competitionTitle: registration.competitionCategory.competition.title,
           categoryName: registration.competitionCategory.category.name,
-          rank: award?.rank || undefined,
+          rank: award?.prizeItem?.rank || undefined,
           certificateUrl: certificate?.certificateUrl || undefined,
           qrCodeUrl: certificate?.qrCodeUrl || undefined,
-          issuedDate: certificate?.issuedAt.toISOString() || new Date().toISOString(),
+          issuedDate: certificate?.issuedAt ? new Date(certificate.issuedAt).toISOString() : new Date().toISOString(),
           registrationId: registration.id,
         });
       }

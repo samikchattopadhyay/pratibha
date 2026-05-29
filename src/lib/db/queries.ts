@@ -2473,6 +2473,45 @@ export async function updateCertificateUrl(
   return updated[0];
 }
 
+export async function getStudentWithCertificatesAndAwards(studentId: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.id, studentId),
+    with: {
+      registrations: {
+        with: {
+          competitionCategory: {
+            with: {
+              competition: {
+                columns: { id: true, title: true },
+              },
+              category: {
+                columns: { id: true, name: true },
+              },
+            },
+          },
+          prizeAward: {
+            with: {
+              prizeItem: {
+                columns: { id: true, rank: true },
+              },
+            },
+          },
+          certificate: {
+            columns: {
+              id: true,
+              type: true,
+              status: true,
+              certificateUrl: true,
+              qrCodeUrl: true,
+              issuedAt: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function createPrizeAwardWithNewCertificate(
   registrationId: string,
   prizeItemId: string,
