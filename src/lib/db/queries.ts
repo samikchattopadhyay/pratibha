@@ -619,6 +619,18 @@ export async function getVerifiedRegistrationsByStudentId(studentId: string) {
   });
 }
 
+export async function getUserForAdminProfile(userId: string) {
+  return db.query.users.findFirst({
+    where: eq(schema.users.id, userId),
+    columns: {
+      email: true,
+      role: true,
+      profileImageUrl: true,
+      passwordHash: true,
+    },
+  });
+}
+
 // ─── ADDITIONAL HELPERS ───────────────────────────────────────────────────
 
 export async function getEmailVerificationTokenByTokenWithUser(token: string) {

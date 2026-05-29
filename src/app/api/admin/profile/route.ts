@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import {
+  getUserForAdminProfile,
+  updateUser,
+} from "@/lib/db/queries";
 import bcryptjs from "bcryptjs";
 
 export async function GET() {
@@ -15,12 +18,9 @@ export async function GET() {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const userId = (session.user as { id?: string }).id;
+    const userId = (session.user as { id?: string }).id!;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, role: true, profileImageUrl: true },
-    });
+    const user = await getUserForAdminProfile(userId);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const userId = (session.user as { id?: string }).id;
+    const userId = (session.user as { id?: string }).id!;
     const body = await request.json();
 
     const { currentPassword, newPassword, confirmPassword } = body;
@@ -66,10 +66,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "New password must be at least 8 characters" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { passwordHash: true },
-    });
+    const user = await getUserForAdminProfile(userId);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -91,10 +88,7 @@ export async function PUT(request: NextRequest) {
       updateData.profileImageUrl = body.profileImage;
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-    });
+    await updateUser(userId, updateData);
 
     return NextResponse.json({ message: "Password changed successfully" });
   } catch (error) {
