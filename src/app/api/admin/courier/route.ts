@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
-import { PackageSKU, PrizeRank } from "@prisma/client";
+import {
+  getPhysicalPrizeOrderStatusCounts,
+  getRecentShipmentBatches,
+  getRecentPhysicalPrizeOrders,
+  getPhysicalPrizeAwardsForCompetition,
+  createPhysicalPrizeOrders,
+} from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// Map PrizeRank → PackageSKU + dimensions
-const PACKAGE_SPECS: Record<PrizeRank, { sku: PackageSKU; weightGrams: number; lengthCm: number; widthCm: number; heightCm: number }> = {
+const PACKAGE_SPECS: Record<string, { sku: string; weightGrams: number; lengthCm: number; widthCm: number; heightCm: number }> = {
   FIRST_PLACE: { sku: "TROPHY_LARGE", weightGrams: 2000, lengthCm: 30, widthCm: 20, heightCm: 20 },
   SECOND_PLACE: { sku: "TROPHY_MEDIUM", weightGrams: 1000, lengthCm: 20, widthCm: 15, heightCm: 15 },
   THIRD_PLACE: { sku: "MEDAL_CERTIFICATE", weightGrams: 500, lengthCm: 25, widthCm: 20, heightCm: 5 },
@@ -18,7 +22,6 @@ const PACKAGE_SPECS: Record<PrizeRank, { sku: PackageSKU; weightGrams: number; l
   PARTICIPATION: { sku: "CERTIFICATE_ONLY", weightGrams: 200, lengthCm: 35, widthCm: 25, heightCm: 1 },
 };
 
-// GET /api/admin/courier — overview metrics + batch list
 export async function GET() {
   try {
     const session = await getEdgeSession();
@@ -26,26 +29,15 @@ export async function GET() {
     if (!ADMIN_ROLES.includes((session.user as { role?: string }).role || "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const [statusCounts, batches, recentOrders] = await Promise.all([
-      prisma.physicalPrizeOrder.groupBy({ by: ["status"], _count: { status: true } }),
-      prisma.shipmentBatch.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
-      prisma.physicalPrizeOrder.findMany({
-        include: {
-          prizeAward: {
-            include: {
-              registration: {
-                include: { student: { select: { name: true } } },
-              },
-              prizeItem: { select: { title: true } },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      }),
+      getPhysicalPrizeOrderStatusCounts(),
+      getRecentShipmentBatches(10),
+      getRecentPhysicalPrizeOrders(50),
     ]);
 
     const counts: Record<string, number> = {};
-    statusCounts.forEach((s) => { counts[s.status] = s._count.status; });
+    statusCounts.forEach((s) => {
+      counts[s.status] = s.count;
+    });
 
     const orders = recentOrders.map((o) => ({
       id: o.id,
@@ -91,7 +83,6 @@ export async function GET() {
   }
 }
 
-// POST /api/admin/courier — generate physical prize orders for a competition
 export async function POST(request: NextRequest) {
   try {
     const session = await getEdgeSession(request);
@@ -102,38 +93,18 @@ export async function POST(request: NextRequest) {
     const { competitionId } = body;
     if (!competitionId) return NextResponse.json({ error: "competitionId is required" }, { status: 400 });
 
-    // Find all physical prize awards for this competition without orders yet
-    const awards = await prisma.prizeAward.findMany({
-      where: {
-        prizeItem: { isPhysical: true },
-        physicalOrder: null,
-        registration: {
-          competitionCategory: { competitionId },
-        },
-      },
-      include: {
-        registration: {
-          include: {
-            student: {
-              include: { parent: { select: { id: true, name: true, phone: true, address: true, city: true, state: true, postalCode: true, country: true } } },
-            },
-          },
-        },
-      },
-    });
+    const allAwards = await getPhysicalPrizeAwardsForCompetition(competitionId);
 
-    if (awards.length === 0) {
+    if (allAwards.length === 0) {
       return NextResponse.json({ message: "No pending physical prize orders to generate for this competition" });
     }
 
-    // Filter awards where parent has complete address information
     const ordersData = [];
     const incompleteAddresses = [];
 
-    for (const award of awards) {
+    for (const award of allAwards) {
       const parent = award.registration.student.parent;
 
-      // Check if all address fields are complete
       if (!parent.address || !parent.city || !parent.state || !parent.postalCode) {
         incompleteAddresses.push({
           studentName: award.registration.student.name,
@@ -158,12 +129,12 @@ export async function POST(request: NextRequest) {
         lengthCm: spec.lengthCm,
         widthCm: spec.widthCm,
         heightCm: spec.heightCm,
-        status: "PENDING" as const,
+        status: "PENDING",
       });
     }
 
     if (ordersData.length > 0) {
-      await prisma.physicalPrizeOrder.createMany({ data: ordersData });
+      await createPhysicalPrizeOrders(ordersData);
     }
 
     return NextResponse.json({

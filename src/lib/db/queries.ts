@@ -1338,6 +1338,99 @@ export async function getParentByStudentId(studentId: string) {
   });
 }
 
+export async function getPhysicalPrizeOrderStatusCounts() {
+  return db
+    .select({
+      status: schema.physicalPrizeOrders.status,
+      count: sql<number>`cast(count(*) as integer)`,
+    })
+    .from(schema.physicalPrizeOrders)
+    .groupBy(schema.physicalPrizeOrders.status);
+}
+
+export async function getRecentShipmentBatches(limit: number = 10) {
+  return db.query.shipmentBatches.findMany({
+    orderBy: (batches, { desc }) => [desc(batches.createdAt)],
+    limit,
+  });
+}
+
+export async function getRecentPhysicalPrizeOrders(limit: number = 50) {
+  return db.query.physicalPrizeOrders.findMany({
+    with: {
+      prizeAward: {
+        with: {
+          registration: {
+            with: {
+              student: {
+                columns: {
+                  name: true,
+                },
+              },
+            },
+          },
+          prizeItem: {
+            columns: {
+              title: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: (orders, { desc }) => [desc(orders.createdAt)],
+    limit,
+  });
+}
+
+export async function getPhysicalPrizeAwardsForCompetition(competitionId: string) {
+  const allAwards = await db.query.prizeAwards.findMany({
+    with: {
+      prizeItem: true,
+      physicalOrder: true,
+      registration: {
+        with: {
+          competitionCategory: {
+            with: {
+              competition: true,
+            },
+          },
+          student: {
+            with: {
+              parent: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return allAwards.filter(
+    (award) =>
+      award.prizeItem.isPhysical &&
+      !award.physicalOrder &&
+      award.registration.competitionCategory.competition.id === competitionId
+  );
+}
+
+export async function createPhysicalPrizeOrders(orders: Array<{
+  prizeAwardId: string;
+  recipientName: string;
+  recipientPhone: string;
+  recipientAddress: string;
+  recipientCity: string;
+  recipientState: string;
+  recipientPostalCode: string;
+  recipientCountry: string;
+  packageSKU: string;
+  weightGrams: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  status: string;
+}>) {
+  return db.insert(schema.physicalPrizeOrders).values(orders as any);
+}
+
 export async function getStudentsForAdminList(params: {
   limit: number;
   offset: number;
