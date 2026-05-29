@@ -1,5 +1,5 @@
 import { db } from "./drizzle";
-import { eq, and, isNull, gt, lt, desc, sql, gte, inArray } from "drizzle-orm";
+import { eq, and, isNull, gt, lt, desc, asc, sql, gte, inArray } from "drizzle-orm";
 import * as schema from "./schema";
 
 // ─── USER QUERIES ────────────────────────────────────────────────────────────
@@ -2103,6 +2103,149 @@ export async function updateCertificateStatusOnly(certificateId: string, status:
     .set({ status: status as any })
     .where(eq(schema.certificates.id, certificateId))
     .returning();
+
+  return updated[0];
+}
+
+export async function getJudgeParticipantsPaginated(judgeId: string, search?: string, limit?: number, offset?: number) {
+  const whereConditions: any[] = [eq(schema.judgeAssignments.judgeId, judgeId)];
+
+  if (search) {
+    whereConditions.push(
+      sql`EXISTS (SELECT 1 FROM ${schema.students} WHERE ${schema.students.name} ILIKE ${'%' + search + '%'} AND ${schema.students.id} = (SELECT "studentId" FROM ${schema.registrations} WHERE ${schema.registrations.id} = ${schema.judgeAssignments.registrationId}))`
+    );
+  }
+
+  const assignments = await db.query.judgeAssignments.findMany({
+    where: and(...whereConditions),
+    with: {
+      registration: {
+        columns: { id: true, finalScore: true },
+        with: {
+          student: {
+            columns: { id: true, name: true },
+          },
+          competitionCategory: {
+            columns: {},
+            with: {
+              category: {
+                columns: { id: true, name: true },
+              },
+            },
+          },
+        },
+      },
+      score: {
+        columns: { totalScore: true },
+      },
+    },
+    limit: limit || 20,
+    offset: offset || 0,
+  });
+
+  const total = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(schema.judgeAssignments)
+    .where(and(...whereConditions));
+
+  return {
+    data: assignments.map((a) => ({
+      id: a.id,
+      participantId: a.registration.student.id,
+      participantName: a.registration.student.name,
+      categoryId: a.registration.competitionCategory.category.id,
+      categoryName: a.registration.competitionCategory.category.name,
+      submissionScore: a.score?.totalScore ? parseFloat(a.score.totalScore.toString()) : (a.registration.finalScore ? parseFloat(a.registration.finalScore.toString()) : null),
+      evaluationStatus: (a.submittedAt ? "completed" : "pending") as "pending" | "in-progress" | "completed",
+      submittedAt: a.submittedAt ? new Date(a.submittedAt).toISOString() : "",
+    })),
+    totalCount: total[0]?.count || 0,
+  };
+}
+
+export async function getCompetitionWithPrizePoolAndRankedRegistrations(competitionId: string) {
+  return db.query.competitions.findFirst({
+    where: eq(schema.competitions.id, competitionId),
+    with: {
+      prizePool: {
+        with: {
+          items: true,
+        },
+      },
+      categories: {
+        with: {
+          registrations: {
+            where: and(
+              eq(schema.registrations.scoringFinalized, true),
+              sql`${schema.registrations.finalRank} IS NOT NULL`
+            ),
+            with: {
+              certificate: {
+                columns: { id: true },
+              },
+            },
+            orderBy: asc(schema.registrations.finalRank),
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function checkExistingPrizeAward(registrationId: string) {
+  return db.query.prizeAwards.findFirst({
+    where: eq(schema.prizeAwards.registrationId, registrationId),
+  });
+}
+
+export async function createPrizeAwardWithCertificate(
+  registrationId: string,
+  prizeItemId: string,
+  rank: string,
+  certificateData?: {
+    certificateId: string;
+    certificateUrl: string;
+    qrCodeUrl: string;
+    type: string;
+  }
+) {
+  if (certificateData) {
+    // Create certificate first, then link to award
+    await db.insert(schema.certificates).values({
+      registrationId,
+      certificateId: certificateData.certificateId,
+      certificateUrl: certificateData.certificateUrl,
+      qrCodeUrl: certificateData.qrCodeUrl,
+      type: certificateData.type as any,
+    });
+  }
+
+  const award = await db
+    .insert(schema.prizeAwards)
+    .values({
+      registrationId,
+      prizeItemId,
+      rank: rank as any,
+    })
+    .returning();
+
+  return award[0];
+}
+
+export async function verifyJudge(judgeId: string, tier?: string) {
+  const updated = await db
+    .update(schema.judges)
+    .set({
+      isVerified: true,
+      ...(tier ? { tier: tier as any } : {}),
+    })
+    .where(eq(schema.judges.id, judgeId))
+    .returning({
+      id: schema.judges.id,
+      name: schema.judges.name,
+      tier: schema.judges.tier,
+      isVerified: schema.judges.isVerified,
+    });
 
   return updated[0];
 }

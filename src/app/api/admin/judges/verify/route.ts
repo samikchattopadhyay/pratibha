@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
-import prisma from "@/lib/db";
+import { verifyJudge } from "@/lib/db/queries";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "MODERATOR"];
 
-// POST /api/admin/judges/verify — verify a judge and set their tier
 export async function POST(request: NextRequest) {
   try {
     const session = await getEdgeSession(request);
@@ -21,14 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid tier. Must be LOCAL, REGIONAL, NATIONAL, or EXPERT" }, { status: 400 });
     }
 
-    const updated = await prisma.judge.update({
-      where: { id: judgeId },
-      data: {
-        isVerified: true,
-        ...(tier ? { tier } : {}),
-      },
-      select: { id: true, name: true, tier: true, isVerified: true },
-    });
+    const updated = await verifyJudge(judgeId, tier);
 
     return NextResponse.json({ message: `Judge ${updated.name} verified as ${updated.tier}`, judge: updated });
   } catch (error) {

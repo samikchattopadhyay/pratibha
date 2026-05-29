@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEdgeSession } from "@/lib/auth-helper";
 
-// Temporary in-memory config store
 const config = {
   whatsAppApiUrl: "https://api.whatsapp.com/v1/messages",
   razorpayWebhookSecret: "••••••••••••••••",
