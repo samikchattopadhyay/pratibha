@@ -30,7 +30,6 @@ const nextConfig: NextConfig = {
       "date-fns",
     ],
   },
-  turbopack: {},
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
