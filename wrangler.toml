@@ -4,12 +4,7 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [env.production]
-vars = {
-  NODE_ENV = "production",
-  OTP_CODE_LENGTH = "6",
-  OTP_TOKEN_EXPIRY = "600",
-  SETUP_TOKEN_EXPIRY = "3600"
-}
+vars = { NODE_ENV = "production", OTP_CODE_LENGTH = "6", OTP_TOKEN_EXPIRY = "600", SETUP_TOKEN_EXPIRY = "3600" }
 
 [[env.production.secrets]]
 name = "DATABASE_URL"
