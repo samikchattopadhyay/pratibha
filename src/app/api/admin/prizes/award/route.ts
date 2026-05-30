@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
     const awards: { registrationId: string; prizeItemId: string; rank: string }[] = [];
 
     const findPrizeItem = (prizeRank: string) =>
-      pool.items.find((item) => item.rank === prizeRank) ?? pool.items.find((item) => item.rank === "PARTICIPATION");
+      pool.items.find((item: any) => item.rank === prizeRank) ?? pool.items.find((item: any) => item.rank === "PARTICIPATION");
 
-    const allRegistrations = competition.categories.flatMap((cc) => cc.registrations);
+    const allRegistrations = competition.categories.flatMap((cc: any) => cc.registrations);
 
     for (const reg of allRegistrations) {
       if (!reg.finalRank) continue;
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     let created = 0;
     for (const a of awards) {
-      const regInfo = allRegistrations.find((r) => r.id === a.registrationId);
+      const regInfo = allRegistrations.find((r: any) => r.id === a.registrationId);
       const fileId = regInfo?.registrationId || a.registrationId;
       const existingCert = regInfo?.certificate;
 

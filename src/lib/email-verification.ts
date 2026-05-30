@@ -69,7 +69,7 @@ export async function verifyEmailToken(
 
   // 3. Mark token as used and user as verified in transaction
   try {
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       // Mark token as verified
       await tx
         .update(emailVerificationTokens)

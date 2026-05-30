@@ -1,17 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  outputFileTracingIncludes: {
-    "/**/*": ["node_modules/.prisma/client/**/*", "node_modules/@prisma/client/**/*"],
-  },
-  outputFileTracingExcludes: {
-    "/**/*": [
-      "node_modules/@prisma/client/runtime/query_engine_bg.mysql.wasm",
-      "node_modules/@prisma/client/runtime/query_engine_bg.sqlite.wasm",
-      "node_modules/.prisma/client/query_engine_bg.mysql.wasm",
-      "node_modules/.prisma/client/query_engine_bg.sqlite.wasm",
-    ],
-  },
   images: {
     remotePatterns: [
       {

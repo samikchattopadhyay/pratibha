@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       skip
     );
 
-    const formatted = assignments.map((asg) => ({
+    const formatted = assignments.map((asg: any) => ({
       id: asg.id,
       registrationId: asg.registration.registrationId,
       competitionTitle: asg.registration.competitionCategory.competition.title,

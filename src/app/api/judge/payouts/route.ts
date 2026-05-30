@@ -23,15 +23,15 @@ export async function GET() {
     }
 
     let totalEarnings = 0;
-    judge.assignments.forEach((asg) => {
+    judge.assignments.forEach((asg: any) => {
       const scope = asg.registration.competitionCategory.competition.scope as "STATE" | "NATIONAL";
       const rate = getJudgeRate(judge.tier, scope);
       totalEarnings += rate;
     });
 
     const totalPaidPayouts = judge.payouts
-      .filter((p) => p.status === "PAID")
-      .reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
+      .filter((p: any) => p.status === "PAID")
+      .reduce((sum: number, p: any) => sum + parseFloat(String(p.amount)), 0);
 
     const pendingPayoutBalance = Math.max(0, totalEarnings - totalPaidPayouts);
 

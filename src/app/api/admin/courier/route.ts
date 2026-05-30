@@ -35,11 +35,11 @@ export async function GET() {
     ]);
 
     const counts: Record<string, number> = {};
-    statusCounts.forEach((s) => {
+    statusCounts.forEach((s: any) => {
       counts[s.status] = s.count;
     });
 
-    const orders = recentOrders.map((o) => ({
+    const orders = recentOrders.map((o: any) => ({
       id: o.id,
       studentName: o.prizeAward.registration.student.name,
       prizeTitle: o.prizeAward.prizeItem.title,
@@ -67,7 +67,7 @@ export async function GET() {
         failed: counts["DELIVERY_FAILED"] ?? 0,
         returned: counts["RETURNED"] ?? 0,
       },
-      batches: batches.map((b) => ({
+      batches: batches.map((b: any) => ({
         id: b.id,
         batchNumber: b.batchNumber,
         description: b.description,

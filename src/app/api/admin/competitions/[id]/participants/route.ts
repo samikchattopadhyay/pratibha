@@ -40,14 +40,14 @@ export async function GET(
     const totalPages = Math.ceil(totalCount / limit);
 
     return NextResponse.json({
-      data: registrations.map((reg) => ({
+      data: registrations.map((reg: any) => ({
         id: reg.id,
         registrationId: reg.registrationId,
         studentName: reg.student.name,
         categoryName: reg.competitionCategory.category.name,
         status: reg.status,
         paymentStatus: reg.paymentStatus,
-        assignedJudges: reg.judgeAssignments.map((ja) => ({
+        assignedJudges: reg.judgeAssignments.map((ja: any) => ({
           id: ja.judge.id,
           name: ja.judge.name,
           score: ja.score?.totalScore ?? null,

@@ -68,7 +68,7 @@ export async function POST() {
       return NextResponse.json({ message: "No pending eligible certificates to generate.", count: 0 });
     }
 
-    const certificateData: (typeof schema.certificates.$inferInsert)[] = eligibleRegistrations.map((reg) => {
+    const certificateData: (typeof schema.certificates.$inferInsert)[] = eligibleRegistrations.map((reg: any) => {
       const serialPart1 = Math.floor(1000 + Math.random() * 9000);
       const serialPart2 = Math.floor(1000 + Math.random() * 9000);
       const certificateId = `CERT-PP-${serialPart1}-${serialPart2}`;

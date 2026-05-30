@@ -19,7 +19,7 @@ export async function GET() {
 
     const rules = await getAllQualificationRules();
 
-    const formatted = rules.map((rule) => ({
+    const formatted = rules.map((rule: any) => ({
       id: rule.id,
       stateCompetitionId: rule.stateCompetitionId,
       stateCompetitionTitle: rule.stateCompetition.title,
@@ -34,13 +34,13 @@ export async function GET() {
       isActive: rule.isActive,
       slotStats: {
         total: rule.slots.length,
-        offered: rule.slots.filter((s) => s.status === "OFFERED").length,
-        accepted: rule.slots.filter((s) => s.status === "ACCEPTED").length,
-        expired: rule.slots.filter((s) => s.status === "EXPIRED").length,
-        declined: rule.slots.filter((s) => s.status === "DECLINED").length,
-        wildCards: rule.slots.filter((s) => s.isWildCard).length,
+        offered: rule.slots.filter((s: any) => s.status === "OFFERED").length,
+        accepted: rule.slots.filter((s: any) => s.status === "ACCEPTED").length,
+        expired: rule.slots.filter((s: any) => s.status === "EXPIRED").length,
+        declined: rule.slots.filter((s: any) => s.status === "DECLINED").length,
+        wildCards: rule.slots.filter((s: any) => s.isWildCard).length,
         acceptanceRate: rule.slots.length > 0
-          ? ((rule.slots.filter((s) => s.status === "ACCEPTED").length / rule.slots.length) * 100).toFixed(1) + "%"
+          ? ((rule.slots.filter((s: any) => s.status === "ACCEPTED").length / rule.slots.length) * 100).toFixed(1) + "%"
           : "0%",
       },
     }));

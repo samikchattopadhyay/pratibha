@@ -31,7 +31,7 @@ export async function GET(
       (page - 1) * limit
     );
 
-    const formatted: StudentRegistrationEntry[] = registrations.map((reg) => ({
+    const formatted: StudentRegistrationEntry[] = registrations.map((reg: any) => ({
       id: reg.id,
       registrationId: reg.registrationId,
       competitionTitle: reg.competitionCategory.competition.title,
@@ -45,7 +45,7 @@ export async function GET(
       fbPostUrl: reg.fbPostUrl,
       scoringFinalized: reg.scoringFinalized,
       createdAt: new Date(reg.createdAt).toISOString(),
-      judgeAssignments: reg.judgeAssignments.map(({ judge, score }) => ({
+      judgeAssignments: reg.judgeAssignments.map(({ judge, score }: any) => ({
         judgeName: judge.name,
         score: score ? parseFloat(String(score.totalScore)) : null,
       })),

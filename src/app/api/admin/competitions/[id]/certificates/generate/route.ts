@@ -68,7 +68,7 @@ export async function POST(
     }
 
     for (const registrationId of certificateIds) {
-      const reg = eligibleRegistrations.find((r) => r.id === registrationId);
+      const reg = eligibleRegistrations.find((r: any) => r.id === registrationId);
       if (reg?.student?.parent?.userId) {
         createAndDispatchNotification({
           userId: reg.student.parent.userId,

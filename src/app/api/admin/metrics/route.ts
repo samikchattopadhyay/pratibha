@@ -45,24 +45,24 @@ export async function GET() {
       dailyRevenue[dayName] = 0;
     }
 
-    successfulTransactions.forEach((tx) => {
+    successfulTransactions.forEach((tx: any) => {
       const dayName = daysOfWeek[new Date(tx.createdAt).getDay()];
       if (dailyRevenue[dayName] !== undefined) {
         dailyRevenue[dayName] += parseFloat(tx.amount.toString());
       }
     });
 
-    const revenueData = Object.keys(dailyRevenue).map((day) => ({
+    const revenueData = Object.keys(dailyRevenue).map((day: any) => ({
       day,
       amount: dailyRevenue[day],
     }));
 
-    const totalRevenueSum = successfulTransactions.reduce((acc, curr) => acc + parseFloat(curr.amount.toString()), 0);
+    const totalRevenueSum = successfulTransactions.reduce((acc: number, curr: any) => acc + parseFloat(curr.amount.toString()), 0);
 
     const stateGroupings = await getParentsByState();
 
-    const totalParents = stateGroupings.reduce((sum, g) => sum + g.count, 0);
-    const hotspots = stateGroupings.map((g) => {
+    const totalParents = stateGroupings.reduce((sum: number, g: any) => sum + g.count, 0);
+    const hotspots = stateGroupings.map((g: any) => {
       const pct = totalParents > 0 ? Math.round((g.count / totalParents) * 100) : 0;
       return {
         state: g.state || "Other",
@@ -74,18 +74,18 @@ export async function GET() {
     const endedCompetitions = await getEndedCompetitions(3);
 
     const pendingAssignmentsByJudge = await getPendingAssignmentsByJudge();
-    const judgeIds = pendingAssignmentsByJudge.map((pa) => pa.judgeId);
+    const judgeIds = pendingAssignmentsByJudge.map((pa: any) => pa.judgeId);
     const judgesList = judgeIds.length > 0 ? await getJudgesByIds(judgeIds) : [];
 
     const urgentJudges = judgesList
-      .map((j) => {
-        const pCount = pendingAssignmentsByJudge.find((pa) => pa.judgeId === j.id)?.count || 0;
+      .map((j: any) => {
+        const pCount = pendingAssignmentsByJudge.find((pa: any) => pa.judgeId === j.id)?.count || 0;
         return {
           name: j.name,
           pendingCount: pCount,
         };
       })
-      .filter(j => j.pendingCount > 0)
+      .filter((j: any) => j.pendingCount > 0)
       .slice(0, 3);
 
     return NextResponse.json({
@@ -103,7 +103,7 @@ export async function GET() {
       },
       hotspots,
       operations: {
-        endedCompetitions: endedCompetitions.map(c => c.title),
+        endedCompetitions: endedCompetitions.map((c: any) => c.title),
         urgentJudges,
       },
     });

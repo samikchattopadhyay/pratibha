@@ -22,21 +22,21 @@ export async function GET() {
     }
 
     const assignments = judge.assignments;
-    const completedAssignments = assignments.filter((asg) => asg.isSubmitted);
+    const completedAssignments = assignments.filter((asg: any) => asg.isSubmitted);
     const pendingAssignmentsCount = assignments.length - completedAssignments.length;
 
     let totalUnpaidEarnings = 0;
     let totalEarnings = 0;
 
-    completedAssignments.forEach((asg) => {
+    completedAssignments.forEach((asg: any) => {
       const scope = asg.registration.competitionCategory.competition.scope as "STATE" | "NATIONAL";
       const rate = getJudgeRate(judge.tier, scope);
       totalEarnings += rate;
     });
 
     const totalPaidPayouts = judge.payouts
-      .filter((p) => p.status === "PAID")
-      .reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
+      .filter((p: any) => p.status === "PAID")
+      .reduce((sum: number, p: any) => sum + parseFloat(String(p.amount)), 0);
 
     totalUnpaidEarnings = Math.max(0, totalEarnings - totalPaidPayouts);
 
@@ -44,21 +44,21 @@ export async function GET() {
 
     const categoryIdsEvaluated = Array.from(
       new Set(
-        completedAssignments.map((asg) => asg.registration.competitionCategory.categoryId)
+        completedAssignments.map((asg: any) => asg.registration.competitionCategory.categoryId)
       )
-    );
+    ) as string[];
 
     const peerAverageScoreStr = await getAveragePeerScore(categoryIdsEvaluated);
     const peerAverageScore = peerAverageScoreStr ? parseFloat(peerAverageScoreStr) : null;
 
     // Workload category distribution counts
     const categoryCounts: Record<string, number> = {};
-    assignments.forEach((asg) => {
+    assignments.forEach((asg: any) => {
       const name = asg.registration.competitionCategory.category.name;
       categoryCounts[name] = (categoryCounts[name] || 0) + 1;
     });
 
-    const categoryDistribution = Object.entries(categoryCounts).map(([name, count]) => ({
+    const categoryDistribution = Object.entries(categoryCounts).map(([name, count]: any) => ({
       name,
       count,
     }));

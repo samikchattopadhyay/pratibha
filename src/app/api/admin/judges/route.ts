@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     let judges = await getAllJudgesWithUserAndAssignments();
 
-    judges = judges.filter((j) => {
+    judges = judges.filter((j: any) => {
       if (tierFilter && j.tier !== tierFilter) return false;
       if (eligibleTiers && !eligibleTiers.includes(j.tier)) return false;
       if (verifiedOnly && !j.isVerified) return false;
@@ -69,17 +69,17 @@ export async function GET(request: NextRequest) {
     const allScores = await getAllScores();
     const globalAvg =
       allScores.length > 0
-        ? allScores.reduce((acc, curr) => acc + parseFloat(curr.totalScore.toString()), 0) / allScores.length
+        ? allScores.reduce((acc: number, curr: any) => acc + parseFloat(curr.totalScore.toString()), 0) / allScores.length
         : 75;
 
-    const enriched = judges.map((j) => {
-      const submitted = j.assignments.filter((a) => a.isSubmitted);
+    const enriched = judges.map((j: any) => {
+      const submitted = j.assignments.filter((a: any) => a.isSubmitted);
       const pending = j.assignments.length - submitted.length;
       const scoreValues = submitted
-        .map((a) => a.score?.totalScore)
-        .filter((s) => s != null)
-        .map(s => parseFloat(s!.toString()));
-      const avgScoreVal = scoreValues.length > 0 ? scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length : 0;
+        .map((a: any) => a.score?.totalScore)
+        .filter((s: any) => s != null)
+        .map((s: any) => parseFloat(s!.toString()));
+      const avgScoreVal = scoreValues.length > 0 ? scoreValues.reduce((a: number, b: number) => a + b, 0) / scoreValues.length : 0;
       const deviationPct = globalAvg > 0 ? ((avgScoreVal - globalAvg) / globalAvg) * 100 : 0;
       const isOutlier = Math.abs(deviationPct) > 15 && scoreValues.length >= 3;
 
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(internalPassword, 10);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pratibhaparishad.in";
 
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx: any) => {
       const userResult = await tx
         .insert(schema.users)
         .values({
@@ -269,7 +269,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid judge tier" }, { status: 400 });
     }
 
-    const updated = await db.transaction(async (tx) => {
+    const updated = await db.transaction(async (tx: any) => {
       const userUpdateData: any = {};
       if (email) userUpdateData.email = email;
       if (password) {

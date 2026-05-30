@@ -155,7 +155,7 @@ export async function getAllJudgesWithUserAndAssignments() {
         },
       },
     },
-    orderBy: (judges, { asc }) => [asc(judges.tier), asc(judges.name)],
+    orderBy: (judges: any, { asc }: any) => [asc(judges.tier), asc(judges.name)],
   });
 }
 
@@ -178,7 +178,7 @@ export async function getAllQualificationRules() {
       },
       slots: true,
     },
-    orderBy: (rules, { desc }) => [desc(rules.createdAt)],
+    orderBy: (rules: any, { desc }: any) => [desc(rules.createdAt)],
   });
 }
 
@@ -631,7 +631,7 @@ export async function getTransactionsPaginated(limit: number, offset: number) {
         },
       },
     },
-    orderBy: (transactions, { desc }) => [desc(transactions.createdAt)],
+    orderBy: (transactions: any, { desc }: any) => [desc(transactions.createdAt)],
   });
 }
 
@@ -660,7 +660,7 @@ export async function getSocialMetricsPaginated(limit: number, offset: number) {
         },
       },
     },
-    orderBy: (metrics, { desc }) => [desc(metrics.calculatedEngagement)],
+    orderBy: (metrics: any, { desc }: any) => [desc(metrics.calculatedEngagement)],
   });
 }
 
@@ -745,7 +745,7 @@ export async function getCompetitionsPaginated(limit: number, offset: number) {
       },
       panelRequirement: true,
     },
-    orderBy: (competitions, { desc }) => [desc(competitions.createdAt)],
+    orderBy: (competitions: any, { desc }: any) => [desc(competitions.createdAt)],
   });
 }
 
@@ -771,7 +771,7 @@ export async function updateCompetition(
 export async function getNotificationsByUserId(userId: string) {
   return db.query.notifications.findMany({
     where: eq(schema.notifications.userId, userId),
-    orderBy: (notifications, { desc }) => [desc(notifications.createdAt)],
+    orderBy: (notifications: any, { desc }: any) => [desc(notifications.createdAt)],
   });
 }
 
@@ -1085,7 +1085,7 @@ export async function getParentWithStudentsAndQualifications(userId: string) {
                 },
               },
             },
-            orderBy: (slots, { desc }) => [desc(slots.offeredAt)],
+            orderBy: (slots: any, { desc }: any) => [desc(slots.offeredAt)],
           },
         },
       },
@@ -1187,7 +1187,7 @@ export async function getVerifiedRegistrationsByStudentId(studentId: string) {
         },
       },
     },
-    orderBy: (registrations, { desc }) => [desc(registrations.createdAt)],
+    orderBy: (registrations: any, { desc }: any) => [desc(registrations.createdAt)],
   });
 }
 
@@ -1228,13 +1228,13 @@ export async function upsertSystemSetting(key: string, value: any) {
 
 export async function getAllCategories() {
   return db.query.categories.findMany({
-    orderBy: (categories, { asc }) => [asc(categories.name)],
+    orderBy: (categories: any, { asc }: any) => [asc(categories.name)],
   });
 }
 
 export async function getCategoryByNameOrSlug(name: string, slug: string) {
   return db.query.categories.findFirst({
-    where: (categories, { eq, or }) => or(
+    where: (categories: any, { eq, or }: any) => or(
       eq(categories.name, name),
       eq(categories.slug, slug)
     ),
@@ -1373,7 +1373,7 @@ export async function getUnusedProfileSetupToken(userId: string) {
       isNull(schema.profileSetupTokens.usedAt),
       gt(schema.profileSetupTokens.expiresAt, new Date())
     ),
-    orderBy: (tokens, { desc }) => [desc(tokens.createdAt)],
+    orderBy: (tokens: any, { desc }: any) => [desc(tokens.createdAt)],
   });
 }
 
@@ -1393,7 +1393,7 @@ export async function getRegistrationWithFullDetails(registrationId: string) {
           judge: true,
           score: true,
         },
-        orderBy: (assignments, { asc }) => [asc(assignments.assignedAt)],
+        orderBy: (assignments: any, { asc }: any) => [asc(assignments.assignedAt)],
       },
       certificate: true,
       prizeAward: {
@@ -1462,7 +1462,7 @@ export async function getParentWithStudentsAndPrizes(userId: string) {
 export async function getActiveBannerTemplates() {
   return db.query.bannerTemplates.findMany({
     where: eq(schema.bannerTemplates.isActive, true),
-    orderBy: (templates, { asc }) => [asc(templates.name)],
+    orderBy: (templates: any, { asc }: any) => [asc(templates.name)],
   });
 }
 
@@ -1573,7 +1573,7 @@ export async function getParentsByState() {
     })
     .from(schema.parents)
     .groupBy(schema.parents.state)
-    .orderBy((fields) => desc(fields.count))
+    .orderBy((fields: any) => desc(fields.count))
     .limit(4);
   return result;
 }
@@ -1628,28 +1628,28 @@ export async function getRegistrationsForAdminList(params: {
         },
       },
     },
-    orderBy: (reg, { desc }) => [desc(reg.createdAt)],
+    orderBy: (reg: any, { desc }: any) => [desc(reg.createdAt)],
   });
 
   let filtered = registrations;
 
   if (filter === "PENDING") {
-    filtered = filtered.filter((r) => r.status === "PENDING_VERIFICATION");
+    filtered = filtered.filter((r: any) => r.status === "PENDING_VERIFICATION");
   } else if (filter === "PAID") {
-    filtered = filtered.filter((r) => r.paymentStatus === "SUCCESS");
+    filtered = filtered.filter((r: any) => r.paymentStatus === "SUCCESS");
   } else if (filter === "UNASSIGNED") {
-    filtered = filtered.filter((r) => r.judgeAssignments.length === 0);
+    filtered = filtered.filter((r: any) => r.judgeAssignments.length === 0);
   }
 
   if (search?.trim()) {
     const searchPattern = search.trim().toLowerCase();
     filtered = filtered.filter(
-      (r) =>
+      (r: any) =>
         r.registrationId.toLowerCase().includes(searchPattern) ||
         r.student.name.toLowerCase().includes(searchPattern) ||
         (r.student.parent.phone?.toLowerCase() ?? "").includes(searchPattern) ||
         r.competitionCategory.category.name.toLowerCase().includes(searchPattern) ||
-        r.judgeAssignments.some((a) =>
+        r.judgeAssignments.some((a: any) =>
           a.judge.name.toLowerCase().includes(searchPattern)
         )
     );
@@ -1727,7 +1727,7 @@ export async function getPhysicalPrizeOrderStatusCounts() {
 
 export async function getRecentShipmentBatches(limit: number = 10) {
   return db.query.shipmentBatches.findMany({
-    orderBy: (batches, { desc }) => [desc(batches.createdAt)],
+    orderBy: (batches: any, { desc }: any) => [desc(batches.createdAt)],
     limit,
   });
 }
@@ -1754,7 +1754,7 @@ export async function getRecentPhysicalPrizeOrders(limit: number = 50) {
         },
       },
     },
-    orderBy: (orders, { desc }) => [desc(orders.createdAt)],
+    orderBy: (orders: any, { desc }: any) => [desc(orders.createdAt)],
     limit,
   });
 }
@@ -1782,7 +1782,7 @@ export async function getPhysicalPrizeAwardsForCompetition(competitionId: string
   });
 
   return allAwards.filter(
-    (award) =>
+    (award: any) =>
       award.prizeItem.isPhysical &&
       !award.physicalOrder &&
       award.registration.competitionCategory.competition.id === competitionId
@@ -1831,7 +1831,7 @@ export async function getJudgePayoutsPaginated(judgeId: string, limit: number, o
   ]);
 
   return {
-    payouts: payouts.map((p) => ({
+    payouts: payouts.map((p: any) => ({
       id: p.id,
       amount: parseFloat(p.amount.toString()),
       status: (p.status.toLowerCase()) as "pending" | "completed" | "failed",
@@ -1865,12 +1865,12 @@ export async function getJudgeRevenueMetadata(judgeId: string) {
   }
 
   const totalEarned = payouts
-    .filter((p) => p.status === "PAID")
-    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+    .filter((p: any) => p.status === "PAID")
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount.toString()), 0);
 
   const totalPending = payouts
-    .filter((p) => p.status === "PENDING")
-    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+    .filter((p: any) => p.status === "PENDING")
+    .reduce((sum: number, p: any) => sum + parseFloat(p.amount.toString()), 0);
 
   const perEvaluationRate = judge.paymentPerEvaluation ? parseFloat(judge.paymentPerEvaluation.toString()) : 150;
   const hourlyRate = perEvaluationRate * 4;
@@ -1981,7 +1981,7 @@ export async function getCompetitionParticipantsPaginated(params: {
   const { competitionId, limit, offset, filter, search } = params;
 
   let registrations = await db.query.registrations.findMany({
-    where: (reg, { eq: eqOp }) =>
+    where: (reg: any, { eq: eqOp }: any) =>
       eqOp(schema.competitionCategories.competitionId, competitionId),
     with: {
       student: {
@@ -2017,17 +2017,17 @@ export async function getCompetitionParticipantsPaginated(params: {
   });
 
   registrations = registrations.filter(
-    (r) => r.competitionCategory.competitionId === competitionId
+    (r: any) => r.competitionCategory.competitionId === competitionId
   );
 
   if (filter && filter !== "ALL") {
-    registrations = registrations.filter((r) => r.status === filter);
+    registrations = registrations.filter((r: any) => r.status === filter);
   }
 
   if (search) {
     const searchLower = search.toLowerCase();
     registrations = registrations.filter(
-      (r) =>
+      (r: any) =>
         r.registrationId.toLowerCase().includes(searchLower) ||
         r.student.name.toLowerCase().includes(searchLower)
     );
@@ -2035,7 +2035,7 @@ export async function getCompetitionParticipantsPaginated(params: {
 
   const totalCount = registrations.length;
   const paginatedRegistrations = registrations
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(offset, offset + limit);
 
   return { registrations: paginatedRegistrations, totalCount };
@@ -2062,10 +2062,10 @@ export async function getStudentsForAdminList(params: {
         with: {
           prizeAward: true,
         },
-        orderBy: (reg, { desc }) => [desc(reg.createdAt)],
+        orderBy: (reg: any, { desc }: any) => [desc(reg.createdAt)],
       },
     },
-    orderBy: (s, { desc }) => [desc(s.createdAt)],
+    orderBy: (s: any, { desc }: any) => [desc(s.createdAt)],
   });
 
   let filtered = students;
@@ -2073,7 +2073,7 @@ export async function getStudentsForAdminList(params: {
   if (search?.trim()) {
     const searchPattern = search.trim().toLowerCase();
     filtered = filtered.filter(
-      (s) =>
+      (s: any) =>
         s.name.toLowerCase().includes(searchPattern) ||
         s.parent.name.toLowerCase().includes(searchPattern) ||
         (s.parent.phone?.toLowerCase() ?? "").includes(searchPattern)
@@ -2081,12 +2081,12 @@ export async function getStudentsForAdminList(params: {
   }
 
   if (filter === "HAS_AWARDS") {
-    filtered = filtered.filter((s) =>
-      s.registrations.some((reg) => reg.prizeAward)
+    filtered = filtered.filter((s: any) =>
+      s.registrations.some((reg: any) => reg.prizeAward)
     );
   } else if (filter === "PENDING_PAYMENT") {
-    filtered = filtered.filter((s) =>
-      s.registrations.some((reg) => reg.paymentStatus === "PENDING")
+    filtered = filtered.filter((s: any) =>
+      s.registrations.some((reg: any) => reg.paymentStatus === "PENDING")
     );
   }
 
@@ -2117,10 +2117,10 @@ export async function getAllPrizePools() {
             },
           },
         },
-        orderBy: (items, { asc }) => [asc(items.createdAt)],
+        orderBy: (items: any, { asc }: any) => [asc(items.createdAt)],
       },
     },
-    orderBy: (pools, { desc }) => [desc(pools.createdAt)],
+    orderBy: (pools: any, { desc }: any) => [desc(pools.createdAt)],
   });
 }
 
@@ -2148,7 +2148,7 @@ export async function createPrizePoolWithItems(data: {
 }) {
   const { competitionId, title, description, isPublished, items } = data;
 
-  return db.transaction(async (tx) => {
+  return db.transaction(async (tx: any) => {
     const prizePool = await tx
       .insert(schema.prizePools)
       .values({
@@ -2196,7 +2196,7 @@ export async function getCompetitionJudges(competitionId: string) {
     orderBy: desc(schema.competitionJudges.assignedAt),
   });
 
-  return judges.map((cj) => ({
+  return judges.map((cj: any) => ({
     id: cj.judge.id,
     name: cj.judge.name,
     tier: cj.judge.tier,
@@ -2263,7 +2263,7 @@ export async function getCertificatesByCompetition(competitionId: string, status
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const whereConditions = [inArray(schema.registrations.competitionCategoryId, categoryIds)];
   if (status && status !== "ALL") {
@@ -2294,7 +2294,7 @@ export async function getCertificatesByCompetition(competitionId: string, status
     .where(and(...whereConditions));
 
   return {
-    certificates: certs.map((cert) => ({
+    certificates: certs.map((cert: any) => ({
       id: cert.id,
       registrationId: cert.registration.registrationId,
       studentName: cert.registration.student.name,
@@ -2314,7 +2314,7 @@ export async function getCertificateStatsByCompetition(competitionId: string) {
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const certs = await db
     .select({ status: schema.certificates.status, type: schema.certificates.type })
@@ -2337,7 +2337,7 @@ export async function getCertificateStatsByCompetition(competitionId: string) {
     SPECIAL_MENTION: 0,
   };
 
-  certs.forEach((cert) => {
+  certs.forEach((cert: any) => {
     if (cert.status && cert.status in byStatus) {
       byStatus[cert.status]++;
     }
@@ -2355,7 +2355,7 @@ export async function getEligibleRegistrationsForCertificateGeneration(competiti
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   return db.query.registrations.findMany({
     where: and(
@@ -2417,7 +2417,7 @@ export async function getGeneratedCertificatesByCompetition(competitionId: strin
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   return db.query.certificates.findMany({
     where: and(
@@ -2526,7 +2526,7 @@ export async function getJudgeParticipantsPaginated(judgeId: string, search?: st
     .where(and(...whereConditions));
 
   return {
-    data: assignments.map((a) => ({
+    data: assignments.map((a: any) => ({
       id: a.id,
       participantId: a.registration.student.id,
       participantName: a.registration.student.name,
@@ -2617,7 +2617,7 @@ export async function getExistingQualificationSlots(qualificationRuleId: string)
     .from(schema.qualificationSlots)
     .where(eq(schema.qualificationSlots.qualificationRuleId, qualificationRuleId));
 
-  return new Set(slots.map((s) => s.registrationId));
+  return new Set(slots.map((s: any) => s.registrationId));
 }
 
 export async function createQualificationSlots(slots: Array<{
@@ -3085,7 +3085,7 @@ export async function createScoreAndUpdateAssignment(
 
   // Calculate average
   const totalScoreSum = submittedAssignments.reduce(
-    (sum, asg) => sum + (asg.score?.totalScore ? parseFloat(String(asg.score.totalScore)) : 0),
+    (sum: number, asg: any) => sum + (asg.score?.totalScore ? parseFloat(String(asg.score.totalScore)) : 0),
     0
   );
 
@@ -3476,7 +3476,7 @@ export async function getVotingLeaderboard(competitionId: string) {
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const registrations = await db.query.registrations.findMany({
     where: and(
@@ -3508,11 +3508,11 @@ export async function getVotingLeaderboard(competitionId: string) {
   });
 
   const leaderboardData = registrations
-    .map((reg) => {
+    .map((reg: any) => {
       const scores = reg.judgeAssignments
-        .map((ja) => ja.score?.totalScore ? parseFloat(ja.score.totalScore.toString()) : 0)
-        .filter((s) => s >= 0);
-      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        .map((ja: any) => ja.score?.totalScore ? parseFloat(ja.score.totalScore.toString()) : 0)
+        .filter((s: any) => s >= 0);
+      const avgScore = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0;
 
       return {
         registrationId: reg.id,
@@ -3520,10 +3520,10 @@ export async function getVotingLeaderboard(competitionId: string) {
         categoryName: reg.competitionCategory.category.name,
         scoresReceived: scores.length,
         averageScore: Math.round(avgScore * 100) / 100,
-        totalScore: Math.round(scores.reduce((a, b) => a + b, 0)),
+        totalScore: Math.round(scores.reduce((a: number, b: number) => a + b, 0)),
       };
     })
-    .sort((a, b) => b.averageScore - a.averageScore)
+    .sort((a: any, b: any) => b.averageScore - a.averageScore)
     .slice(0, 10);
 
   return leaderboardData;
@@ -3535,7 +3535,7 @@ export async function getRecentVotingActivity(competitionId: string, limit?: num
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const recentScores = await db.query.scores.findMany({
     where: inArray(schema.registrations.competitionCategoryId, categoryIds),
@@ -3569,7 +3569,7 @@ export async function getRecentVotingActivity(competitionId: string, limit?: num
     limit: limit || 20,
   });
 
-  return recentScores.map((score) => ({
+  return recentScores.map((score: any) => ({
     id: score.id,
     judgeId: score.assignment.judge.id,
     judgeName: score.assignment.judge.name,
@@ -3592,7 +3592,7 @@ export async function getPendingShipmentsForCompetition(competitionId: string, s
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const whereConditions = [
     inArray(schema.registrations.competitionCategoryId, categoryIds),
@@ -3645,7 +3645,7 @@ export async function getCompetitionShipments(competitionId: string, status?: st
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const statusMap: Record<string, string> = {
     PENDING: "PENDING",
@@ -3701,7 +3701,7 @@ export async function getCompetitionShipments(competitionId: string, status?: st
   };
 
   return {
-    data: shipments.map((ship) => ({
+    data: shipments.map((ship: any) => ({
       id: ship.id,
       registrationId: ship.prizeAward.registration.registrationId,
       studentName: ship.prizeAward.registration.student.name,
@@ -3721,14 +3721,14 @@ export async function getCompetitionJudgesWithVotingStats(competitionId: string,
     .from(schema.competitionCategories)
     .where(eq(schema.competitionCategories.competitionId, competitionId));
 
-  const categoryIds = competitionCategories.map((cc) => cc.id);
+  const categoryIds = competitionCategories.map((cc: any) => cc.id);
 
   const registrationIds = await db
     .select({ id: schema.registrations.id })
     .from(schema.registrations)
     .where(inArray(schema.registrations.competitionCategoryId, categoryIds));
 
-  const regIds = registrationIds.map((r) => r.id);
+  const regIds = registrationIds.map((r: any) => r.id);
 
   const judgesData = await db.query.competitionJudges.findMany({
     where: eq(schema.competitionJudges.competitionId, competitionId),
@@ -3757,13 +3757,13 @@ export async function getCompetitionJudgesWithVotingStats(competitionId: string,
     .from(schema.competitionJudges)
     .where(eq(schema.competitionJudges.competitionId, competitionId));
 
-  const votingData = judgesData.map((cj) => {
+  const votingData = judgesData.map((cj: any) => {
     const assignments = cj.judge.assignments;
-    const submitted = assignments.filter((a) => a.isSubmitted);
-    const scores = submitted.map((a) => a.score?.totalScore ?? 0).map(s => parseFloat(s.toString()));
+    const submitted = assignments.filter((a: any) => a.isSubmitted);
+    const scores = submitted.map((a: any) => a.score?.totalScore ?? 0).map((s: any) => parseFloat(s.toString()));
     const averageScore =
       scores.length > 0
-        ? scores.reduce((a, b) => a + b, 0) / scores.length
+        ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length
         : undefined;
 
     return {

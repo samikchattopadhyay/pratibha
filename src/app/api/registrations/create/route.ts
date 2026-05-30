@@ -116,7 +116,7 @@ export async function POST(req: Request) {
 
     // Notify all admins
     const admins = await getAdminUsers();
-    admins.forEach((admin) => {
+    admins.forEach((admin: any) => {
       createAndDispatchNotification({
         userId: admin.id,
         type: "ADMIN_NEW_REGISTRATION",

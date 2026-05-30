@@ -70,8 +70,8 @@ export async function GET(
 
     // 5. Compute stats
     const verifiedAchievements = student.registrations
-      .filter((reg) => reg.certificate)
-      .map((reg) => ({
+      .filter((reg: any) => reg.certificate)
+      .map((reg: any) => ({
         type: reg.certificate!.type,
         competitionTitle: reg.competitionCategory.competition.title,
         categoryName: reg.competitionCategory.category.name,
@@ -96,7 +96,7 @@ export async function GET(
       memberSince: student.createdAt.getFullYear().toString(),
       stats: {
         totalCompetitions: student.registrations.length,
-        totalAwards: student.registrations.filter((r) => r.certificate).length,
+        totalAwards: student.registrations.filter((r: any) => r.certificate).length,
       },
       verifiedAchievements,
       externalAchievements: student.externalAchievements,

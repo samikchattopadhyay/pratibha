@@ -88,9 +88,9 @@ export async function POST(
     const prizeItems = competition.prizePool?.items ?? [];
 
     // 4. Flatten all eligible registrations
-    const allRegistrations = competition.categories.flatMap((c) => c.registrations);
+    const allRegistrations = competition.categories.flatMap((c: any) => c.registrations);
 
-    const toProcess = allRegistrations.filter((reg) => {
+    const toProcess = allRegistrations.filter((reg: any) => {
       const cert = reg.certificate;
       if (!cert) return true;
       if (cert.status === "REVOKED") return false;
@@ -110,21 +110,21 @@ export async function POST(
     }
 
     const uniqueParentIds = [
-      ...new Set(toProcess.map((r) => r.student.parentId)),
-    ];
+      ...new Set(toProcess.map((r: any) => r.student.parentId)),
+    ] as string[];
     const parents = await getParentsByIds(uniqueParentIds);
-    const parentUserIds = parents.map((p) => p.userId);
+    const parentUserIds = parents.map((p: any) => p.userId);
     const users = await getUsersByIds(parentUserIds);
 
     const parentLookup = new Map<string, ParentInfo>();
     for (const p of parents) {
-      const u = users.find((u) => u.id === p.userId);
+      const u = users.find((u: any) => u.id === p.userId);
       if (u?.email) {
         parentLookup.set(p.id, { userId: p.userId, email: u.email });
       }
     }
 
-    const plans: CertPlan[] = toProcess.map((reg) => {
+    const plans: CertPlan[] = toProcess.map((reg: any) => {
       const certId = generateCertId();
       const certType = rankToCertType(reg.finalRank);
       const certUrl = `/certificates/${reg.registrationId}.pdf`;
@@ -137,8 +137,8 @@ export async function POST(
       if (hasPrizePool && reg.finalRank !== null && !reg.prizeAward) {
         prizeRank = rankToPrizeRank(reg.finalRank);
         const item =
-          prizeItems.find((i) => i.rank === prizeRank) ??
-          prizeItems.find((i) => i.rank === "PARTICIPATION") ??
+          prizeItems.find((i: any) => i.rank === prizeRank) ??
+          prizeItems.find((i: any) => i.rank === "PARTICIPATION") ??
           null;
         if (item) prizeItemId = item.id;
       }
@@ -217,11 +217,11 @@ export async function POST(
     }
 
     // 8. Count results
-    const prizesAwarded = results.filter((r) => r.kind === "award").length;
+    const prizesAwarded = results.filter((r: any) => r.kind === "award").length;
     const certificatesCreated = results.filter(
-      (r) => r.kind === "create" || r.kind === "award"
+      (r: any) => r.kind === "create" || r.kind === "award"
     ).length;
-    const certificatesUpdated = results.filter((r) => r.kind === "update")
+    const certificatesUpdated = results.filter((r: any) => r.kind === "update")
       .length;
     const skipped = allRegistrations.length - toProcess.length;
 
@@ -229,7 +229,7 @@ export async function POST(
     let notificationsSent = 0;
 
     for (const result of results) {
-      const plan = plans.find((p) => p.registration.id === result.registrationId);
+      const plan = plans.find((p: any) => p.registration.id === result.registrationId);
       if (!plan) continue;
 
       const parentInfo = parentLookup.get(plan.registration.student.parentId);

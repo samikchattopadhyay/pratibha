@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create User & Parent in transaction
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx: any) => {
       const userResult = await tx
         .insert(users)
         .values({

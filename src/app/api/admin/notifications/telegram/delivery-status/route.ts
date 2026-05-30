@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       PERMANENTLY_FAILED: 0,
     };
 
-    stats.forEach((stat) => {
+    stats.forEach((stat: any) => {
       statusCounts[stat.status as keyof typeof statusCounts] = stat.count;
     });
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
           deliveryRate: `${deliveryRate}%`,
           totalProcessed: sentCount,
         },
-        deliveries: deliveries.map((d) => ({
+        deliveries: deliveries.map((d: any) => ({
           id: d.id,
           notificationId: d.notificationId,
           chatId: d.chatId,

@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
 
       for (const cat of categories) {
         const topRegs = cat.registrations
-          .filter((r) => !alreadyOffered.has(r.id))
-          .filter((r) => !rule.minScoreThreshold || (r.finalScore && parseFloat(String(r.finalScore)) >= parseFloat(String(rule.minScoreThreshold))))
+          .filter((r: any) => !alreadyOffered.has(r.id))
+          .filter((r: any) => !rule.minScoreThreshold || (r.finalScore && parseFloat(String(r.finalScore)) >= parseFloat(String(rule.minScoreThreshold))))
           .slice(0, rule.slotsPerCategory);
 
         for (const reg of topRegs) {
@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
       }
 
       const allRanked = categories
-        .flatMap((c) => c.registrations)
-        .filter((r) => r.finalRank !== null && !alreadyOffered.has(r.id))
-        .sort((a, b) => (a.finalScore && b.finalScore ? parseFloat(String(b.finalScore)) - parseFloat(String(a.finalScore)) : 0))
+        .flatMap((c: any) => c.registrations)
+        .filter((r: any) => r.finalRank !== null && !alreadyOffered.has(r.id))
+        .sort((a: any, b: any) => (a.finalScore && b.finalScore ? parseFloat(String(b.finalScore)) - parseFloat(String(a.finalScore)) : 0))
         .slice(0, rule.wildCardSlots);
 
       for (const reg of allRanked) {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     await createQualificationSlots(slotsCreated);
 
-    const ruleMap = new Map(rules.map((r) => [r.id, r]));
+    const ruleMap = new Map<string, any>(rules.map((r: any) => [r.id, r]));
 
     for (const slot of slotsCreated) {
       const registration = await getRegistrationForNotification(slot.registrationId);

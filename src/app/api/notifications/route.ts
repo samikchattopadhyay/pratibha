@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       getUnreadNotificationCount(userId!),
     ]);
 
-    const mappedNotifications: NotificationItem[] = notifications.map((n) => ({
+    const mappedNotifications: NotificationItem[] = notifications.map((n: any) => ({
       id: n.id,
       type: n.type,
       title: n.title,

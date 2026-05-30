@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const totalCount = await getCompetitionCount();
     const competitions = await getCompetitionsPaginated(limit, (page - 1) * limit);
 
-    const formatted = competitions.map((comp) => ({
+    const formatted = competitions.map((comp: any) => ({
       id: comp.id,
       title: comp.title,
       description: comp.description,
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       hostState: comp.hostState,
       difficultyLevel: comp.difficultyLevel,
       minJudgesRequired: comp.minJudgesRequired,
-      categories: comp.categories.map((c) => c.category.name).join(", "),
+      categories: comp.categories.map((c: any) => c.category.name).join(", "),
       prizePool: comp.prizePool
         ? { id: comp.prizePool.id, isPublished: comp.prizePool.isPublished, itemCount: comp.prizePool.items.length }
         : null,
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     } else if (categoryName) {
       // Find by name with case-insensitive search
       const allCategories = await db.query.categories.findMany();
-      dbCategory = allCategories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+      dbCategory = allCategories.find((c: any) => c.name.toLowerCase() === categoryName.toLowerCase());
     }
 
     if (!dbCategory) {
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const registrationDeadline = regDeadlineInput ? new Date(regDeadlineInput) : new Date(now.getTime() + 20 * 86400000);
     const resultDate = resultDateInput ? new Date(resultDateInput) : new Date(now.getTime() + 45 * 86400000);
 
-    const competition = await db.transaction(async (tx) => {
+    const competition = await db.transaction(async (tx: any) => {
       const compResult = await tx
         .insert(schema.competitions)
         .values({

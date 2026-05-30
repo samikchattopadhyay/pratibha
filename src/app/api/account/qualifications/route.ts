@@ -19,8 +19,8 @@ export async function GET() {
     // Auto-expire any overdue OFFERED slots
     await expireOverdueQualificationSlots(parent.id);
 
-    const qualifications = parent.students.flatMap((student) =>
-      student.qualificationSlots.map((slot) => {
+    const qualifications = parent.students.flatMap((student: any) =>
+      student.qualificationSlots.map((slot: any) => {
         const rule = slot.qualificationRule;
         const originalFee = Number(slot.nationalCompetition.entryFeeINR);
         const discountedFee = originalFee * (1 - rule.discountPercent / 100);

@@ -13,10 +13,10 @@ export async function GET() {
 
     if (!parent) return NextResponse.json({ error: "Parent profile not found" }, { status: 404 });
 
-    const prizes = parent.students.flatMap((student) =>
+    const prizes = parent.students.flatMap((student: any) =>
       student.registrations
-        .filter((reg) => reg.prizeAward !== null)
-        .map((reg) => ({
+        .filter((reg: any) => reg.prizeAward !== null)
+        .map((reg: any) => ({
           studentName: student.name,
           competitionTitle: reg.competitionCategory.competition.title,
           competitionScope: reg.competitionCategory.competition.scope,

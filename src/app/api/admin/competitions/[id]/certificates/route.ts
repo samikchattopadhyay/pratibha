@@ -38,7 +38,7 @@ export async function GET(
     const totalPages = Math.ceil(totalCount / limit);
 
     return NextResponse.json({
-      data: certificates.map((cert) => ({
+      data: certificates.map((cert: any) => ({
         id: cert.id,
         registrationId: cert.registrationId,
         studentName: cert.studentName,

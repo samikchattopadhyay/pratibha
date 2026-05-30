@@ -69,7 +69,7 @@ export async function GET(
 
     // Anonymize judge labels based on assignedAt order
     const judgeScores: ParentJudgeScore[] | null = registration.scoringFinalized
-      ? registration.judgeAssignments.map((assignment, index) => ({
+      ? registration.judgeAssignments.map((assignment: any, index: number) => ({
           label: `Judge ${index + 1}`,
           isSubmitted: assignment.isSubmitted,
           criteria1: assignment.score?.criteria1 ?? null,

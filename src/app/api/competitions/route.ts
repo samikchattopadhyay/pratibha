@@ -19,7 +19,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Competition not found" }, { status: 404 });
       }
 
-      const formattedCategories = competition.categories.map((cc) => ({
+      const formattedCategories = competition.categories.map((cc: any) => ({
         id: cc.id,
         categoryName: `${cc.category.name} (Ages ${cc.minAge}-${cc.maxAge})`,
         minAge: cc.minAge,
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
           ? {
               title: competition.prizePool.title,
               description: competition.prizePool.description,
-              items: competition.prizePool.items.map((item) => ({
+              items: competition.prizePool.items.map((item: any) => ({
                 rank: item.rank,
                 type: item.type,
                 title: item.title,
@@ -68,24 +68,24 @@ export async function GET(req: Request) {
 
     // Additional filtering after fetch for OR logic (scope NATIONAL OR eligible state)
     if (stateFilter) {
-      competitions = competitions.filter((comp) => {
+      competitions = competitions.filter((comp: any) => {
         return comp.scope === "NATIONAL" || (comp.eligibleStates as string[]).includes(stateFilter);
       });
     }
 
     // Sort by registrationDeadline ascending
-    competitions.sort((a, b) => a.registrationDeadline.getTime() - b.registrationDeadline.getTime());
+    competitions.sort((a: any, b: any) => a.registrationDeadline.getTime() - b.registrationDeadline.getTime());
 
     return NextResponse.json(
-      competitions.map((comp) => {
-        const minAges = comp.categories.map((c) => c.minAge);
-        const maxAges = comp.categories.map((c) => c.maxAge);
+      competitions.map((comp: any) => {
+        const minAges = comp.categories.map((c: any) => c.minAge);
+        const maxAges = comp.categories.map((c: any) => c.maxAge);
         const minAge = minAges.length > 0 ? Math.min(...minAges) : 4;
         const maxAge = maxAges.length > 0 ? Math.max(...maxAges) : 16;
 
         let prizeSummary = null;
         if (comp.prizePool?.isPublished && comp.prizePool.items.length > 0) {
-          const prizeTypes = Array.from(new Set(comp.prizePool.items.map(item => {
+          const prizeTypes = Array.from(new Set(comp.prizePool.items.map((item: any) => {
             if (item.type === "CASH_PRIZE" && item.estimatedValue) {
               return `₹${Number(item.estimatedValue)} Cash`;
             }
@@ -119,7 +119,7 @@ export async function GET(req: Request) {
           eligibleStates: comp.eligibleStates,
           difficultyLevel: comp.difficultyLevel,
           hasPrizePool: comp.prizePool?.isPublished ?? false,
-          categoryName: Array.from(new Set(comp.categories.map((c) => c.category.name))).join(", ") || "General Arts",
+          categoryName: Array.from(new Set(comp.categories.map((c: any) => c.category.name))).join(", ") || "General Arts",
           minAge,
           maxAge,
           prizeSummary,

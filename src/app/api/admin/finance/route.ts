@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const successfulTx = await getSuccessfulTransactions();
 
-    const totalRevenue = successfulTx.reduce((acc, curr) => acc + parseFloat(curr.amount.toString()), 0);
+    const totalRevenue = successfulTx.reduce((acc: number, curr: any) => acc + parseFloat(curr.amount.toString()), 0);
     const totalTransactionsCount = successfulTx.length;
     const avgTicketSize = totalTransactionsCount > 0 ? (totalRevenue / totalTransactionsCount).toFixed(2) : "0.00";
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const totalTransactions = await getTransactionCount();
     const transactions = await getTransactionsPaginated(limit, (page - 1) * limit);
 
-    const formattedTxList = transactions.map((tx) => ({
+    const formattedTxList = transactions.map((tx: any) => ({
       id: tx.id,
       orderId: tx.razorpayOrderId,
       paymentId: tx.razorpayPaymentId || "N/A",

@@ -64,8 +64,8 @@ export async function GET() {
 
     // Flatten registrations for easy rendering
     const registrations: any[] = [];
-    parentWithDetails.students.forEach((student) => {
-      student.registrations.forEach((reg) => {
+    parentWithDetails.students.forEach((student: any) => {
+      student.registrations.forEach((reg: any) => {
         registrations.push({
           id: reg.id,
           studentName: student.name,
@@ -106,7 +106,7 @@ export async function GET() {
         postalCode: parentWithDetails.postalCode,
         country: parentWithDetails.country,
       },
-      students: parentWithDetails.students.map((s) => ({
+      students: parentWithDetails.students.map((s: any) => ({
         id: s.id,
         name: s.name,
         dateOfBirth: s.dateOfBirth,
@@ -114,7 +114,7 @@ export async function GET() {
         disciplineInterests: s.disciplineInterests,
       })),
       registrations,
-      categories: categories.map((c) => ({
+      categories: categories.map((c: any) => ({
         id: c.id,
         name: c.name,
         grouping: c.grouping,

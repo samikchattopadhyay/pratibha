@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const metrics = await getRegistrationCountsForMetrics();
 
-    const formatted = registrations.map((reg) => ({
+    const formatted = registrations.map((reg: any) => ({
       id: reg.id,
       registrationId: reg.registrationId,
       studentId: reg.studentId,
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       status: reg.status,
       scoringFinalized: reg.scoringFinalized,
       createdAt: reg.createdAt,
-      assignments: reg.judgeAssignments.map((a) => ({
+      assignments: reg.judgeAssignments.map((a: any) => ({
         id: a.id,
         judgeName: a.judge.name,
         isSubmitted: a.isSubmitted,

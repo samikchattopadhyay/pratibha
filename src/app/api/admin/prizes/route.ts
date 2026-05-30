@@ -17,7 +17,7 @@ export async function GET() {
 
     const prizePools = await getAllPrizePools();
 
-    const formatted = prizePools.map((pool) => ({
+    const formatted = prizePools.map((pool: any) => ({
       id: pool.id,
       competitionId: pool.competitionId,
       competitionTitle: pool.competition.title,
@@ -26,8 +26,8 @@ export async function GET() {
       description: pool.description,
       isPublished: pool.isPublished,
       itemCount: pool.items.length,
-      awardedCount: pool.items.reduce((sum, item) => sum + item.awards.length, 0),
-      items: pool.items.map((item) => ({
+      awardedCount: pool.items.reduce((sum: number, item: any) => sum + item.awards.length, 0),
+      items: pool.items.map((item: any) => ({
         id: item.id,
         rank: item.rank,
         type: item.type,

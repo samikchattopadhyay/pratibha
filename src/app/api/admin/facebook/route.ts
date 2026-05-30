@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const totalCount = await getSocialMetricCount();
     const metrics = await getSocialMetricsPaginated(limit, (page - 1) * limit);
 
-    const formatted = metrics.map((m) => {
+    const formatted = metrics.map((m: any) => {
       const likes = m.likesCount;
       const comments = m.commentsCount;
       const shares = m.sharesCount;

@@ -28,7 +28,7 @@ export async function GET(
   // Get all verified registrations for this student
   const registrations = await getVerifiedRegistrationsByStudentId(studentId);
 
-  const formattedRegistrations = registrations.map((reg) => ({
+  const formattedRegistrations = registrations.map((reg: any) => ({
     id: reg.id,
     competitionTitle: reg.competitionCategory.competition.title,
     categoryName: reg.competitionCategory.category.name,

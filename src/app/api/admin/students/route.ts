@@ -28,12 +28,12 @@ export async function GET(request: NextRequest) {
       filter,
     });
 
-    const formatted: StudentSummary[] = students.map((student) => ({
+    const formatted: StudentSummary[] = students.map((student: any) => ({
       id: student.id,
       name: student.name,
       parentName: student.parent.name,
       competitionCount: student.registrations.length,
-      awardCount: student.registrations.filter((reg) => reg.prizeAward).length,
+      awardCount: student.registrations.filter((reg: any) => reg.prizeAward).length,
       lastRegistrationDate: student.registrations[0]?.createdAt.toISOString() || null,
     }));
 

@@ -100,7 +100,7 @@ export default function ParentProfilePage() {
           state: formData.state,
           postalCode: formData.postalCode,
           country: formData.country,
-          profileImage: formData.profileImageUrl.startsWith("data:") ? formData.profileImageUrl : null,
+          profileImage: formData.profileImageUrl && formData.profileImageUrl.startsWith("data:") ? formData.profileImageUrl : null,
         }),
       });
 

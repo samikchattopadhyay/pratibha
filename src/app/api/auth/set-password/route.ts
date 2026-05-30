@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       await tx
         .update(users)
         .set({ passwordHash })

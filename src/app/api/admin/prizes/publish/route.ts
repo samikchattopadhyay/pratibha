@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!pool) return NextResponse.json({ error: "Prize pool not found" }, { status: 404 });
     if (pool.isPublished) return NextResponse.json({ error: "Prize pool is already published" }, { status: 409 });
 
-    const ranks = pool.items.map((i) => i.rank);
+    const ranks = pool.items.map((i: any) => i.rank);
     if (!ranks.includes("FIRST_PLACE")) {
       return NextResponse.json({ error: "Prize pool must include a FIRST_PLACE prize before publishing" }, { status: 400 });
     }

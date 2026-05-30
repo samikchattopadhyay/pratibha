@@ -28,19 +28,19 @@ export async function GET(
 
     const registrations = student.registrations;
     const totalCompetitions = registrations.length;
-    const totalAwards = registrations.filter((reg) => reg.prizeAward).length;
+    const totalAwards = registrations.filter((reg: any) => reg.prizeAward).length;
 
     const verifiedCount = registrations.filter(
-      (reg) => reg.status === "VERIFIED"
+      (reg: any) => reg.status === "VERIFIED"
     ).length;
     const successRate = totalCompetitions > 0 ? (verifiedCount / totalCompetitions) * 100 : 0;
 
     const scoresArray = registrations
-      .filter((reg) => {
+      .filter((reg: any) => {
         const firstScore = reg.judgeAssignments?.[0]?.score;
         return firstScore && reg.scoringFinalized;
       })
-      .map((reg) => {
+      .map((reg: any) => {
         const firstScore = reg.judgeAssignments?.[0]?.score;
         return firstScore ? parseFloat(String(firstScore.totalScore)) : 0;
       });
@@ -51,13 +51,13 @@ export async function GET(
 
     const categories = Array.from(
       new Set(
-        registrations.map((reg) => reg.competitionCategory.category.name)
+        registrations.map((reg: any) => reg.competitionCategory.category.name)
       )
     ) as string[];
 
     const ranks = registrations
-      .filter((reg) => reg.finalRank !== null && reg.finalRank !== undefined)
-      .map((reg) => reg.finalRank as number);
+      .filter((reg: any) => reg.finalRank !== null && reg.finalRank !== undefined)
+      .map((reg: any) => reg.finalRank as number);
 
     const bestRank = ranks.length > 0 ? Math.min(...ranks) : null;
 

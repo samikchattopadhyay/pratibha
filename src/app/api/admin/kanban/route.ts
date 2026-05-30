@@ -25,21 +25,21 @@ export async function GET() {
 
     const registrations = await getVerifiedRegistrationsWithAssignments();
 
-    const cards = registrations.map((reg) => {
+    const cards = registrations.map((reg: any) => {
       // Determine Kanban Column Status
       let columnStatus = "PENDING"; // PENDING, IN_REVIEW, COMPLETED, CONFLICT_FLAGGED
 
       const totalAssignments = reg.judgeAssignments.length;
-      const submittedAssignments = reg.judgeAssignments.filter((a) => a.isSubmitted);
+      const submittedAssignments = reg.judgeAssignments.filter((a: any) => a.isSubmitted);
       const allSubmitted = totalAssignments > 0 && submittedAssignments.length === totalAssignments;
-      
+
       const scores = submittedAssignments
-        .map((a) => a.score?.totalScore ? parseFloat(String(a.score.totalScore)) : null)
-        .filter((s): s is number => s !== undefined && s !== null);
+        .map((a: any) => a.score?.totalScore ? parseFloat(String(a.score.totalScore)) : null)
+        .filter((s: any): s is number => s !== undefined && s !== null);
 
       let avgScore: number | null = null;
       if (scores.length > 0) {
-        avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        avgScore = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length);
       }
 
       if (reg.scoringFinalized) {
@@ -64,7 +64,7 @@ export async function GET() {
         }
       }
 
-      const judgeNames = reg.judgeAssignments.map((a) => a.judge.name).join(", ");
+      const judgeNames = reg.judgeAssignments.map((a: any) => a.judge.name).join(", ");
 
       return {
         id: reg.id,
@@ -74,7 +74,7 @@ export async function GET() {
         judge: judgeNames,
         score: avgScore,
         rawScores: scores,
-        assignments: reg.judgeAssignments.map((a) => ({
+        assignments: reg.judgeAssignments.map((a: any) => ({
           id: a.id,
           judgeId: a.judge.id,
           judgeName: a.judge.name,
@@ -154,12 +154,12 @@ export async function PATCH(request: NextRequest) {
 
         if (parent) {
           const scores = registration.judgeAssignments
-            .filter((a) => a.score?.totalScore)
-            .map((a) => a.score?.totalScore ? parseFloat(String(a.score.totalScore)) : null)
-            .filter((s): s is number => s !== undefined && s !== null);
+            .filter((a: any) => a.score?.totalScore)
+            .map((a: any) => a.score?.totalScore ? parseFloat(String(a.score.totalScore)) : null)
+            .filter((s: any): s is number => s !== undefined && s !== null);
 
           const avgScore = scores.length > 0
-            ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+            ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length)
             : 0;
 
           createAndDispatchNotification({
