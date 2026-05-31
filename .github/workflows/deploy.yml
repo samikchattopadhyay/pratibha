@@ -137,10 +137,16 @@ jobs:
       - name: Create Cloudflare Pages Project
         if: github.ref == 'refs/heads/main'
         run: |
-          npx wrangler pages project create pratibha-parishad --production-branch main -ErrorAction SilentlyContinue
-          Write-Host "Project creation attempt completed (may already exist)"
+          try {
+            npx wrangler pages project create pratibha-parishad --production-branch main
+            Write-Host "✅ Project created successfully"
+          } catch {
+            Write-Host "⚠️ Project creation failed (may already exist)"
+            Write-Host "Error: $_"
+          }
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Push Secrets to Cloudflare Workers
         if: github.ref == 'refs/heads/main'
