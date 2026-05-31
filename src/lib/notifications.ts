@@ -1,19 +1,12 @@
-import { Resend } from "resend";
 import { DeliveryErrorType, DeliveryStatus } from "@prisma/client";
 import prisma from "@/lib/db";
 import { renderEmailTemplate } from "@/lib/email/emailTemplateEngine";
 import * as emailTemplates from "@/lib/email/templates";
 
-let resendClient: Resend | null = null;
+const brevoApiKey = process.env.BREVO_API_KEY;
+const brevoApiUrl = "https://api.brevo.com/v3/smtp/email";
 
-function getResendClient(): Resend {
-  if (!resendClient) {
-    resendClient = new Resend(process.env.RESEND_API_KEY);
-  }
-  return resendClient;
-}
-
-const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@pratibhaparishad.in";
+const fromEmail = process.env.FROM_EMAIL || "noreply@pratibhaparishad.in";
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
 const telegramApiUrl = "https://api.telegram.org/bot";
 
@@ -118,21 +111,36 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Core email delivery via Resend.
+ * Core email delivery via Brevo.
  */
 export async function sendEmailViaResend(
   to: string,
   subject: string,
   html: string
 ): Promise<void> {
+  if (!brevoApiKey) {
+    throw new Error("BREVO_API_KEY environment variable is not set");
+  }
+
   try {
-    const resend = getResendClient();
-    await resend.emails.send({
-      from: fromEmail,
-      to,
-      subject,
-      html,
+    const response = await fetch(brevoApiUrl, {
+      method: "POST",
+      headers: {
+        "api-key": brevoApiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { email: fromEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Brevo API error: ${JSON.stringify(error)}`);
+    }
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error);
     throw error;
