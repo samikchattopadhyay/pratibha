@@ -1,5 +1,6 @@
 name = "pratibha-parishad"
 type = "service"
+account_id = ""
 main = ".open-next/worker.js"
 pages_build_output_dir = ".open-next/static"
 
