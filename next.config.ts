@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     webpackMemoryOptimizations: true,
+    parallelServerCompiles: true,
+    parallelServerBuildTraces: true,
     optimizePackageImports: [
       "lucide-react",
       "recharts",
