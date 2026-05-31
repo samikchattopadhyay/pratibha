@@ -25,6 +25,9 @@ const eslintConfig = defineConfig([
     "scripts/**",
     "prisma/**",
     ".open-next/**",
+    // Self-hosted runner directories:
+    "actions-runner/**",
+    ".git/**",
   ]),
 ]);
 
