@@ -1,5 +1,5 @@
 import { db } from "./drizzle";
-import { eq, and, isNull, gt, lt, desc, asc, sql, gte, inArray } from "drizzle-orm";
+import { eq, and, isNull, gt, lt, desc, asc, sql, gte, inArray, ne } from "drizzle-orm";
 import * as schema from "./schema";
 
 // ─── USER QUERIES ────────────────────────────────────────────────────────────
@@ -3785,4 +3785,59 @@ export async function getCompetitionJudgesWithVotingStats(competitionId: string,
     data: votingData,
     totalCount: totalCount[0]?.count || 0,
   };
+}
+
+// ─── NOTIFICATION QUERIES (Additional) ────────────────────────────────────────
+
+export async function getRecentNotificationByTypeAndRegistration(
+  userId: string,
+  type: string,
+  registrationId: string,
+  sinceMins: number = 1
+) {
+  const sinceTime = new Date(Date.now() - sinceMins * 60 * 1000);
+  return db.query.notifications.findFirst({
+    where: and(
+      eq(schema.notifications.userId, userId),
+      eq(schema.notifications.type, type as any),
+      eq(schema.notifications.registrationId, registrationId),
+      gt(schema.notifications.createdAt, sinceTime)
+    ),
+    orderBy: desc(schema.notifications.createdAt),
+  });
+}
+
+// ─── USER QUERIES (Additional) ────────────────────────────────────────────────
+
+export async function updateUserFacebookId(userId: string, facebookId: string) {
+  return db
+    .update(schema.users)
+    .set({ facebookId })
+    .where(eq(schema.users.id, userId))
+    .returning();
+}
+
+export async function findUserByEmailExcluding(email: string, excludeUserId?: string) {
+  if (excludeUserId) {
+    return db.query.users.findFirst({
+      where: and(
+        eq(schema.users.email, email),
+        ne(schema.users.id, excludeUserId)
+      ),
+    });
+  }
+  return db.query.users.findFirst({
+    where: eq(schema.users.email, email),
+  });
+}
+
+// ─── STUDENT QUERIES (Additional) ─────────────────────────────────────────────
+
+export async function getStudentWithExternalAchievements(studentId: string) {
+  return db.query.students.findFirst({
+    where: eq(schema.students.id, studentId),
+    with: {
+      externalAchievements: true,
+    },
+  });
 }

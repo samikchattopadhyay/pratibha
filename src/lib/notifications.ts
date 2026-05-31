@@ -1,5 +1,6 @@
-import { DeliveryErrorType, DeliveryStatus } from "@prisma/client";
-import prisma from "@/lib/db";
+import { db } from "@/lib/db/drizzle";
+import { telegramMessageDeliveries } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { renderEmailTemplate } from "@/lib/email/emailTemplateEngine";
 import * as emailTemplates from "@/lib/email/templates";
 
@@ -10,7 +11,8 @@ const fromEmail = process.env.FROM_EMAIL || "noreply@pratibhaparishad.in";
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
 const telegramApiUrl = "https://api.telegram.org/bot";
 
-// ─── RETRY & ERROR HANDLING CONSTANTS ──────────────────────────────────────
+type DeliveryErrorType = "RATE_LIMITED" | "USER_BLOCKED" | "INVALID_CHAT" | "BAD_REQUEST" | "NETWORK_ERROR" | "UNKNOWN";
+type DeliveryStatus = "QUEUED" | "SENDING" | "SENT" | "TEMPORARILY_FAILED" | "PERMANENTLY_FAILED";
 
 const RETRY_CONFIG = {
   maxAttempts: 3,
@@ -23,8 +25,6 @@ interface TelegramError {
   description?: string;
   parameters?: { retry_after?: number };
 }
-
-// ─── ERROR CLASSIFICATION ─────────────────────────────────────────────────────
 
 interface TelegramAPIErrorResponse {
   response?: {
@@ -45,7 +45,7 @@ function classifyTelegramError(error: TelegramAPIErrorResponse): {
   if (status === 429 || (status === 400 && data.parameters?.retry_after)) {
     const retryAfter = data.parameters?.retry_after || 30;
     return {
-      type: DeliveryErrorType.RATE_LIMITED,
+      type: "RATE_LIMITED" as DeliveryErrorType,
       isRetryable: true,
       retryAfterSeconds: retryAfter,
     };
@@ -54,7 +54,7 @@ function classifyTelegramError(error: TelegramAPIErrorResponse): {
   // User blocked or chat not found
   if (status === 403) {
     return {
-      type: DeliveryErrorType.USER_BLOCKED,
+      type: "USER_BLOCKED" as DeliveryErrorType,
       isRetryable: false,
     };
   }
@@ -62,7 +62,7 @@ function classifyTelegramError(error: TelegramAPIErrorResponse): {
   // Invalid chat ID
   if (status === 404 || data.error_code === 400) {
     return {
-      type: DeliveryErrorType.INVALID_CHAT,
+      type: "INVALID_CHAT" as DeliveryErrorType,
       isRetryable: false,
     };
   }
@@ -70,7 +70,7 @@ function classifyTelegramError(error: TelegramAPIErrorResponse): {
   // Bad request (validation error)
   if (status === 400) {
     return {
-      type: DeliveryErrorType.BAD_REQUEST,
+      type: "BAD_REQUEST" as DeliveryErrorType,
       isRetryable: false,
     };
   }
@@ -78,13 +78,13 @@ function classifyTelegramError(error: TelegramAPIErrorResponse): {
   // Server errors or network issues
   if (status === 502 || status === 503 || !status) {
     return {
-      type: DeliveryErrorType.NETWORK_ERROR,
+      type: "NETWORK_ERROR" as DeliveryErrorType,
       isRetryable: true,
     };
   }
 
   return {
-    type: DeliveryErrorType.UNKNOWN,
+    type: "UNKNOWN" as DeliveryErrorType,
     isRetryable: true,
   };
 }
@@ -339,45 +339,49 @@ export async function sendTelegramWithTracking(
   message: string
 ): Promise<void> {
   // Create initial delivery record
-  let delivery = await prisma.telegramMessageDelivery.create({
-    data: {
-      notificationId,
-      chatId,
-      status: DeliveryStatus.QUEUED,
-    },
-  });
+  const created = await db.insert(telegramMessageDeliveries).values({
+    notificationId,
+    chatId,
+    status: "QUEUED",
+  }).returning();
+
+  let delivery = created[0];
 
   try {
     // Mark as sending
-    delivery = await prisma.telegramMessageDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: DeliveryStatus.SENDING,
+    const updated = await db
+      .update(telegramMessageDeliveries)
+      .set({
+        status: "SENDING",
         lastAttemptAt: new Date(),
-      },
-    });
+      })
+      .where(eq(telegramMessageDeliveries.id, delivery.id))
+      .returning();
+
+    delivery = updated[0];
 
     // Attempt to send
     const result = await sendTelegramViaBotAPI(chatId, message);
 
     // Mark as sent
-    await prisma.telegramMessageDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: DeliveryStatus.SENT,
+    await db
+      .update(telegramMessageDeliveries)
+      .set({
+        status: "SENT",
         messageId: result.messageId,
         sentAt: new Date(),
-      },
-    });
+      })
+      .where(eq(telegramMessageDeliveries.id, delivery.id))
+      .returning();
 
     console.log(`Telegram message sent successfully to ${chatId} (messageId: ${result.messageId})`);
   } catch (error: unknown) {
-    const err = error as { 
-      message?: string; 
-      response?: { 
-        status?: number; 
-        data?: { description?: string }; 
-      } 
+    const err = error as {
+      message?: string;
+      response?: {
+        status?: number;
+        data?: { description?: string };
+      }
     };
     const errorObj = {
       response: {
@@ -394,13 +398,13 @@ export async function sendTelegramWithTracking(
       ? new Date(Date.now() + calculateBackoffDelay(failureCount, retryAfterSeconds))
       : null;
 
-    const status = isRetryable
-      ? DeliveryStatus.TEMPORARILY_FAILED
-      : DeliveryStatus.PERMANENTLY_FAILED;
+    const status: DeliveryStatus = isRetryable
+      ? "TEMPORARILY_FAILED"
+      : "PERMANENTLY_FAILED";
 
-    await prisma.telegramMessageDelivery.update({
-      where: { id: delivery.id },
-      data: {
+    await db
+      .update(telegramMessageDeliveries)
+      .set({
         status,
         errorType: type,
         errorCode: err.response?.status?.toString(),
@@ -408,8 +412,9 @@ export async function sendTelegramWithTracking(
         failureCount,
         lastAttemptAt: new Date(),
         nextRetryAt,
-      },
-    });
+      })
+      .where(eq(telegramMessageDeliveries.id, delivery.id))
+      .returning();
 
     console.error(
       `Telegram delivery failed for ${chatId} [${type}] (attempt ${failureCount}):`,

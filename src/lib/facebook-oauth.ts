@@ -1,4 +1,10 @@
-import prisma from "@/lib/db";
+import {
+  getUserByFacebookId,
+  getUserByEmail,
+  updateUserFacebookId,
+  createUser,
+  findUserByEmailExcluding
+} from "@/lib/db/queries";
 import { generateProfileSetupToken } from "@/lib/profile-setup-token";
 
 export interface FacebookProfile {
@@ -14,11 +20,7 @@ export interface FacebookProfile {
 
 export async function createOrGetFacebookUser(profile: FacebookProfile) {
   // Check if user exists by Facebook ID
-  let user = await prisma.user.findFirst({
-    where: {
-      facebookId: profile.id,
-    },
-  });
+  let user = await getUserByFacebookId(profile.id);
 
   if (user) {
     return { user, isNewUser: false };
@@ -26,17 +28,12 @@ export async function createOrGetFacebookUser(profile: FacebookProfile) {
 
   // Check if user exists by email
   if (profile.email) {
-    user = await prisma.user.findUnique({
-      where: { email: profile.email },
-    });
+    user = await getUserByEmail(profile.email);
 
     if (user) {
       // Link Facebook ID to existing user
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { facebookId: profile.id },
-      });
-      return { user, isNewUser: false, isLinked: true };
+      const updated = await updateUserFacebookId(user.id, profile.id);
+      return { user: updated[0], isNewUser: false, isLinked: true };
     }
   }
 
@@ -45,18 +42,16 @@ export async function createOrGetFacebookUser(profile: FacebookProfile) {
     throw new Error("Facebook email not available");
   }
 
-  user = await prisma.user.create({
-    data: {
-      email: profile.email,
-      facebookId: profile.id,
-      passwordHash: null, // OAuth user has no password
-      profileImageUrl: profile.picture?.data?.url || null,
-      emailVerified: null, // Even if Facebook provided email, mark as unverified
-      role: "PARENT",
-    },
+  const created = await createUser({
+    email: profile.email,
+    facebookId: profile.id,
+    passwordHash: null,
+    profileImageUrl: profile.picture?.data?.url || null,
+    emailVerified: null,
+    role: "PARENT",
   });
 
-  return { user, isNewUser: true };
+  return { user: created[0], isNewUser: true };
 }
 
 export async function getFacebookSetupToken(userId: string) {
@@ -68,12 +63,9 @@ export async function validateFacebookEmailUniqueness(
   email: string,
   excludeUserId?: string
 ) {
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      email,
-      ...(excludeUserId && { id: { not: excludeUserId } }),
-    },
-  });
+  const existingUser = await (excludeUserId
+    ? findUserByEmailExcluding(email, excludeUserId)
+    : getUserByEmail(email));
 
   return !existingUser;
 }

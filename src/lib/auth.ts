@@ -1,7 +1,7 @@
 import { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import FacebookProvider from "next-auth/providers/facebook";
-import prisma from "@/lib/db";
+import { getUserByEmail, getUserByFacebookId } from "@/lib/db/queries";
 import bcrypt from "bcryptjs";
 
 export const authOptions: AuthOptions = {
@@ -21,9 +21,7 @@ export const authOptions: AuthOptions = {
         }
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email },
-          });
+          const user = await getUserByEmail(credentials.email);
 
           if (!user) {
             return null;

@@ -1,4 +1,4 @@
-import prisma from "@/lib/db";
+import { getPublicStudentProfile, getStudentBySlug, getStudentById } from "@/lib/db/queries";
 
 export interface FetchedCompetitionResult {
   registrationId: string;
@@ -66,88 +66,7 @@ export async function fetchPublicStudent(
   slugOrId: string
 ): Promise<FetchedPublicStudent | null> {
   // Try to find by slug first
-  let student = await prisma.student.findUnique({
-    where: { slug: slugOrId.toLowerCase() },
-    include: {
-      externalAchievements: {
-        select: {
-          title: true,
-          eventName: true,
-          category: true,
-          year: true,
-          rank: true,
-          description: true,
-          proofUrl: true,
-        },
-      },
-      registrations: {
-        where: {
-          status: "VERIFIED",
-          certificate: { isNot: null },
-        },
-        include: {
-          certificate: {
-            select: {
-              type: true,
-              certificateUrl: true,
-              issuedAt: true,
-            },
-          },
-          prizeAward: {
-            select: {
-              rank: true,
-              dispatchedAt: true,
-              prizeItem: {
-                select: {
-                  title: true,
-                  description: true,
-                  type: true,
-                  imageUrl: true,
-                },
-              },
-            },
-          },
-          competitionCategory: {
-            include: {
-              competition: {
-                select: {
-                  title: true,
-                  startDate: true,
-                  endDate: true,
-                },
-              },
-              category: {
-                select: {
-                  name: true,
-                  id: true,
-                },
-              },
-            },
-          },
-          judgeAssignments: {
-            include: {
-              judge: {
-                select: {
-                  name: true,
-                  tier: true,
-                },
-              },
-              score: {
-                select: {
-                  criteria1: true,
-                  criteria2: true,
-                  criteria3: true,
-                  criteria4: true,
-                  totalScore: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
+  let student = await getStudentBySlug(slugOrId);
 
   // Fallback to ID lookup if slug not found and looks like a UUID
   if (
@@ -156,88 +75,13 @@ export async function fetchPublicStudent(
       slugOrId
     )
   ) {
-    student = await prisma.student.findUnique({
-      where: { id: slugOrId },
-      include: {
-        externalAchievements: {
-          select: {
-            title: true,
-            eventName: true,
-            category: true,
-            year: true,
-            rank: true,
-            description: true,
-            proofUrl: true,
-          },
-        },
-        registrations: {
-          where: {
-            status: "VERIFIED",
-            certificate: { isNot: null },
-          },
-          include: {
-            certificate: {
-              select: {
-                type: true,
-                certificateUrl: true,
-                issuedAt: true,
-              },
-            },
-            prizeAward: {
-              select: {
-                rank: true,
-                dispatchedAt: true,
-                prizeItem: {
-                  select: {
-                    title: true,
-                    description: true,
-                    type: true,
-                    imageUrl: true,
-                  },
-                },
-              },
-            },
-            competitionCategory: {
-              include: {
-                competition: {
-                  select: {
-                    title: true,
-                    startDate: true,
-                    endDate: true,
-                  },
-                },
-                category: {
-                  select: {
-                    name: true,
-                    id: true,
-                  },
-                },
-              },
-            },
-            judgeAssignments: {
-              include: {
-                judge: {
-                  select: {
-                    name: true,
-                    tier: true,
-                  },
-                },
-                score: {
-                  select: {
-                    criteria1: true,
-                    criteria2: true,
-                    criteria3: true,
-                    criteria4: true,
-                    totalScore: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+    student = await getStudentById(slugOrId);
+  }
+
+  // If still not found, try the full profile query (includes relations)
+  if (!student) {
+    const fullProfile = await getPublicStudentProfile(slugOrId);
+    student = fullProfile;
   }
 
   if (!student || !student.isPublic) {

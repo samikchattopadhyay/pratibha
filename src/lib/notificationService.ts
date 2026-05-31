@@ -1,5 +1,7 @@
-import prisma from "@/lib/db";
-import { NotificationType, NotificationChannel } from "@prisma/client";
+import {
+  getRecentNotificationByTypeAndRegistration,
+  createNotification,
+} from "@/lib/db/queries";
 import {
   sendEmailRegistrationCreated,
   sendEmailPaymentReceived,
@@ -10,6 +12,12 @@ import {
   sendEmailQualificationOffered,
   sendTelegramWithTracking,
 } from "@/lib/notifications";
+import { db } from "@/lib/db/drizzle";
+import { notificationPreferences } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+
+type NotificationType = "REGISTRATION_CREATED" | "PAYMENT_RECEIVED" | "REGISTRATION_VERIFIED" | "REGISTRATION_REJECTED" | "RESULTS_PUBLISHED" | "CERTIFICATE_READY" | "QUALIFICATION_OFFERED" | "QUALIFICATION_EXPIRING" | "JUDGE_ASSIGNED" | "SCORING_REMINDER" | "SCORING_DEADLINE" | "ADMIN_NEW_REGISTRATION" | "ADMIN_PAYMENT_CONFIRMED" | "ADMIN_JUDGE_CONFLICT" | "ADMIN_UNASSIGNED_REGISTRATIONS";
+type NotificationChannel = "IN_APP" | "EMAIL" | "TELEGRAM";
 
 export interface CreateNotificationInput {
   userId: string;
@@ -46,33 +54,28 @@ export async function createAndDispatchNotification(
 
   // Deduplication: prevent duplicate notifications within 60 seconds
   if (registrationId) {
-    const recent = await prisma.notification.findFirst({
-      where: {
-        userId,
-        type,
-        registrationId,
-        createdAt: {
-          gte: new Date(Date.now() - 60_000),
-        },
-      },
-    });
+    const recent = await getRecentNotificationByTypeAndRegistration(
+      userId,
+      type,
+      registrationId,
+      1
+    );
     if (recent) return; // Skip if same notification was created in the last 60 seconds
   }
 
   // Step 1: Create the in-app notification record (always)
-  const notification = await prisma.notification.create({
-    data: {
-      userId,
-      type,
-      title,
-      body,
-      actionUrl,
-      registrationId,
-      assignmentId,
-      certificateId,
-      qualificationId,
-    },
+  const created = await createNotification({
+    userId,
+    type: type as any,
+    title,
+    body,
+    actionUrl,
+    registrationId,
+    assignmentId,
+    certificateId,
+    qualificationId,
   });
+  const notification = created[0];
 
   // Step 2: Dispatch to external channels based on user preferences
   // Fire-and-forget: never await or let external failures block the HTTP response
@@ -98,23 +101,19 @@ async function dispatchToExternalChannels(
 ): Promise<void> {
   // Fetch user preferences for email and Telegram channels
   const [emailPref, telegramPref] = await Promise.all([
-    prisma.notificationPreference.findUnique({
-      where: {
-        userId_type_channel: {
-          userId,
-          type,
-          channel: NotificationChannel.EMAIL,
-        },
-      },
+    db.query.notificationPreferences.findFirst({
+      where: and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.type, type as any),
+        eq(notificationPreferences.channel, "EMAIL" as any)
+      ),
     }),
-    prisma.notificationPreference.findUnique({
-      where: {
-        userId_type_channel: {
-          userId,
-          type,
-          channel: NotificationChannel.TELEGRAM,
-        },
-      },
+    db.query.notificationPreferences.findFirst({
+      where: and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.type, type as any),
+        eq(notificationPreferences.channel, "TELEGRAM" as any)
+      ),
     }),
   ]);
 
