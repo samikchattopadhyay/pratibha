@@ -14,16 +14,7 @@ export default function VerifyEmailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
 
-  useEffect(() => {
-    // If we have the email token from the verification link click
-    if (emailToken) {
-      completeVerification();
-    } else {
-      setIsLoading(false);
-    }
-  }, [emailToken]);
-
-  const completeVerification = async () => {
+  async function completeVerification() {
     try {
       const response = await fetch("/api/auth/setup/verify-email", {
         method: "POST",
@@ -50,7 +41,16 @@ export default function VerifyEmailPage() {
       setError(err.message || "An error occurred");
       setIsLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    // If we have the email token from the verification link click
+    if (emailToken) {
+      completeVerification();
+    } else {
+      setIsLoading(false);
+    }
+  }, [emailToken]);;
 
   const handleResendEmail = async () => {
     setIsResending(true);

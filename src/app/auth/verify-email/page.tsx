@@ -16,17 +16,7 @@ export default function VerifyEmailPage() {
   >("verifying");
   const [error, setError] = useState<string>("");
 
-  useEffect(() => {
-    if (!token || !email) {
-      setStatus("error");
-      setError("Invalid verification link");
-      return;
-    }
-
-    verifyEmail();
-  }, [token, email]);
-
-  const verifyEmail = async () => {
+  async function verifyEmail() {
     try {
       const response = await fetch("/api/auth/verify-email", {
         method: "POST",
@@ -55,7 +45,17 @@ export default function VerifyEmailPage() {
       setError("An unexpected error occurred");
       setStatus("error");
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!token || !email) {
+      setStatus("error");
+      setError("Invalid verification link");
+      return;
+    }
+
+    verifyEmail();
+  }, [token, email]);;
 
   const handleResend = async () => {
     try {
