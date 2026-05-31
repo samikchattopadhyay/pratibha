@@ -50,3 +50,6 @@ next-env.d.ts
 /.open-next/
 
 .env.production
+
+# self-hosted GitHub Actions runner
+/actions-runner/
