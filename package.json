@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack -H 0.0.0.0",
     "build": "next build",
+    "build:cf": "npx opennextjs-cloudflare build && node scripts/post-build-cf.js",
     "build:pages": "@cloudflare/next-on-pages",
     "deploy:pages": "npm run build:pages && wrangler pages deploy .vercel/output/static",
     "build:workers": "npm run build && npx opennextjs-cloudflare build",
