@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+// Production deployment test run
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
