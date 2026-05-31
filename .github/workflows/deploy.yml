@@ -42,9 +42,12 @@ jobs:
 
       - run: npm ci --prefer-offline --no-audit
 
-      - run: npm run lint
+      - name: Lint
+        if: github.event_name == 'pull_request'
+        run: npm run lint
 
       - name: Typecheck
+        if: github.event_name == 'pull_request'
         run: |
           if (Test-Path "tsconfig.json") {
             npx tsc --noEmit
