@@ -1,4 +1,5 @@
 name = "pratibha-parishad"
+account_id = "f4f281db9ef7b38bf04d880e82ced7a7"
 main = ".open-next/worker.js"
 
 # Compatibility settings - required for Node.js APIs
