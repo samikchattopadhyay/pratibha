@@ -115,19 +115,8 @@ if ($DryRun) {
     exit 0
 }
 
-# Prompt for confirmation
-Write-Host "[⚠️  WARNING] You are about to upload $($secretsToUpload.Count) PRODUCTION secrets to GitHub" -ForegroundColor Red
 Write-Host "[INFO] Environment: $Environment" -ForegroundColor Yellow
 Write-Host "[INFO] These secrets REQUIRE APPROVAL before deployment!" -ForegroundColor Yellow
-Write-Host "[INFO] This action CANNOT be undone easily." -ForegroundColor Yellow
-Write-Host ""
-$confirm = Read-Host "Type 'YES I UNDERSTAND' to continue (or anything else to cancel)"
-
-if ($confirm -ne "YES I UNDERSTAND") {
-    Write-Host "[CANCELLED] Upload cancelled." -ForegroundColor Red
-    exit 0
-}
-
 Write-Host ""
 Write-Host "[UPLOADING] Uploading environment secrets to '$Environment'..." -ForegroundColor Cyan
 Write-Host ""
