@@ -42,7 +42,31 @@ GitHub secrets are **encrypted at rest** and **only exposed to workflows**—the
 5. Click **"Add secret"**
 6. Repeat for all secrets
 
-### Option 2: GitHub CLI (Batch Upload)
+### Option 2: Automated Scripts (Recommended)
+
+We provide two PowerShell scripts for secure secret management:
+
+**For Repository Secrets (shared, non-sensitive):**
+```powershell
+.\upload-repo-secrets.ps1              # Upload repository-level secrets
+.\upload-repo-secrets.ps1 -DryRun      # Preview what would be uploaded
+```
+
+**For Environment Secrets (production-critical, requires approval):**
+```powershell
+.\upload-env-secrets.ps1               # Upload to production environment
+.\upload-env-secrets.ps1 -DryRun       # Preview what would be uploaded
+.\upload-env-secrets.ps1 -Environment preview  # Upload to preview instead
+```
+
+These scripts:
+- Read from your `.env.secrets` file (locally only, never committed)
+- Upload only the appropriate secrets to the correct level
+- Validate GitHub CLI is installed
+- Require confirmation before uploading
+- Delete `.env.secrets` after successful upload (optional)
+
+### Option 3: GitHub CLI Manual Commands
 
 First, ensure you have the `gh` CLI installed: https://cli.github.com/
 
@@ -158,15 +182,20 @@ const databaseUrl = process.env.DATABASE_URL;
 
 ✅ **DO:**
 - Store all sensitive values in GitHub Secrets, never in code
+- Use **Repository Secrets** for non-sensitive, shared values (API keys, etc.)
+- Use **Environment Secrets** for production-critical secrets (database, auth tokens)
+- Require reviewers/approval for environment secrets before deployment
 - Rotate API tokens periodically
-- Use environment-specific secrets (production vs. preview)
 - Review secret usage in `.github/workflows/deploy.yml`
+- Use the provided scripts (`upload-repo-secrets.ps1`, `upload-env-secrets.ps1`)
 
 ❌ **DON'T:**
 - Commit `.env` files with real secrets
+- Store production-critical secrets as repository secrets
 - Paste secrets in pull request descriptions or comments
 - Share secrets via email or chat
-- Use the same secret across multiple environments
+- Use the same secret across multiple environments without scoping
+- Use the deprecated `upload-github-secrets.ps1` script (use the two new scripts instead)
 
 ---
 
