@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 // Production deployment test run
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   images: {
     remotePatterns: [
       {
