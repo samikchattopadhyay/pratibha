@@ -18,6 +18,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://pratibha-parishad.workers.dev"),
   title: "Pratibha Parishad | Global Council for Indian Fine Arts",
   description:
     "Earning verified digital fine arts certifications and participating in global Indian fine arts competitions online. Join Recitation, Singing, Dance, Drawing, and Instrumental contests.",

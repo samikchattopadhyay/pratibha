@@ -3,8 +3,14 @@ import path from "path";
 
 // Production deployment test run
 const nextConfig: NextConfig = {
+  cacheMaxMemorySize: 0,
+  onDemandEntries: {
+    maxInactiveAge: 60 * 1000,
+    pagesBufferLength: 5,
+  },
   turbopack: {
     root: path.resolve(__dirname),
+    cacheDir: ".next/cache/turbopack",
   },
   images: {
     remotePatterns: [
