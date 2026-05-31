@@ -104,7 +104,7 @@ jobs:
 
   # ── 3. Deploy App ───────────────────────────────────────────────────
   deploy:
-    name: Deploy to Cloudflare Pages
+    name: Deploy to Cloudflare Workers
     needs: build
     runs-on: [self-hosted, Windows]
     environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
@@ -134,75 +134,9 @@ jobs:
             Expand-Archive -Path next-build.zip -DestinationPath .open-next -Force
           }
 
-      - name: Create Cloudflare Pages Project
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy to Cloudflare Workers
         run: |
-          try {
-            npx wrangler pages project create pratibha-parishad --production-branch main
-            Write-Host "✅ Project created successfully"
-          } catch {
-            Write-Host "⚠️ Project creation failed (may already exist)"
-            Write-Host "Error: $_"
-          }
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Push Secrets to Cloudflare Workers
-        if: github.ref == 'refs/heads/main'
-        run: |
-          $secrets = @{
-            "DATABASE_URL"             = $env:DATABASE_URL
-            "NEXTAUTH_SECRET"          = $env:NEXTAUTH_SECRET
-            "BREVO_API_KEY"            = $env:BREVO_API_KEY
-            "RAZORPAY_KEY_ID"          = $env:RAZORPAY_KEY_ID
-            "RAZORPAY_KEY_SECRET"      = $env:RAZORPAY_KEY_SECRET
-            "CRON_SECRET"              = $env:CRON_SECRET
-            "R2_ACCESS_KEY_ID"         = $env:R2_ACCESS_KEY_ID
-            "R2_SECRET_ACCESS_KEY"     = $env:R2_SECRET_ACCESS_KEY
-            "FACEBOOK_APP_ID"          = $env:FACEBOOK_APP_ID
-            "FACEBOOK_APP_SECRET"      = $env:FACEBOOK_APP_SECRET
-            "TELEGRAM_BOT_TOKEN"       = $env:TELEGRAM_BOT_TOKEN
-            "NEXTAUTH_URL"             = $env:NEXTAUTH_URL
-          }
-          
-          # Filter out empty values
-          $filtered = @{}
-          foreach ($k in $secrets.Keys) {
-            if (-not [string]::IsNullOrEmpty($secrets[$k])) {
-              $filtered[$k] = $secrets[$k]
-            }
-          }
-          
-          $json = $filtered | ConvertTo-Json -Compress
-          Set-Content -Path "secrets.json" -Value $json -NoNewline
-          try {
-            npx wrangler pages secret bulk secrets.json --project-name pratibha-parishad
-            Write-Host "✅ Bulk Pages secrets upload successful."
-          } finally {
-            Remove-Item -Force "secrets.json" -ErrorAction SilentlyContinue
-          }
-        env:
-          CLOUDFLARE_API_TOKEN:     ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID:    ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DATABASE_URL:             ${{ secrets.DATABASE_URL }}
-          NEXTAUTH_SECRET:          ${{ secrets.NEXTAUTH_SECRET }}
-          BREVO_API_KEY:            ${{ secrets.BREVO_API_KEY }}
-          RAZORPAY_KEY_ID:          ${{ secrets.RAZORPAY_KEY_ID }}
-          RAZORPAY_KEY_SECRET:      ${{ secrets.RAZORPAY_KEY_SECRET }}
-          CRON_SECRET:              ${{ secrets.CRON_SECRET }}
-          R2_ACCESS_KEY_ID:         ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY:     ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          FACEBOOK_APP_ID:          ${{ secrets.FACEBOOK_APP_ID }}
-          FACEBOOK_APP_SECRET:      ${{ secrets.FACEBOOK_APP_SECRET }}
-          TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          NEXTAUTH_URL:             "https://pratibha-parishad.pages.dev"
-
-      - name: Deploy to Cloudflare Pages
-        run: |
-          Remove-Item -Force wrangler.toml -ErrorAction SilentlyContinue
-          Remove-Item -Force wrangler.jsonc -ErrorAction SilentlyContinue
-          npx wrangler pages deploy .open-next --project-name pratibha-parishad --branch ${{ github.ref_name }}
+          npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN:     ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID:    ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
