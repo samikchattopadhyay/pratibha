@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     root: path.resolve(__dirname),
-    cacheDir: ".next/cache/turbopack",
   },
   images: {
     remotePatterns: [
