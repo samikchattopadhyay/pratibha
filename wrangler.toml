@@ -16,21 +16,24 @@ main = "./.open-next/worker.js"
 
 # Environment-specific configuration
 [env.production]
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", NEXTAUTH_URL = "https://pratibha-parishad.workers.dev" }
+# Update NEXTAUTH_URL to your custom domain if configured in Cloudflare
 
 [env.preview]
-vars = { ENVIRONMENT = "preview" }
+vars = { ENVIRONMENT = "preview", NEXTAUTH_URL = "https://preview.pratibha-parishad.workers.dev" }
 
 # Secrets (set via wrangler secret put or Cloudflare UI)
-# These will be injected at runtime and NOT visible in code
-# DATABASE_URL
-# NEXTAUTH_SECRET
-# BREVO_API_KEY
-# RAZORPAY_KEY_ID
-# RAZORPAY_KEY_SECRET
-# CRON_SECRET
-# R2_ACCESS_KEY_ID
-# R2_SECRET_ACCESS_KEY
-# FACEBOOK_APP_ID
-# FACEBOOK_APP_SECRET
-# TELEGRAM_BOT_TOKEN
+# Environment-level secrets (set in GitHub Actions as protected environment):
+# - DATABASE_URL
+# - NEXTAUTH_SECRET
+#
+# Repository-level secrets:
+# - BREVO_API_KEY
+# - RAZORPAY_KEY_ID (optional)
+# - RAZORPAY_KEY_SECRET (optional)
+# - CRON_SECRET
+# - R2_ACCESS_KEY_ID
+# - R2_SECRET_ACCESS_KEY
+# - FACEBOOK_APP_ID
+# - FACEBOOK_APP_SECRET
+# - TELEGRAM_BOT_TOKEN (optional)
