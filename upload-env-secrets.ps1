@@ -26,14 +26,6 @@ if ($Help) {
 
 $ErrorActionPreference = "Stop"
 
-# Secrets that go to ENVIRONMENT level (production-critical)
-$environmentSecrets = @(
-    'CLOUDFLARE_API_TOKEN',
-    'CLOUDFLARE_ACCOUNT_ID',
-    'DATABASE_URL',
-    'NEXTAUTH_SECRET'
-)
-
 Write-Host "[GITHUB ENVIRONMENT SECRETS UPLOAD]" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Environment: $Environment" -ForegroundColor Yellow
@@ -47,8 +39,8 @@ if (-not (Test-Path ".env.secrets")) {
     exit 1
 }
 
-# Read .env.secrets file and parse key=value pairs
-$allSecrets = @{}
+# Read .env.secrets file and parse key=value@LEVEL pairs
+$secretsToUpload = @{}
 Get-Content ".env.secrets" | ForEach-Object {
     $line = $_.Trim()
 
@@ -57,30 +49,28 @@ Get-Content ".env.secrets" | ForEach-Object {
         return
     }
 
-    # Parse KEY=VALUE
+    # Parse KEY=value@LEVEL
     if ($line.Contains("=")) {
         $parts = $line -split "=", 2
         $key = $parts[0].Trim()
-        $value = $parts[1].Trim()
+        $fullValue = $parts[1].Trim()
 
-        # Only add non-empty values
-        if (-not [string]::IsNullOrWhiteSpace($value)) {
-            $allSecrets[$key] = $value
+        # Extract level marker (@REPO, @ENV, @LOCAL)
+        if ($fullValue -match "@(REPO|ENV|LOCAL)$") {
+            $level = $matches[1]
+            $value = $fullValue -replace "@(REPO|ENV|LOCAL)$", ""
+
+            # Only include @ENV level secrets for this script
+            if ($level -eq "ENV" -and -not [string]::IsNullOrWhiteSpace($value)) {
+                $secretsToUpload[$key] = $value
+            }
         }
     }
 }
 
-# Filter only environment-level secrets
-$secretsToUpload = @{}
-foreach ($key in $environmentSecrets) {
-    if ($allSecrets.ContainsKey($key)) {
-        $secretsToUpload[$key] = $allSecrets[$key]
-    }
-}
-
 if ($secretsToUpload.Count -eq 0) {
-    Write-Host "[WARN] No environment secrets found in .env.secrets!" -ForegroundColor Yellow
-    Write-Host "[INFO] Expected secrets: $($environmentSecrets -join ', ')" -ForegroundColor Yellow
+    Write-Host "[WARN] No environment-level secrets found in .env.secrets!" -ForegroundColor Yellow
+    Write-Host "[INFO] Make sure secrets are marked with @ENV suffix (e.g., KEY=value@ENV)" -ForegroundColor Yellow
     exit 1
 }
 

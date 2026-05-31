@@ -23,22 +23,6 @@ if ($Help) {
 
 $ErrorActionPreference = "Stop"
 
-# Secrets that go to REPOSITORY level (shared, non-sensitive)
-$repositorySecrets = @(
-    'BREVO_API_KEY',
-    'NEXTAUTH_URL',
-    'RESEND_FROM_EMAIL',
-    'RAZORPAY_KEY_ID',
-    'RAZORPAY_KEY_SECRET',
-    'CRON_SECRET',
-    'R2_ACCESS_KEY_ID',
-    'R2_SECRET_ACCESS_KEY',
-    'FACEBOOK_APP_ID',
-    'FACEBOOK_APP_SECRET',
-    'TELEGRAM_BOT_TOKEN',
-    'FROM_EMAIL'
-)
-
 Write-Host "[GITHUB REPOSITORY SECRETS UPLOAD]" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Scope: Repository-level (all workflows)" -ForegroundColor Yellow
@@ -51,8 +35,8 @@ if (-not (Test-Path ".env.secrets")) {
     exit 1
 }
 
-# Read .env.secrets file and parse key=value pairs
-$allSecrets = @{}
+# Read .env.secrets file and parse key=value@LEVEL pairs
+$secretsToUpload = @{}
 Get-Content ".env.secrets" | ForEach-Object {
     $line = $_.Trim()
 
@@ -61,30 +45,28 @@ Get-Content ".env.secrets" | ForEach-Object {
         return
     }
 
-    # Parse KEY=VALUE
+    # Parse KEY=value@LEVEL
     if ($line.Contains("=")) {
         $parts = $line -split "=", 2
         $key = $parts[0].Trim()
-        $value = $parts[1].Trim()
+        $fullValue = $parts[1].Trim()
 
-        # Only add non-empty values
-        if (-not [string]::IsNullOrWhiteSpace($value)) {
-            $allSecrets[$key] = $value
+        # Extract level marker (@REPO, @ENV, @LOCAL)
+        if ($fullValue -match "@(REPO|ENV|LOCAL)$") {
+            $level = $matches[1]
+            $value = $fullValue -replace "@(REPO|ENV|LOCAL)$", ""
+
+            # Only include @REPO level secrets for this script
+            if ($level -eq "REPO" -and -not [string]::IsNullOrWhiteSpace($value)) {
+                $secretsToUpload[$key] = $value
+            }
         }
     }
 }
 
-# Filter only repository-level secrets
-$secretsToUpload = @{}
-foreach ($key in $repositorySecrets) {
-    if ($allSecrets.ContainsKey($key)) {
-        $secretsToUpload[$key] = $allSecrets[$key]
-    }
-}
-
 if ($secretsToUpload.Count -eq 0) {
-    Write-Host "[WARN] No repository secrets found in .env.secrets!" -ForegroundColor Yellow
-    Write-Host "[INFO] Expected secrets: $($repositorySecrets -join ', ')" -ForegroundColor Yellow
+    Write-Host "[WARN] No repository-level secrets found in .env.secrets!" -ForegroundColor Yellow
+    Write-Host "[INFO] Make sure secrets are marked with @REPO suffix (e.g., KEY=value@REPO)" -ForegroundColor Yellow
     exit 1
 }
 
