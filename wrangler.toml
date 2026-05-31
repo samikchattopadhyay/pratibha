@@ -8,15 +8,6 @@ compatibility_flags = ["nodejs_compat"]
 
 [build]
 command = "npm ci --prefer-offline --no-audit && npm run build && npx opennextjs-cloudflare build"
-cwd = "."
-
-[build.upload]
-format = "service-worker"
-
-[build.upload.rules]
-type = "CompiledContentType"
-globs = ["**/*.wasm"]
-fallthrough = true
 
 # Environment-specific configuration
 [env.production]

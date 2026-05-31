@@ -36,7 +36,7 @@ export async function GET(
       prizePool: {
         title: competition.prizePool.title,
         description: competition.prizePool.description,
-        items: competition.prizePool.items.map((item) => ({
+        items: competition.prizePool.items.map((item: any) => ({
           id: item.id,
           rank: item.rank,
           type: item.type,
