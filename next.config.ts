@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 // Production deployment test run
 const nextConfig: NextConfig = {
@@ -9,7 +8,7 @@ const nextConfig: NextConfig = {
     pagesBufferLength: 5,
   },
   turbopack: {
-    root: path.resolve(__dirname),
+    root: process.cwd(),
   },
   images: {
     remotePatterns: [
